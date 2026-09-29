@@ -2173,6 +2173,12 @@ export function Email({ ctx }: { ctx: AppContext }) {
     integrations = useResource("/integrations", ctx.refresh),
     [edit, setEdit] = useState<Data | null>(null);
   const providers = ["gmail", "outlook", "imap"];
+  const reloadIntegrations = integrations.reload;
+  useEffect(() => {
+    // OAuth completes in the system browser; refresh its outcome on return.
+    window.addEventListener("focus", reloadIntegrations);
+    return () => window.removeEventListener("focus", reloadIntegrations);
+  }, [reloadIntegrations]);
   return (
     <>
       <SectionTitle
@@ -2358,7 +2364,9 @@ export function IntegrationEditor({
       description={
         imap
           ? "Use an application password where your provider requires one. It is stored in macOS Keychain. Save & connect authenticates and reads recent messages; it never sends email."
-          : "Register your OAuth application and set its loopback redirect URI. Connecting opens your provider’s authorization page."
+          : p === "gmail"
+            ? "Use a Desktop app OAuth client from Google Cloud. Copy the client ID and client secret from that same client. These identify Meridian; they are not your Gmail password."
+            : "Register your OAuth application and set its loopback redirect URI. Connecting opens your provider’s authorization page."
       }
       fields={
         imap
@@ -2393,15 +2401,25 @@ export function IntegrationEditor({
               { key: "client_id", label: "OAuth client ID", required: true },
               {
                 key: "secret",
-                label: "Client secret (if required by your app)",
+                label:
+                  p === "gmail"
+                    ? "Google OAuth client secret"
+                    : "Client secret (if required by your app)",
                 type: "password",
-                hint: "Stored only in macOS Keychain. Leave blank to keep the existing secret.",
+                hint:
+                  p === "gmail"
+                    ? "Use client_secret from the same Google Desktop app client. Stored in macOS Keychain. Leave blank only if already saved."
+                    : "Stored only in macOS Keychain. Leave blank to keep the existing secret.",
               },
-              {
-                key: "tenant",
-                label: "Microsoft tenant (Outlook only)",
-                hint: "Use common for personal or organizational accounts.",
-              },
+              ...(p === "outlook"
+                ? [
+                    {
+                      key: "tenant",
+                      label: "Microsoft tenant",
+                      hint: "Use common for personal or organizational accounts.",
+                    },
+                  ]
+                : []),
             ]
       }
       initial={{

@@ -265,6 +265,42 @@ OAUTH = {
 }
 
 
+def oauth_exchange_error(provider: str, response: httpx.Response) -> str:
+    """Explain known OAuth failures without echoing credentials or provider payloads."""
+    name = "Google" if provider == "gmail" else "Microsoft"
+    try:
+        payload = response.json()
+    except ValueError:
+        payload = {}
+    if not isinstance(payload, dict):
+        payload = {}
+    code = payload.get("error")
+    description = payload.get("error_description", "")
+    if (
+        code == "invalid_request"
+        and isinstance(description, str)
+        and "client_secret" in description.lower()
+        and re.search(r"missing|required", description, re.IGNORECASE)
+    ):
+        return (
+            f"{name} requires the OAuth client secret. In Meridian, open Email > Manage connection and paste "
+            "the client secret from the same OAuth client as the client ID, then Save & authorize again. "
+            "This is not your email password."
+        )
+    messages = {
+        "invalid_client": "The OAuth client ID or client secret was rejected. Use both values from the same registered client.",
+        "invalid_grant": "The authorization code expired, was already used, or failed verification. Start Save & authorize again; do not refresh the callback page.",
+        "redirect_uri_mismatch": "The redirect URI does not match the OAuth client. For Gmail, use a Desktop app client and start authorization again.",
+        "unauthorized_client": "This OAuth client is not allowed to use this authorization flow. Check the registered application type.",
+        "access_denied": "Email access was not authorized. Start Save & authorize again when you are ready.",
+        "invalid_scope": "The provider rejected the requested read-only email permission. Check the OAuth application's permitted scopes.",
+        "invalid_request": "The provider rejected the authorization request. Check the OAuth client ID, its required client secret, and registered redirect URI.",
+    }
+    if isinstance(code, str) and code in messages:
+        return f"{name} authorization failed ({code}). {messages[code]}"
+    return f"{name} token exchange failed (HTTP {response.status_code}). Check the OAuth client configuration and try again."
+
+
 class MailService:
     def __init__(self, db, secrets_store: SecretStore):
         self.db, self.secrets = db, secrets_store
@@ -320,10 +356,26 @@ class MailService:
                 params["login_hint"] = expected_email
         return OAUTH[provider]["authorize"] + "?" + urlencode(params)
 
-    async def callback(self, state, code):
+    async def callback(self, state, code, authorization_error=""):
         pending = self.pending.pop(state, None)
         if not pending or pending["expires"] < time.time():
             raise ValueError("OAuth state is invalid or expired. Start connection again.")
+        try:
+            if authorization_error or not code:
+                raise ValueError(
+                    "Email access was not authorized. Return to Meridian and start Save & authorize again."
+                )
+            return await self._complete_authorization(pending, code)
+        except (ValueError, httpx.HTTPError) as exc:
+            message = (
+                "Could not reach the email provider. Check your connection and start Save & authorize again."
+                if isinstance(exc, httpx.HTTPError)
+                else str(exc)
+            )
+            self.db.execute("UPDATE integrations SET last_error=? WHERE provider=?", (message, pending["provider"]))
+            raise ValueError(message) from None
+
+    async def _complete_authorization(self, pending, code):
         provider = pending["provider"]
         config = self.config(provider)
         expected_email = self.expected_gmail_address(config) if provider == "gmail" else ""
@@ -342,8 +394,13 @@ class MailService:
         async with httpx.AsyncClient(timeout=30) as client:
             response = await client.post(OAUTH[provider]["token"], data=data)
             if response.status_code != 200:
-                raise ValueError("OAuth token exchange failed. Check the registered client and redirect URI.")
-            tokens = response.json()
+                raise ValueError(oauth_exchange_error(provider, response))
+            try:
+                tokens = response.json()
+            except ValueError:
+                raise ValueError(
+                    "OAuth token exchange returned an invalid response. Start authorization again."
+                ) from None
             if (
                 not isinstance(tokens, dict)
                 or not isinstance(tokens.get("access_token"), str)

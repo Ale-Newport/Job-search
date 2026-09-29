@@ -179,3 +179,59 @@ def test_text_drafts_only_trusted_facts(api):
     ).json()
     assert answer["requires_review"] is True
     assert answer["facts_used"] == [fact["id"]]
+
+
+def test_oauth_callback_shows_recoverable_error_without_leaking_provider_payload(api, monkeypatch):
+    from urllib.parse import parse_qs, urlparse
+    import httpx
+
+    api.put("/api/integrations/gmail", json={"config": {"client_id": "desktop-client"}})
+    authorization = api.post("/api/integrations/gmail/connect").json()["url"]
+    state = parse_qs(urlparse(authorization).query)["state"][0]
+    original = httpx.AsyncClient
+
+    def respond(request):
+        return httpx.Response(
+            400,
+            json={
+                "error": "invalid_request",
+                "error_description": "client_secret is missing. private-provider-details",
+                "access_token": "private-token",
+            },
+        )
+
+    monkeypatch.setattr(
+        "jobagent.mail.httpx.AsyncClient", lambda **kwargs: original(transport=httpx.MockTransport(respond), **kwargs)
+    )
+    response = api.get(
+        "/api/oauth/callback", params={"state": state, "code": "private-code"}, headers={"Authorization": ""}
+    )
+    assert response.status_code == 400
+    assert response.headers["content-type"].startswith("text/html")
+    assert response.headers["cache-control"] == "no-store"
+    assert response.headers["referrer-policy"] == "no-referrer"
+    assert "requires the OAuth client secret" in response.text
+    assert "private-" not in response.text
+    row = api.get("/api/integrations").json()["items"][0]
+    assert "requires the OAuth client secret" in row["last_error"]
+    assert row["status"] == "configured"
+    repeated = api.get("/api/oauth/callback", params={"state": state, "code": "private-code"})
+    assert "invalid or expired" in repeated.text
+
+
+def test_oauth_denial_requires_valid_state_and_is_single_use(api):
+    from urllib.parse import parse_qs, urlparse
+
+    api.put("/api/integrations/gmail", json={"config": {"client_id": "desktop-client"}})
+    authorization = api.post("/api/integrations/gmail/connect").json()["url"]
+    state = parse_qs(urlparse(authorization).query)["state"][0]
+    forged = api.get("/api/oauth/callback", params={"state": "wrong", "error": "access_denied"})
+    assert forged.status_code == 400
+    assert api.get("/api/integrations").json()["items"][0]["last_error"] is None
+    denied = api.get("/api/oauth/callback", params={"state": state, "error": "<script>private-error</script>"})
+    assert denied.status_code == 400
+    assert "Email access was not authorized" in denied.text
+    assert "private-error" not in denied.text
+    assert "<script>" not in denied.text
+    assert api.get("/api/integrations").json()["items"][0]["last_error"]
+    assert state not in api.app.state.mail.pending

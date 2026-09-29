@@ -46,7 +46,7 @@ Search profiles include editable scoring weights and explicit role, technology, 
 
 Meridian reads mail; it has no automatic email-send function.
 
-- **Gmail:** register a desktop OAuth client in your Google Cloud project, enable Gmail API and add yourself as a test user when applicable. Configure the client ID and, if supplied by Google, the client secret in the secret field. Connect opens Google's consent page with the `gmail.readonly` scope. Tokens live in macOS Keychain. Desktop OAuth clients allow a loopback callback on the local service's ephemeral port.
+- **Gmail:** register a desktop OAuth client in your Google Cloud project, enable Gmail API and add yourself as a test user when applicable. Copy `client_id` and `client_secret` from the same downloaded Desktop app client JSON into the corresponding fields; the client secret is not your Gmail password. Leave the secret blank only to keep an existing saved value. Connect opens Google's consent page with the `gmail.readonly` scope. Tokens and client secrets live in macOS Keychain. Desktop OAuth clients allow a loopback callback on the local service's ephemeral port. See [Google's desktop OAuth documentation](https://developers.google.com/identity/protocols/oauth2/native-app).
 - **Outlook:** register a public/native Microsoft identity application with delegated `Mail.Read` and `offline_access`. Register `http://localhost/api/oauth/callback` under Mobile and desktop applications. Meridian uses that path with an ephemeral port, which Microsoft ignores when matching localhost redirects. Tenant policy may require administrator consent. The authorization-code flow uses PKCE. See [Microsoft redirect URI rules](https://learn.microsoft.com/entra/identity-platform/reply-url).
 - **IMAP:** configure a TLS server, port (normally 993), username and folder. Put an app password in the separate secret field, then Connect. IMAP reads with `BODY.PEEK` and does not mark messages read.
 
@@ -111,6 +111,7 @@ If the app bundle succeeds but Tauri's Finder styling step fails while making th
 - **Form stopped:** inspect the run and human task. Complete CAPTCHA, login, MFA or unsupported controls yourself, then resume. An uncertain submission needs reconciliation first.
 - **No jobs found:** inspect source health and the board identifier. Career websites may change structure or require human access. Public sources need network connectivity.
 - **Email not linked:** open the email and choose the application. Similar roles at the same company intentionally remain ambiguous.
+- **Google rejects the connection:** the callback page and Gmail card now retain a safe, actionable reason. For a missing client secret, use the secret from the same Desktop app client JSON as the ID, then start Save & authorize again. A used or expired authorization code requires a new authorization; reloading the callback does not retry it. Return to Meridian and use Sync inbox after the account is verified.
 - **Keychain unavailable:** Meridian does not fall back to plaintext credential storage. Unlock the login Keychain and approve the operating-system prompt if requested.
 - **Offline:** local profile, documents, jobs, history and analytics remain available. Network operations report their errors without removing saved data.
 

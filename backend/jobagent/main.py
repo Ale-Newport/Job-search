@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import hmac
+import html
 import json
 import logging
 import os
@@ -266,12 +267,24 @@ def create_app(data_dir: Path | None = None, token: str | None = None, secret_st
 
     @app.get("/api/oauth/callback", response_class=HTMLResponse)
     async def oauth_callback(state: str = "", code: str = "", error: str = ""):
-        if error or not code:
+        try:
+            await app.state.mail.callback(state, code, error)
+        except ValueError as exc:
             return HTMLResponse(
-                "<h1>Authorization was not completed</h1><p>Return to Meridian to try again.</p>", status_code=400
+                "<!doctype html><html lang='en'><head><meta charset='utf-8'>"
+                "<meta name='viewport' content='width=device-width, initial-scale=1'>"
+                "<title>Meridian · Email connection</title></head>"
+                "<body style='font:18px system-ui;max-width:640px;margin:12vh auto;padding:24px'>"
+                "<h1>Email connection needs attention</h1>"
+                f"<p>{html.escape(str(exc))}</p>"
+                "<p>You can close this tab and return to Meridian → Email.</p></body></html>",
+                status_code=400,
+                headers={"Cache-Control": "no-store", "Referrer-Policy": "no-referrer"},
             )
-        await app.state.mail.callback(state, code)
-        return HTMLResponse("<h1>Email connected</h1><p>You can close this window and return to Meridian.</p>")
+        return HTMLResponse(
+            "<h1>Email connected</h1><p>Return to Meridian and choose Sync inbox to complete the first sync.</p>",
+            headers={"Cache-Control": "no-store", "Referrer-Policy": "no-referrer"},
+        )
 
     @app.post("/api/email/sync")
     async def email_sync():

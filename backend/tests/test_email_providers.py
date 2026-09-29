@@ -28,6 +28,7 @@ async def test_oauth_pkce_state_single_use_and_vault_only(tmp_path, monkeypatch)
         (json.dumps({"client_id": "desktop-client"}),),
     )
     vault = Vault()
+    vault.set("gmail:client_secret", "test-desktop-client-secret")
     service = MailService(db, vault)
     url = service.connect("gmail", "http://127.0.0.1:12345/api/oauth/callback")
     query = parse_qs(urlparse(url).query)
@@ -45,6 +46,7 @@ async def test_oauth_pkce_state_single_use_and_vault_only(tmp_path, monkeypatch)
         form = parse_qs(request.content.decode())
         assert "code_verifier" in form
         assert form["grant_type"] == ["authorization_code"]
+        assert form["client_secret"] == ["test-desktop-client-secret"]
         return httpx.Response(
             200,
             json={"access_token": "secret-access-token", "refresh_token": "secret-refresh-token", "expires_in": 3600},
@@ -197,3 +199,75 @@ async def test_readonly_provider_import_and_dedup(tmp_path, monkeypatch, provide
     assert second["imported"] == 0
     assert len(db.query("SELECT * FROM email_messages")) == 1
     assert db.one("SELECT classification FROM email_messages")["classification"] == "APPLICATION_CONFIRMATION"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("payload", "expected"),
+    [
+        (
+            {"error": "invalid_request", "error_description": "client_secret is missing."},
+            "requires the OAuth client secret",
+        ),
+        ({"error": "invalid_client"}, "client ID or client secret was rejected"),
+        ({"error": "invalid_grant"}, "Start Save & authorize again"),
+        ({"error": "redirect_uri_mismatch"}, "Desktop app client"),
+        ({"error": "invalid_request"}, "required client secret"),
+        ({"error": {"untrusted": "secret-payload"}}, "HTTP 400"),
+        (["secret-payload"], "HTTP 400"),
+        (None, "HTTP 400"),
+    ],
+)
+async def test_oauth_failures_are_actionable_persisted_and_redacted(tmp_path, monkeypatch, payload, expected):
+    db = Database(tmp_path / "mail.db")
+    db.execute(
+        "INSERT INTO integrations(id,provider,config,status) VALUES('g','gmail',?,'configured')",
+        (json.dumps({"client_id": "desktop-client"}),),
+    )
+    vault = Vault()
+    service = MailService(db, vault)
+    query = parse_qs(urlparse(service.connect("gmail", "http://127.0.0.1:12345/api/oauth/callback")).query)
+
+    def respond(request):
+        assert request.url == "https://oauth2.googleapis.com/token"
+        if payload is None:
+            return httpx.Response(400, text="<html>secret-payload</html>")
+        body = dict(payload, access_token="secret-payload") if isinstance(payload, dict) else payload
+        return httpx.Response(400, json=body)
+
+    original = httpx.AsyncClient
+    monkeypatch.setattr(
+        "jobagent.mail.httpx.AsyncClient", lambda **kwargs: original(transport=httpx.MockTransport(respond), **kwargs)
+    )
+    with pytest.raises(ValueError, match=expected) as exc:
+        await service.callback(query["state"][0], "private-code")
+    row = db.one("SELECT status,last_error FROM integrations WHERE provider='gmail'")
+    assert row["last_error"] == str(exc.value)
+    assert row["status"] == "configured"
+    assert vault.data == {}
+    assert "secret-payload" not in row["last_error"]
+    assert "private-code" not in row["last_error"]
+    with pytest.raises(ValueError, match="invalid or expired"):
+        await service.callback(query["state"][0], "private-code")
+
+
+@pytest.mark.asyncio
+async def test_oauth_network_failure_does_not_leak_request_details(tmp_path, monkeypatch):
+    db = Database(tmp_path / "mail.db")
+    db.execute(
+        "INSERT INTO integrations(id,provider,config,status) VALUES('g','gmail',?,'configured')",
+        (json.dumps({"client_id": "desktop-client"}),),
+    )
+    service = MailService(db, Vault())
+    query = parse_qs(urlparse(service.connect("gmail", "http://127.0.0.1:12345/api/oauth/callback")).query)
+
+    def respond(request):
+        raise httpx.ConnectError("private-request-details", request=request)
+
+    original = httpx.AsyncClient
+    monkeypatch.setattr(
+        "jobagent.mail.httpx.AsyncClient", lambda **kwargs: original(transport=httpx.MockTransport(respond), **kwargs)
+    )
+    with pytest.raises(ValueError, match="Could not reach the email provider"):
+        await service.callback(query["state"][0], "private-code")
+    assert "private-request-details" not in db.one("SELECT last_error FROM integrations")["last_error"]

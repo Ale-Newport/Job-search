@@ -1,0 +1,27 @@
+{
+  "measured_at": "2026-09-29T12:15:09.600368+00:00",
+  "installation_path": "/Users/alejandro/Library/Application Support/Meridian/models/laya-runtime/bin/localdecide",
+  "revision": "9060f073e7836d6f10a6b0596f362e362f32107e",
+  "model": "ichenney/laya-browser-v32b",
+  "model_downloaded": true,
+  "managed_pid": 50887,
+  "runtime": "laya-mlx",
+  "memory_mb": 1487.91,
+  "probe": {
+    "engine": "laya",
+    "available": true,
+    "model_downloaded": true,
+    "runtime": "laya-mlx",
+    "memory_mb": null,
+    "model": "localdecide",
+    "latency_ms": 1054.8,
+    "hardware": "Darwin arm64",
+    "inference_verified": true,
+    "operation": "TYPE_TEXT",
+    "target": 1,
+    "correct_target": true,
+    "installed_runtimes": []
+  },
+  "final_state": "installed",
+  "service_left_running": false
+}

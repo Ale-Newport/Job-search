@@ -1,0 +1,15 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><title>Greenhouse-style local fixture</title>
+<style>body{font:16px system-ui;padding:32px}label{display:block;margin:14px 0}input,select,button{padding:8px}fieldset{margin:20px 0}</style>
+<h1>Software Engineer — Example Company</h1><p>Local mock application. No information leaves this test server.</p>
+<form id="application">
+<label>First name <input name="job_application[first_name]" required></label>
+<label>Last name <input name="job_application[last_name]" required></label>
+<label>Email <input name="job_application[email]" type="email" required></label>
+<label>Country <select name="country" required><option value="">Select</option><option value="gb">United Kingdom</option><option value="es">Spain</option></select></label>
+<fieldset><legend>Willing to relocate</legend><label><input type="radio" name="relocation" value="yes" required>Yes</label><label><input type="radio" name="relocation" value="no">No</label></fieldset>
+<label>Resume <input type="file" name="resume" required></label>
+<label><input type="checkbox" name="privacy" required>I agree to the privacy policy</label>
+<button type="submit">Submit application</button>
+</form>
+<script>window.submissions=0;document.querySelector('form').addEventListener('submit',event=>{event.preventDefault();window.submissions++;document.body.innerHTML='<h1>Thank you for applying</h1><p>Your application has been received. Confirmation GH-MOCK-001.</p>'})</script>
+</html>

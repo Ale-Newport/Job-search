@@ -1,0 +1,71 @@
+{
+  "engine": "laya",
+  "fixture": "local_application_email",
+  "page": "http://127.0.0.1/benchmark",
+  "elements": 2,
+  "runs": [
+    {
+      "engine": "laya",
+      "available": true,
+      "model_downloaded": true,
+      "runtime": "laya",
+      "memory_mb": null,
+      "model": "localdecide",
+      "latency_ms": 1432.82,
+      "hardware": "Darwin arm64",
+      "inference_verified": true,
+      "operation": "HUMAN_REQUIRED",
+      "target": null,
+      "correct_target": false,
+      "installed_runtimes": []
+    },
+    {
+      "engine": "laya",
+      "available": true,
+      "model_downloaded": true,
+      "runtime": "laya",
+      "memory_mb": null,
+      "model": "localdecide",
+      "latency_ms": 72.89,
+      "hardware": "Darwin arm64",
+      "inference_verified": true,
+      "operation": "HUMAN_REQUIRED",
+      "target": null,
+      "correct_target": false,
+      "installed_runtimes": []
+    },
+    {
+      "engine": "laya",
+      "available": true,
+      "model_downloaded": true,
+      "runtime": "laya",
+      "memory_mb": null,
+      "model": "localdecide",
+      "latency_ms": 76.78,
+      "hardware": "Darwin arm64",
+      "inference_verified": true,
+      "operation": "HUMAN_REQUIRED",
+      "target": null,
+      "correct_target": false,
+      "installed_runtimes": []
+    }
+  ],
+  "decisions": 3,
+  "correct_targets": 0,
+  "median_latency_ms": 76.78,
+  "memory_mb": 1492.03,
+  "note": "Actual inference on a synthetic local form; no browser actions or real applications.",
+  "measured_at": "2026-09-29T11:54:01.118045+00:00",
+  "runtime": "MLX",
+  "hardware": "Apple M2 Max, 64 GB",
+  "memory_measurement": "RSS of localdecide service after inference",
+  "source_revision": "9060f073e7836d6f10a6b0596f362e362f32107e",
+  "health": {
+    "ok": true,
+    "backend": "laya-mlx",
+    "calls": 3,
+    "errors": 0,
+    "uptime_s": 1.3,
+    "max_options_per_question": 20
+  }
+}

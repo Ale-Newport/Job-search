@@ -1,0 +1,6 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><title>Lever-style local fixture</title>
+<style>body{font:16px system-ui;padding:30px}label{display:block;margin:20px}</style>
+<h1>Example Company — Graduate Software Engineer</h1><form>
+<label>Full name <input name="name" required></label><label>Email <input type="email" name="email" required></label>
+<label>Resume/CV <input type="file" name="resume" required></label><button>Submit application</button></form>
+<script>window.submissions=0;document.querySelector('form').onsubmit=e=>{e.preventDefault();window.submissions++;document.body.innerHTML='<h1>Application successfully submitted</h1><p>LV-MOCK-001</p>'}</script></html>

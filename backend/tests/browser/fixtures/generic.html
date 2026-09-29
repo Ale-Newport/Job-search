@@ -1,0 +1,4 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><title>Generic application fixture</title>
+<style>body{font:16px system-ui;padding:32px}label{display:block;margin:20px}</style><h1>Apply to Example Company</h1>
+<form><label>Email <input name="email" type="email" required></label><button>Submit application</button></form>
+<script>window.submissions=0;document.querySelector('form').onsubmit=e=>{e.preventDefault();window.submissions++;document.querySelector('form').innerHTML='<p role="alert">Please use a different email address.</p>'}</script></html>

@@ -1,0 +1,4 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><title>Workday-style multi-step fixture</title>
+<style>body{font:16px system-ui;padding:32px}label{display:block;margin:20px}</style>
+<h1>Example Workday application</h1><main><form id="step1"><label>First name <input name="first_name" required></label><label>Last name <input name="last_name" required></label><button>Next</button></form></main>
+<script>window.submissions=0;document.querySelector('form').onsubmit=e=>{e.preventDefault();document.querySelector('main').innerHTML='<h2>Step 2: Contact</h2><iframe title="Application contact" src="workday-frame.html" style="width:800px;height:500px;border:1px solid #ddd"></iframe>'};window.addEventListener('message',e=>{if(e.origin===location.origin&&e.data==='submitted'){window.submissions++;document.querySelector('main').innerHTML='<h2>We have received your application</h2><p>WD-MOCK-001</p>'}})</script></html>

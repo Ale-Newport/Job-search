@@ -1,0 +1,3 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><title>Contact form frame</title>
+<style>body{font:16px system-ui;padding:20px}label{display:block;margin:20px}</style><form><label>Email <input name="email" type="email" required></label><label>Country <select name="country" required><option value="">Select</option><option>United Kingdom</option></select></label><button>Submit application</button></form>
+<script>document.querySelector('form').onsubmit=e=>{e.preventDefault();parent.postMessage('submitted',location.origin)}</script></html>

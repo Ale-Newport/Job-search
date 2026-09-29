@@ -21,7 +21,15 @@ import httpx
 from bs4 import BeautifulSoup
 
 from .db import decode_row, dumps, now, uid
-from .matching import extract_skills, match_job, normalized
+from .matching import (
+    contract_types,
+    extract_skills,
+    match_job,
+    normalized,
+    numeric_years,
+    text_values,
+    work_arrangement,
+)
 
 MAX_BODY = 8 * 1024 * 1024
 MAX_JOBS = 2000
@@ -85,6 +93,31 @@ def clean_text(value) -> str:
 
 
 def normalize_job(raw: dict, source="manual") -> dict:
+    metadata = raw.get("metadata") or {}
+    if isinstance(metadata, str):
+        metadata = json.loads(metadata)
+    if not isinstance(metadata, dict):
+        raise ValueError("Job metadata must be an object")
+    metadata = dict(metadata)
+    for key in (
+        "industries",
+        "work_arrangement",
+        "contract_types",
+        "sponsorship_available",
+        "education_requirements",
+        "experience_years_required",
+        "salary_unit",
+    ):
+        if raw.get(key) is not None and raw.get(key) != []:
+            metadata[key] = raw[key]
+    metadata["industries"] = text_values(metadata.get("industries") or metadata.get("industry"))
+    metadata["work_arrangement"] = work_arrangement(metadata.get("work_arrangement"))
+    metadata["contract_types"] = contract_types(metadata.get("contract_types") or metadata.get("employment_type"))
+    metadata["experience_years_required"] = numeric_years(metadata.get("experience_years_required"))
+    sponsorship = metadata.get("sponsorship_available")
+    if isinstance(sponsorship, str) and sponsorship.lower() in {"true", "false"}:
+        sponsorship = sponsorship.lower() == "true"
+    metadata["sponsorship_available"] = sponsorship if isinstance(sponsorship, bool) else None
     url = canonical_url(str(raw.get("url") or raw.get("application_url") or ""))
     ats, identity = ats_identity(url)
     title = clean_text(raw.get("title"))[:400]
@@ -110,7 +143,7 @@ def normalize_job(raw: dict, source="manual") -> dict:
         "remote": raw.get("remote"),
         "experience_level": raw.get("experience_level"),
         "posted_at": raw.get("posted_at"),
-        "metadata": raw.get("metadata", {}),
+        "metadata": metadata,
     }
     for field in ("salary_min", "salary_max"):
         if result[field] == "":
@@ -128,6 +161,10 @@ def normalize_job(raw: dict, source="manual") -> dict:
             if remote in {"false", "no", "0", "onsite", "on-site"}
             else None
         )
+    if metadata["work_arrangement"] is not None:
+        result["remote"] = metadata["work_arrangement"] == "remote"
+    elif result["remote"] is True:
+        metadata["work_arrangement"] = "remote"
     return result
 
 
@@ -153,6 +190,7 @@ def rescore_job(db, job: dict):
                     "roles": company["preferred_roles"],
                     "locations": company["locations"],
                     "minimum_salary": company["salary_preference"].get("minimum_salary"),
+                    "salary_currency": company["salary_preference"].get("salary_currency"),
                 },
             }
         ]
@@ -205,9 +243,31 @@ def ingest_job(db, raw: dict, source_id: str | None = None) -> tuple[dict, bool]
             )
             # A refresh may add a better description without resetting pipeline state.
             if len(job["description"]) >= len(existing["description"]):
+                merged_metadata = json.loads(existing["metadata"] or "{}")
+                merged_metadata.update(
+                    {key: value for key, value in job["metadata"].items() if value not in (None, [], "")}
+                )
+                if job["remote"] is False and job["metadata"].get("work_arrangement") is None:
+                    merged_metadata["work_arrangement"] = None
+                salary_refresh = job["salary_min"] is not None or job["salary_max"] is not None
+                if salary_refresh:
+                    # Amount, currency and period must come from the same advertisement snapshot.
+                    merged_metadata["salary_unit"] = job["metadata"].get("salary_unit")
                 conn.execute(
-                    "UPDATE jobs SET description=?,skills=?,salary_min=COALESCE(?,salary_min),salary_max=COALESCE(?,salary_max),updated_at=? WHERE id=?",
-                    (job["description"], dumps(job["skills"]), job["salary_min"], job["salary_max"], stamp, job_id),
+                    "UPDATE jobs SET description=?,skills=?,salary_min=?,salary_max=?,currency=?,metadata=?,remote=COALESCE(?,remote),posted_at=COALESCE(?,posted_at),experience_level=COALESCE(?,experience_level),updated_at=? WHERE id=?",
+                    (
+                        job["description"],
+                        dumps(job["skills"]),
+                        job["salary_min"] if salary_refresh else existing["salary_min"],
+                        job["salary_max"] if salary_refresh else existing["salary_max"],
+                        job["currency"] if salary_refresh else existing["currency"],
+                        dumps(merged_metadata),
+                        job["remote"],
+                        job["posted_at"],
+                        job["experience_level"],
+                        stamp,
+                        job_id,
+                    ),
                 )
         else:
             job_id = uid()
@@ -326,6 +386,11 @@ def parse_jsonld(text: str, url: str) -> list[dict]:
         if isinstance(amount, (float, int)):
             amount = {"minValue": amount, "maxValue": amount}
         remote = True if post.get("jobLocationType") == "TELECOMMUTE" else None
+        experience_requirement = post.get("experienceRequirements")
+        months = experience_requirement.get("monthsOfExperience") if isinstance(experience_requirement, dict) else None
+        experience_years = (
+            numeric_years(months / 12) if isinstance(months, (int, float)) and not isinstance(months, bool) else None
+        )
         result.append(
             {
                 "title": post.get("title", ""),
@@ -342,6 +407,11 @@ def parse_jsonld(text: str, url: str) -> list[dict]:
                     "salary_unit": amount.get("unitText"),
                     "valid_through": post.get("validThrough"),
                     "employment_type": post.get("employmentType"),
+                    "work_arrangement": "remote" if remote else None,
+                    "industries": post.get("industry"),
+                    "education_requirements": post.get("educationRequirements"),
+                    "experience_years_required": experience_years,
+                    "raw_experience_requirements": experience_requirement,
                 },
             }
         )
@@ -395,7 +465,12 @@ def parse_lever(data: list, board: str) -> list[dict]:
                 "salary_min": salary.get("min"),
                 "salary_max": salary.get("max"),
                 "currency": salary.get("currency"),
-                "metadata": {"salary_unit": salary.get("interval"), "categories": item.get("categories", {})},
+                "metadata": {
+                    "salary_unit": salary.get("interval"),
+                    "categories": item.get("categories", {}),
+                    "work_arrangement": item.get("workplaceType"),
+                    "employment_type": item.get("categories", {}).get("commitment"),
+                },
             }
         )
     return result
@@ -418,6 +493,7 @@ def parse_ashby(data: dict, board: str) -> list[dict]:
                 "department": item.get("department"),
                 "compensation": item.get("compensation"),
                 "employment_type": item.get("employmentType"),
+                "work_arrangement": item.get("workplaceType"),
             },
         }
         for item in data.get("jobs", [])
@@ -513,6 +589,10 @@ async def discover(source: dict) -> list[dict]:
                         "posted_at": post.get("releasedDate"),
                         "ats": "smartrecruiters",
                         "external_id": str(post["id"]),
+                        "metadata": {
+                            "employment_type": post.get("typeOfEmployment"),
+                            "industries": post.get("industry"),
+                        },
                     }
                 )
             offset += len(postings)

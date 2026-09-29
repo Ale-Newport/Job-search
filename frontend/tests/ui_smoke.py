@@ -57,8 +57,21 @@ async def main():
         await page.get_by_role('textbox', name='Search profile name').fill('UI smoke graduate search')
         await page.get_by_role('textbox', name='Roles', exact=True).fill('Graduate Software Engineer, AI Engineer')
         await page.get_by_role('textbox', name='Locations', exact=True).fill('London, Remote')
+        await page.get_by_role('textbox', name='Industries', exact=True).fill('Technology, Education')
+        await page.get_by_role('listbox', name='Work arrangements', exact=True).select_option(['remote', 'hybrid'])
+        await page.get_by_role('listbox', name='Contract types', exact=True).select_option(['full_time', 'internship'])
+        await page.get_by_role('spinbutton', name='Maximum posting age (days)', exact=True).fill('30')
+        await page.get_by_role('combobox', name='Visa sponsorship preference', exact=True).select_option('required')
+        await page.get_by_role('spinbutton', name='Skills weight', exact=True).fill('60')
+        await page.get_by_role('spinbutton', name='Role weight', exact=True).fill('40')
         await page.get_by_role('button', name='Save changes', exact=True).click()
         await page.get_by_role('heading', name='UI smoke graduate search', exact=True).wait_for()
+        await page.get_by_role('button', name='Edit UI smoke graduate search', exact=True).click()
+        assert await page.get_by_role('spinbutton', name='Maximum posting age (days)', exact=True).input_value() == '30'
+        assert await page.get_by_role('spinbutton', name='Skills weight', exact=True).input_value() == '60'
+        assert await page.get_by_role('combobox', name='Visa sponsorship preference', exact=True).input_value() == 'required'
+        assert await page.get_by_role('listbox', name='Work arrangements', exact=True).evaluate('(select) => Array.from(select.selectedOptions).map(option => option.value)') == ['remote', 'hybrid']
+        await page.get_by_role('button', name='Cancel', exact=True).click()
         await page.get_by_role('button', name='Delete UI smoke graduate search', exact=True).click()
         await page.get_by_role('button', name='Delete', exact=True).click()
         await page.get_by_role('navigation').get_by_role('button', name='Profile', exact=True).click()
@@ -92,7 +105,7 @@ async def main():
         await browser.close()
     if errors:
         raise AssertionError('\n'.join(errors))
-    print(json.dumps({'result': 'passed', 'checked': '13 views, local Laya status, rule CRUD, search profile CRUD, verified fact CRUD, company CRUD, Command-K, light/dark, compact viewport', 'screenshots': str(output)}))
+    print(json.dumps({'result': 'passed', 'checked': '13 views, local Laya status, source/rule CRUD, advanced search filter and weight persistence, verified fact CRUD, company CRUD, Command-K, light/dark, compact viewport', 'screenshots': str(output)}))
 
 if __name__ == '__main__':
     asyncio.run(main())

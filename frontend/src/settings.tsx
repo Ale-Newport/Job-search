@@ -215,7 +215,7 @@ export function Automation({ ctx }: { ctx: AppContext }) {
                 : "Configured discovery and permitted application actions can run. Pause is checked before each browser action."}
             </p>
           </div>
-          <Tag>{d.running ? "Browser operation running" : "Browser idle"}</Tag>
+          <Tag>{d.running ? "Agent running" : "Agent idle"}</Tag>
         </div>
         <div className="two-col">
           <Panel

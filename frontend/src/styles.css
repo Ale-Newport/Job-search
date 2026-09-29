@@ -2409,3 +2409,140 @@ kbd {
     scroll-behavior: auto !important;
   }
 }
+.timing-metrics {
+  padding: 26px 23px;
+  display: grid;
+  grid-template-columns: 1fr 1fr 1.2fr;
+  gap: 17px;
+}
+.timing-metrics > div {
+  display: flex;
+  flex-direction: column;
+  gap: 13px;
+}
+.timing-metrics span {
+  font-size: 10px;
+  color: var(--muted);
+}
+.timing-metrics strong {
+  font-size: 26px;
+  letter-spacing: -0.5px;
+  font-weight: 550;
+}
+.timing-metrics strong.small {
+  font-size: 17px;
+  padding-top: 6px;
+}
+.analytics-footnote {
+  display: flex;
+  gap: 14px;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 10px;
+  color: var(--muted);
+  padding: 0 23px 23px;
+  line-height: 1.7;
+}
+.weekly-chart {
+  display: flex;
+  align-items: flex-end;
+  gap: 11px;
+  height: 217px;
+  padding: 24px 23px;
+}
+.weekly-column {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  height: 100%;
+  gap: 9px;
+  min-width: 0;
+}
+.weekly-column > strong {
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--muted);
+}
+.weekly-track {
+  height: 100%;
+  width: 100%;
+  max-width: 32px;
+  display: flex;
+  align-items: flex-end;
+  background: var(--hover);
+  border-radius: 4px;
+  overflow: hidden;
+}
+.weekly-track > div {
+  width: 100%;
+  background: #729e8d;
+  border-radius: 4px;
+}
+.weekly-column > span {
+  font-size: 8px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.cohort-controls {
+  display: flex;
+  align-items: flex-end;
+  gap: 18px;
+  padding: 22px;
+}
+.cohort-controls .field {
+  min-width: 150px;
+  flex: none;
+}
+.cohort-controls > p {
+  font-size: 10px;
+  line-height: 1.8;
+  color: var(--muted);
+  margin-left: auto;
+  max-width: 490px;
+}
+.cohort-bar {
+  margin-top: 8px;
+  max-width: 120px;
+  height: 4px;
+}
+.chart-row small {
+  font-size: 10px;
+  font-weight: 400;
+  margin-left: 5px;
+}
+@media (max-width: 760px) {
+  .timing-metrics {
+    gap: 12px;
+    padding: 23px 18px;
+  }
+  .timing-metrics strong {
+    font-size: 22px;
+  }
+  .timing-metrics strong.small {
+    font-size: 14px;
+  }
+  .cohort-controls {
+    flex-wrap: wrap;
+    padding: 18px;
+  }
+  .cohort-controls .field {
+    flex: 1;
+    min-width: 110px;
+  }
+  .cohort-controls > p {
+    max-width: 100%;
+    margin-left: 0;
+  }
+  .analytics-footnote {
+    align-items: flex-start;
+    padding: 0 18px 18px;
+  }
+  .weekly-chart {
+    gap: 6px;
+    padding: 24px 18px;
+  }
+  .weekly-column > span {
+    font-size: 7px;
+  }
+}

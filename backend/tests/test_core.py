@@ -75,7 +75,7 @@ def fact(db, value="Python", status="verified", category="skill", key="python"):
 
 def test_database_migrates_reopens_foreign_keys_and_rolls_back(db):
     assert db.one("PRAGMA journal_mode")["journal_mode"] == "wal"
-    assert db.one("SELECT version_num FROM alembic_version")["version_num"] == "0002_fact_history"
+    assert db.one("SELECT version_num FROM alembic_version")["version_num"] == "0003_notifications"
     with pytest.raises(Exception):
         with db.transaction() as conn:
             conn.execute("INSERT INTO settings VALUES('example','true')")
@@ -130,11 +130,79 @@ def test_matching_excludes_unverified_and_explains_unknowns(db):
 
 def test_explicit_exclusion_never_silently_changes_facts(db):
     facts = [fact(db)]
-    posting = job(db, title="Senior Software Engineer", salary_min=30000, salary_max=40000)
-    match = match_job(posting, facts, {"id": "x", "config": {"negative_keywords": ["Senior"], "minimum_salary": 50000}})
+    posting = job(
+        db,
+        title="Senior Software Engineer",
+        salary_min=30000,
+        salary_max=40000,
+        currency="GBP",
+        metadata={"salary_unit": "YEAR"},
+    )
+    match = match_job(
+        posting,
+        facts,
+        {"id": "x", "config": {"negative_keywords": ["Senior"], "minimum_salary": 50000, "salary_currency": "GBP"}},
+    )
     assert match["eligible"] is False
     assert len(match["exclusions"]) == 2
     assert db.one("SELECT COUNT(*) AS n FROM facts")["n"] == 1
+
+
+@pytest.mark.parametrize(
+    "unit,currency,preference_currency",
+    [("hour", "USD", "USD"), ("YEAR", "USD", "GBP"), (None, "GBP", "GBP"), ("YEAR", "GBP", None)],
+)
+def test_incompatible_salary_is_unknown_and_never_excluded(unit, currency, preference_currency):
+    posting = {
+        "title": "Software Engineer",
+        "company": "Example",
+        "description": "Python",
+        "salary_min": 80,
+        "salary_max": 100,
+        "currency": currency,
+        "metadata": {"salary_unit": unit},
+    }
+    result = match_job(
+        posting, [], {"id": "profile", "config": {"minimum_salary": 50000, "salary_currency": preference_currency}}
+    )
+    assert result["eligible"] is True
+    assert result["salary_comparison"]["status"] == "unknown"
+    assert result["components"]["salary"]["value"] == 0.5
+    assert "salary_comparison" in result["unknowns"]
+    assert not result["exclusions"]
+
+
+def test_annual_same_currency_salary_is_compared_and_profile_validates_currency(client):
+    posting = {
+        "title": "Engineer",
+        "company": "Example",
+        "description": "",
+        "salary_max": 45000,
+        "currency": "GBP",
+        "metadata": {"salary_unit": "per-year"},
+    }
+    result = match_job(posting, [], {"id": "p", "config": {"minimum_salary": 50000, "salary_currency": "GBP"}})
+    assert result["salary_comparison"]["status"] == "compared"
+    assert "Advertised salary is below the minimum" in result["exclusions"]
+    assert (
+        client.post(
+            "/api/search-profiles",
+            json={"name": "Annual GBP", "config": {"minimum_salary": 50000, "salary_currency": "GBP"}},
+        ).status_code
+        == 201
+    )
+    assert (
+        client.post(
+            "/api/search-profiles", json={"name": "No currency", "config": {"salary_currency": None}}
+        ).status_code
+        == 201
+    )
+    assert (
+        client.post(
+            "/api/search-profiles", json={"name": "Invalid", "config": {"salary_currency": "pounds"}}
+        ).status_code
+        == 422
+    )
 
 
 def test_document_import_unverified_and_docx_extraction(db, tmp_path):

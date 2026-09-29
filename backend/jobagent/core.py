@@ -10,7 +10,7 @@ from typing import Literal
 
 from fastapi import APIRouter, File, HTTPException, Query, Request, UploadFile
 from fastapi.responses import FileResponse
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from .db import decode_row, dumps, get_db, historical_facts, now, uid
 from .discovery import canonical_url, ingest_job, ingest_url, rescore_job, run_sources
@@ -455,6 +455,15 @@ class JobPayload(Payload):
     remote: bool | None = None
     posted_at: str | None = None
     experience_level: str | None = None
+    industries: list[str] = Field(default_factory=list)
+    work_arrangement: Literal["remote", "hybrid", "onsite"] | None = None
+    contract_types: list[
+        Literal["full_time", "part_time", "contract", "temporary", "internship", "volunteer", "other"]
+    ] = Field(default_factory=list)
+    sponsorship_available: bool | None = None
+    education_requirements: str | None = None
+    experience_years_required: float | None = Field(default=None, ge=0, le=100)
+    salary_unit: str | None = None
 
 
 @router.get("/jobs")
@@ -835,13 +844,36 @@ class SearchConfig(BaseModel):
     locations: list[str] = Field(default_factory=list)
     remote: bool | None = None
     minimum_salary: float | None = Field(default=None, ge=0)
+    salary_currency: str | None = Field(default=None, pattern=r"^[A-Z]{3}$")
     experience_levels: list[str] = Field(default_factory=list)
     companies: list[str] = Field(default_factory=list)
     excluded_companies: list[str] = Field(default_factory=list)
     technologies: list[str] = Field(default_factory=list)
+    industries: list[str] = Field(default_factory=list)
+    work_arrangements: list[Literal["remote", "hybrid", "onsite"]] = Field(default_factory=list)
+    contract_types: list[
+        Literal["full_time", "part_time", "contract", "temporary", "internship", "volunteer", "other"]
+    ] = Field(default_factory=list)
+    max_posting_age_days: int | None = Field(default=None, ge=1, le=3650)
+    requires_sponsorship: bool | None = None
+    weights: dict[
+        Literal[
+            "skills", "role", "location", "seniority", "salary", "technology_preference", "education", "experience"
+        ],
+        float,
+    ] = Field(default_factory=dict)
     mode: Literal["manual", "review", "auto"] = "review"
     min_match: float = Field(default=50, ge=0, le=100)
     stretch_factor: float = Field(default=0.15, ge=0, le=1)
+
+    @field_validator("weights")
+    @classmethod
+    def validate_weights(cls, value):
+        if any(not math.isfinite(weight) or weight < 0 for weight in value.values()):
+            raise ValueError("Matching weights must be finite and nonnegative")
+        if value and (not math.isfinite(sum(value.values())) or sum(value.values()) <= 0):
+            raise ValueError("At least one matching weight must be positive, with a finite total")
+        return {key: weight / sum(value.values()) * 100 for key, weight in value.items()} if value else {}
 
 
 class ProfilePayload(Payload):
@@ -1122,21 +1154,26 @@ def activity(request: Request, limit: int = Query(50, ge=1, le=200), offset: int
 
 @router.get("/dashboard")
 def dashboard(request: Request):
-    db = get_db(request)
+    from .analytics import pipeline_analytics
 
-    def scalar(sql):
-        return db.one(sql)["n"]
+    db = get_db(request)
+    settings = get_settings(db)
+    history = pipeline_analytics(db)
+
+    def scalar(sql, params=()):
+        return db.one(sql, params)["n"]
 
     stats = {
         "jobs": scalar("SELECT COUNT(*) AS n FROM jobs"),
-        "strong_matches": scalar("SELECT COUNT(*) AS n FROM jobs WHERE match_score>=80 AND status!='IGNORED'"),
+        "strong_matches": scalar(
+            "SELECT COUNT(*) AS n FROM jobs WHERE match_score>=? AND status!='IGNORED' AND CASE WHEN json_valid(match_details) THEN json_extract(match_details,'$.eligible') ELSE 0 END=1",
+            (settings["min_match"],),
+        ),
         "applications": scalar("SELECT COUNT(*) AS n FROM applications"),
         "needs_review": scalar("SELECT COUNT(*) AS n FROM applications WHERE status='NEEDS_REVIEW'"),
-        "applied": scalar(
-            "SELECT COUNT(*) AS n FROM applications WHERE status IN ('APPLIED','CONFIRMED','RECRUITER_SCREEN','ASSESSMENT','TECHNICAL_TEST','INTERVIEW','FINAL_INTERVIEW','OFFER','REJECTED')"
-        ),
-        "interviews": scalar("SELECT COUNT(*) AS n FROM applications WHERE status IN ('INTERVIEW','FINAL_INTERVIEW')"),
-        "offers": scalar("SELECT COUNT(*) AS n FROM applications WHERE status='OFFER'"),
+        "applied": history["submitted"],
+        "interviews": history["interviews"],
+        "offers": history["offers"],
         "open_tasks": scalar("SELECT COUNT(*) AS n FROM human_tasks WHERE lower(status)='open'"),
         "verified_facts": scalar("SELECT COUNT(*) AS n FROM facts WHERE verification_status='verified' OR locked=1"),
     }
@@ -1149,36 +1186,15 @@ def dashboard(request: Request):
         "recent_events": activity(request, limit=10, offset=0)["items"],
         "deadlines": deadlines,
         "source_health": sources_list(request)["items"],
-        "automation_paused": get_settings(db)["automation_paused"],
+        "automation_paused": settings["automation_paused"],
     }
 
 
 @router.get("/analytics")
 def analytics(request: Request):
-    db = get_db(request)
-    counts = db.query("SELECT status,COUNT(*) AS count FROM applications GROUP BY status ORDER BY count DESC")
-    submitted = db.one(
-        "SELECT COUNT(DISTINCT application_id) AS n FROM application_events WHERE status IN ('APPLIED','CONFIRMED','RECRUITER_SCREEN','ASSESSMENT','TECHNICAL_TEST','INTERVIEW','FINAL_INTERVIEW','OFFER','REJECTED')"
-    )["n"]
-    responded = db.one(
-        "SELECT COUNT(DISTINCT application_id) AS n FROM application_events WHERE status IN ('RECRUITER_SCREEN','ASSESSMENT','TECHNICAL_TEST','INTERVIEW','FINAL_INTERVIEW','OFFER','REJECTED')"
-    )["n"]
-    return {
-        "status_counts": counts,
-        "applications_over_time": db.query(
-            "SELECT substr(created_at,1,10) AS date,COUNT(*) AS count FROM applications GROUP BY date ORDER BY date"
-        ),
-        "source_performance": db.query(
-            "SELECT j.source,COUNT(a.id) AS applications,SUM(CASE WHEN a.status IN ('INTERVIEW','FINAL_INTERVIEW','OFFER') THEN 1 ELSE 0 END) AS interviews,ROUND(AVG(j.match_score),1) AS average_match FROM applications a JOIN jobs j ON j.id=a.job_id GROUP BY j.source"
-        ),
-        "skills": db.query(
-            "SELECT s.name,COUNT(DISTINCT js.job_id) AS jobs FROM job_skills js JOIN skills s ON s.id=js.skill_id GROUP BY s.id ORDER BY jobs DESC LIMIT 20"
-        ),
-        "response_rate": round(100 * responded / submitted, 1) if submitted else 0,
-        "submitted": submitted,
-        "responded": responded,
-        "note": "Observed associations describe your recorded pipeline. They do not explain the cause of a rejection.",
-    }
+    from .analytics import pipeline_analytics
+
+    return pipeline_analytics(get_db(request))
 
 
 @router.get("/search")

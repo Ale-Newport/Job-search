@@ -330,6 +330,7 @@ export interface Field {
     | "textarea"
     | "number"
     | "select"
+    | "multiselect"
     | "checkbox"
     | "json"
     | "password"
@@ -364,13 +365,15 @@ export function Editor({
       Object.fromEntries(
         fields.map((f) => [
           f.key,
-          f.type === "json"
-            ? JSON.stringify(initial[f.key] ?? {}, null, 2)
-            : f.type === "list"
-              ? Array.isArray(initial[f.key])
-                ? initial[f.key].join(", ")
-                : (initial[f.key] ?? "")
-              : (initial[f.key] ?? (f.type === "checkbox" ? false : "")),
+          f.type === "multiselect"
+            ? (initial[f.key] ?? [])
+            : f.type === "json"
+              ? JSON.stringify(initial[f.key] ?? {}, null, 2)
+              : f.type === "list"
+                ? Array.isArray(initial[f.key])
+                  ? initial[f.key].join(", ")
+                  : (initial[f.key] ?? "")
+                : (initial[f.key] ?? (f.type === "checkbox" ? false : "")),
         ]),
       ),
     ),
@@ -428,18 +431,34 @@ export function Editor({
                     setValues({ ...values, [f.key]: e.target.checked })
                   }
                 />
-              ) : f.type === "select" ? (
+              ) : f.type === "select" || f.type === "multiselect" ? (
                 <select
                   aria-label={f.label}
                   required={f.required}
+                  multiple={f.type === "multiselect"}
+                  size={
+                    f.type === "multiselect"
+                      ? Math.min(f.options?.length || 3, 5)
+                      : undefined
+                  }
                   value={values[f.key]}
                   onChange={(e) =>
-                    setValues({ ...values, [f.key]: e.target.value })
+                    setValues({
+                      ...values,
+                      [f.key]:
+                        f.type === "multiselect"
+                          ? Array.from(e.target.selectedOptions).map(
+                              (option) => option.value,
+                            )
+                          : e.target.value,
+                    })
                   }
                 >
-                  <option value="" disabled={f.required}>
-                    {f.required ? "Select…" : "Not specified"}
-                  </option>
+                  {f.type !== "multiselect" && (
+                    <option value="" disabled={f.required}>
+                      {f.required ? "Select…" : "Not specified"}
+                    </option>
+                  )}
                   {f.options?.map((o) => (
                     <option
                       key={typeof o === "string" ? o : o.value}

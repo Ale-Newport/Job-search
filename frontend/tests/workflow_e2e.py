@@ -81,9 +81,25 @@ async def main():
             await message.get_by_role('button', name='Close', exact=True).click()
             await page.get_by_role('navigation').get_by_role('button', name='Applications', exact=True).click()
             await page.screenshot(path=str(output / 'application-board.png'), full_page=True)
+            print('Recording synthetic analytics milestones and inspecting cohort comparisons', flush=True)
+            applications_response = await page.request.get(base + '/api/applications?q=' + unique, headers=headers)
+            application_record = (await applications_response.json())['items'][0]
+            # These are manual tracking events on a synthetic .invalid fixture only.
+            for status in ['APPLIED', 'INTERVIEW']:
+                event_response = await page.request.patch(base + '/api/applications/' + application_record['id'], headers=headers, data={'status': status, 'notes': 'Synthetic UI analytics fixture; no external submission occurred.'})
+                assert event_response.ok, await event_response.text()
+            await page.get_by_role('navigation').get_by_role('button', name='Analytics', exact=True).click()
+            await page.get_by_role('heading', name='Time to first response', exact=True).wait_for()
+            await page.get_by_role('heading', name='Observed application funnel', exact=True).wait_for()
+            for dimension in ['source', 'company', 'role', 'cv', 'match']:
+                await page.get_by_role('combobox', name='Group by', exact=True).select_option(dimension)
+                await page.get_by_role('combobox', name='Outcome', exact=True).select_option('interview')
+                await page.get_by_role('columnheader', name='Interview rate', exact=True).wait_for()
+            await page.get_by_role('combobox', name='Group by', exact=True).select_option('cv')
+            await page.screenshot(path=str(output / 'analytics-cohorts.png'), full_page=True)
             if errors:
                 raise AssertionError('\n'.join(errors))
-            print(json.dumps({'result': 'passed', 'checked': 'CV import, document approval, authenticated download, job matching detail, application preparation with exact CV, verified answer, email import and original evidence', 'screenshots': str(output)}), flush=True)
+            print(json.dumps({'result': 'passed', 'checked': 'CV import, document approval, authenticated download, job matching detail, application preparation with exact CV, verified answer, email import and evidence, response timing and five analytics cohort views', 'screenshots': str(output)}), flush=True)
         except Exception:
             await page.screenshot(path=str(output / 'workflow-failure.png'), full_page=True)
             print((await page.locator('body').inner_text())[-6000:], flush=True)

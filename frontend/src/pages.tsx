@@ -567,6 +567,16 @@ const sourceFields: Field[] = [
     hint: "Provider options, such as repository, branch, paths, parser, or search filters.",
   },
 ];
+const weightKeys = [
+  "skills",
+  "role",
+  "location",
+  "seniority",
+  "salary",
+  "technology_preference",
+  "education",
+  "experience",
+] as const;
 const searchFields: Field[] = [
   { key: "name", label: "Search profile name", required: true },
   {
@@ -584,11 +594,72 @@ const searchFields: Field[] = [
     type: "select",
     options: ["any", "remote", "onsite"],
   },
-  { key: "minimum_salary", label: "Minimum salary", type: "number", min: 0 },
+  {
+    key: "minimum_salary",
+    label: "Minimum annual salary",
+    type: "number",
+    min: 0,
+  },
+  {
+    key: "salary_currency",
+    label: "Salary currency (ISO code)",
+    placeholder: "GBP",
+    hint: "Optional three-letter code, such as GBP or EUR. Only explicitly annual salaries in the same currency are compared; other salary values remain unknown.",
+  },
   { key: "experience_levels", label: "Experience levels", type: "list" },
   { key: "companies", label: "Preferred companies", type: "list" },
   { key: "excluded_companies", label: "Exclude companies", type: "list" },
   { key: "technologies", label: "Technologies", type: "list" },
+  {
+    key: "industries",
+    label: "Industries",
+    type: "list",
+    hint: "Optional comma-separated industries. Missing advertised information remains unknown.",
+  },
+  {
+    key: "work_arrangements",
+    label: "Work arrangements",
+    type: "multiselect",
+    options: ["remote", "hybrid", "onsite"],
+    hint: "Leave empty to accept any arrangement. Hold ⌘ to select or clear multiple choices.",
+  },
+  {
+    key: "contract_types",
+    label: "Contract types",
+    type: "multiselect",
+    options: [
+      "full_time",
+      "part_time",
+      "contract",
+      "temporary",
+      "internship",
+      "volunteer",
+      "other",
+    ],
+    hint: "Leave empty to accept any contract. Hold ⌘ to select or clear multiple choices.",
+  },
+  {
+    key: "max_posting_age_days",
+    label: "Maximum posting age (days)",
+    type: "number",
+    min: 1,
+    max: 3650,
+    hint: "Optional. Offers without a known publication date remain unknown.",
+  },
+  {
+    key: "requires_sponsorship",
+    label: "Visa sponsorship preference",
+    type: "select",
+    options: [
+      { value: "unspecified", label: "Not specified" },
+      { value: "required", label: "I need visa sponsorship" },
+      {
+        value: "not_required",
+        label: "I do not need sponsorship for this search",
+      },
+    ],
+    hint: "A search preference, not a verified work-authorization fact. Requiring sponsorship excludes only roles that explicitly say they cannot provide it.",
+  },
   {
     key: "mode",
     label: "Application mode",
@@ -611,6 +682,17 @@ const searchFields: Field[] = [
     max: 1,
     step: 0.05,
   },
+  ...weightKeys.map((key, index): Field => ({
+    key: `weight_${key}`,
+    label: `${label(key)} weight`,
+    type: "number",
+    min: 0,
+    step: 0.1,
+    hint:
+      index === 0
+        ? "Leave every weight blank to use the default mix. Setting any weight replaces the complete mix: blank categories receive zero, and the result is normalized to 100."
+        : undefined,
+  })),
 ];
 export function Discover({ ctx }: { ctx: AppContext }) {
   const sources = useResource("/sources", ctx.refresh),
@@ -856,6 +938,18 @@ export function Discover({ ctx }: { ctx: AppContext }) {
                       : edit.data?.config?.remote === false
                         ? "onsite"
                         : "any",
+                  requires_sponsorship:
+                    edit.data?.config?.requires_sponsorship === true
+                      ? "required"
+                      : edit.data?.config?.requires_sponsorship === false
+                        ? "not_required"
+                        : "unspecified",
+                  ...Object.fromEntries(
+                    weightKeys.map((key) => [
+                      `weight_${key}`,
+                      edit.data?.config?.weights?.[key] ?? "",
+                    ]),
+                  ),
                   name: edit.data?.name,
                 }
           }
@@ -866,6 +960,41 @@ export function Discover({ ctx }: { ctx: AppContext }) {
             let payload = values;
             if (edit.kind === "profile") {
               const { name, ...config } = values;
+              config.requires_sponsorship =
+                config.requires_sponsorship === "required"
+                  ? true
+                  : config.requires_sponsorship === "not_required"
+                    ? false
+                    : null;
+              const weights: Record<string, number> = {};
+              for (const key of weightKeys) {
+                const value = config[`weight_${key}`];
+                if (value != null && value !== "") weights[key] = Number(value);
+                delete config[`weight_${key}`];
+              }
+              if (
+                Object.keys(weights).length &&
+                Object.values(weights).reduce(
+                  (total, value) => total + value,
+                  0,
+                ) <= 0
+              )
+                throw new Error(
+                  "Custom matching weights need at least one positive value.",
+                );
+              config.weights = weights;
+              config.salary_currency =
+                String(config.salary_currency || "")
+                  .trim()
+                  .toUpperCase() || null;
+              if (
+                config.salary_currency &&
+                !/^[A-Z]{3}$/.test(config.salary_currency)
+              ) {
+                throw new Error(
+                  "Use a three-letter ISO currency code, such as GBP or EUR.",
+                );
+              }
               config.remote =
                 config.remote === "remote"
                   ? true
@@ -2136,154 +2265,359 @@ export function IntegrationEditor({
 }
 export function Analytics({ ctx }: { ctx: AppContext }) {
   const r = useResource("/analytics", ctx.refresh),
-    d = r.data || {},
-    statusData = d.by_status || d.status_counts || d.funnel || {},
-    values = Array.isArray(statusData)
-      ? statusData.map((v) => [
-          v.status || v.label || v.name,
-          v.count ?? v.value ?? 0,
-        ])
-      : Object.entries(statusData),
-    max = Math.max(1, ...values.map((v) => Number(v[1]))),
-    metrics = d.metrics || d.summary || {};
+    d = r.data || {};
+  const statusCounts: Data[] = d.status_counts || [];
+  const funnel: Data[] = d.funnel || [];
+  const responseTime = d.time_to_response || {};
+  const maxStage = Math.max(1, ...funnel.map((stage) => Number(stage.count)));
+  const weeks: Data[] = (d.applications_by_week || []).slice(-12);
+  const maxWeek = Math.max(1, ...weeks.map((week) => Number(week.count)));
+  const offers =
+    funnel.find((stage) => String(stage.stage).toLowerCase() === "offer")
+      ?.count ??
+    statusCounts.find((row) => row.status === "OFFER")?.count ??
+    0;
   return (
     <>
       <SectionTitle
         eyebrow="LEARN FROM YOUR SEARCH"
         title="Analytics"
-        description="Understand your pipeline through evidence, without guessing why a decision was made."
+        description="Understand your recorded outcomes, response times, and the opportunities behind them."
       />
       <Resource {...r} retry={r.reload}>
         <div className="stat-grid">
           {[
             {
               name: "Applications",
-              value:
-                d.total_applications ??
-                metrics.total_applications ??
-                values.reduce((n, v) => n + Number(v[1]), 0),
+              value: statusCounts.reduce(
+                (sum, row) => sum + Number(row.count),
+                0,
+              ),
               icon: BriefcaseBusiness,
+              note: `${d.submitted ?? 0} explicitly recorded submissions`,
             },
             {
               name: "Response rate",
-              value: d.response_rate ?? metrics.response_rate,
+              value: d.response_rate,
               percent: true,
               icon: Mail,
+              note: `${d.responded ?? 0} responses from ${d.submitted ?? 0} submissions`,
             },
             {
               name: "Interview rate",
-              value: d.interview_rate ?? metrics.interview_rate,
+              value: d.interview_rate,
               percent: true,
               icon: TrendingUp,
+              note: "Based on recorded interview events",
             },
             {
               name: "Offers",
-              value: d.offers ?? metrics.offers ?? statusData.OFFER ?? 0,
+              value: offers,
               icon: Target,
+              note: "Observed offer events",
             },
-          ].map((m) => (
-            <div className="stat-card" key={m.name}>
+          ].map((metric) => (
+            <div className="stat-card" key={metric.name}>
               <div className="stat-label">
-                {m.name}
-                <m.icon size={17} />
+                {metric.name}
+                <metric.icon size={17} />
               </div>
               <strong>
-                {m.value == null
+                {metric.value == null
                   ? "—"
-                  : `${Number(m.value).toLocaleString(undefined, { maximumFractionDigits: 1 })}${m.percent ? "%" : ""}`}
+                  : `${Number(metric.value).toLocaleString(undefined, { maximumFractionDigits: 1 })}${metric.percent ? "%" : ""}`}
               </strong>
-              <span>
-                {m.percent
-                  ? "Based on recorded application outcomes"
-                  : "From your local application history"}
-              </span>
+              <span>{metric.note}</span>
             </div>
           ))}
         </div>
         <div className="two-col">
           <Panel
-            title="Application pipeline"
-            description="Where your opportunities stand today"
+            title="Time to first response"
+            description="Measured from explicit submission to the first recorded recruitment response."
           >
-            {values.length ? (
-              <div className="bar-chart">
-                {values.map(([name, value]) => (
-                  <div className="chart-row" key={name}>
-                    <div>
-                      <span>{label(name)}</span>
-                      <strong>{String(value)}</strong>
-                    </div>
-                    <div className="bar-track">
+            {responseTime.sample_size > 0 ? (
+              <>
+                <div className="timing-metrics">
+                  <div>
+                    <span>Median</span>
+                    <strong>{formatDays(responseTime.median_days)}</strong>
+                  </div>
+                  <div>
+                    <span>Average</span>
+                    <strong>{formatDays(responseTime.mean_days)}</strong>
+                  </div>
+                  <div>
+                    <span>Observed range</span>
+                    <strong className="small">
+                      {formatDays(responseTime.min_days)} –{" "}
+                      {formatDays(responseTime.max_days)}
+                    </strong>
+                  </div>
+                </div>
+                <div className="analytics-footnote">
+                  <span>
+                    {responseTime.sample_size} measured responses ·{" "}
+                    {responseTime.pending_applications ?? 0} still awaiting a
+                    response
+                  </span>
+                  {responseTime.small_sample && (
+                    <Tag tone="amber">Small sample</Tag>
+                  )}
+                </div>
+              </>
+            ) : (
+              <Empty
+                icon={<Clock3 size={24} />}
+                title="Response timing needs two recorded events"
+                description={`There are no valid submission-to-response intervals yet. ${responseTime.pending_applications ?? 0} submitted applications are still awaiting a recorded response.`}
+              />
+            )}
+          </Panel>
+          <Panel
+            title="Weekly application activity"
+            description="Application workspaces created during the latest 12 recorded weeks."
+          >
+            {weeks.length ? (
+              <div
+                className="weekly-chart"
+                role="img"
+                aria-label={weeks
+                  .map(
+                    (week) => `${week.week_start}: ${week.count} applications`,
+                  )
+                  .join("; ")}
+              >
+                {weeks.map((week) => (
+                  <div className="weekly-column" key={week.week_start}>
+                    <strong>{week.count}</strong>
+                    <div className="weekly-track">
                       <div
-                        style={{ width: `${(Number(value) / max) * 100}%` }}
+                        style={{
+                          height: `${(Number(week.count) / maxWeek) * 100}%`,
+                        }}
+                        title={`${week.week_start}: ${week.count} applications`}
                       />
                     </div>
+                    <span>
+                      {new Date(
+                        `${week.week_start}T12:00:00`,
+                      ).toLocaleDateString(undefined, {
+                        day: "numeric",
+                        month: "short",
+                      })}
+                    </span>
                   </div>
                 ))}
               </div>
             ) : (
               <Empty
-                icon={<TrendingUp size={25} />}
-                title="Insights grow with your search"
-                description="Prepare and track applications to see your pipeline take shape."
-              />
-            )}
-          </Panel>
-          <Panel
-            title="Source performance"
-            description="Compare the sources behind your opportunities"
-          >
-            {(d.source_performance || d.by_source || d.sources || []).length ? (
-              <div className="simple-list">
-                {(d.source_performance || d.by_source || d.sources).map(
-                  (v: Data, i: number) => (
-                    <div key={v.source || i}>
-                      <Globe2 size={17} />
-                      <div className="grow">
-                        <strong>{v.source || v.name}</strong>
-                        <small>
-                          {v.applications ?? v.count ?? 0} applications
-                        </small>
-                      </div>
-                      {v.response_rate != null && (
-                        <Tag>{v.response_rate}% response</Tag>
-                      )}
-                    </div>
-                  ),
-                )}
-              </div>
-            ) : (
-              <Empty
-                icon={<Globe2 size={25} />}
-                title="No source outcomes yet"
-                description="Source comparisons appear as your application history develops."
+                icon={<TrendingUp size={24} />}
+                title="Your search over time"
+                description="Weekly counts appear as you prepare and track applications."
               />
             )}
           </Panel>
         </div>
-        <Panel title="Usage and additional measurements">
-          <KeyValues
-            data={d}
-            exclude={[
-              "by_status",
-              "status_counts",
-              "funnel",
-              "by_source",
-              "sources",
-              "metrics",
-              "summary",
-              "total_applications",
-              "response_rate",
-              "interview_rate",
-              "offers",
-            ]}
-          />
-          {!Object.keys(d).length && (
-            <p className="panel-copy">No measurements recorded yet.</p>
+        <Panel
+          title="Observed application funnel"
+          description="Historical milestones; later events do not imply that an earlier stage was recorded."
+        >
+          {funnel.length ? (
+            <div className="bar-chart">
+              {funnel.map((stage) => (
+                <div className="chart-row" key={stage.stage}>
+                  <div>
+                    <span>{stage.stage}</span>
+                    <strong>
+                      {stage.count}
+                      <small className="muted">
+                        {stage.rate == null
+                          ? ""
+                          : ` · ${formatRate(stage.rate)} of ${stage.denominator}`}
+                      </small>
+                    </strong>
+                  </div>
+                  <div className="bar-track">
+                    <div
+                      style={{
+                        width: `${(Number(stage.count) / maxStage) * 100}%`,
+                      }}
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <Empty
+              title="No recorded milestones"
+              description="Discovery and application events will populate the funnel."
+            />
           )}
+        </Panel>
+        <CohortComparisons data={d} />
+        <Panel
+          title="How to read these measurements"
+          description="Observed associations are evidence about your recorded pipeline, not explanations for a hiring decision."
+        >
+          <p className="panel-copy">
+            {d.note ||
+              "Rates use explicitly recorded submissions as their denominator. Outcomes without a recorded submission are retained as evidence but do not inflate submission counts."}
+          </p>
+          {d.definitions && (
+            <JsonDetails title="Metric definitions" data={d.definitions} />
+          )}
+          {d.data_quality && <KeyValues data={d.data_quality} />}
         </Panel>
       </Resource>
     </>
+  );
+}
+function formatRate(value: unknown): string {
+  return value == null
+    ? "—"
+    : `${Number(value).toLocaleString(undefined, { maximumFractionDigits: 1 })}%`;
+}
+function formatDays(value: unknown): string {
+  return value == null
+    ? "—"
+    : `${Number(value).toLocaleString(undefined, { maximumFractionDigits: 1 })} d`;
+}
+function CohortComparisons({ data }: { data: Data }) {
+  const [dimension, setDimension] = useState("source"),
+    [outcome, setOutcome] = useState("response"),
+    [page, setPage] = useState(0);
+  const dimensions = [
+    { value: "source", label: "Source", key: "applications_by_source" },
+    { value: "company", label: "Company", key: "applications_by_company" },
+    { value: "role", label: "Role", key: "applications_by_role" },
+    { value: "cv", label: "CV version", key: "cv_version_performance" },
+    { value: "match", label: "Match score", key: "match_score_performance" },
+  ];
+  const outcomes = [
+    { value: "response", label: "Responses", count: "responded" },
+    { value: "assessment", label: "Assessments", count: "assessments" },
+    { value: "interview", label: "Interviews", count: "interviews" },
+    { value: "offer", label: "Offers", count: "offers" },
+    { value: "rejection", label: "Rejections", count: "rejected" },
+  ];
+  const grouping = dimensions.find((value) => value.value === dimension)!;
+  const metric = outcomes.find((value) => value.value === outcome)!;
+  const rows: Data[] =
+    data[grouping.key] ||
+    (dimension === "source" ? data.source_performance : []) ||
+    [];
+  const rowName = (row: Data): string =>
+    dimension === "cv"
+      ? row.document_version_id
+        ? `${row.document_name || row.filename || "CV"} · version ${row.version ?? "unknown"}`
+        : "No recorded CV"
+      : dimension === "match"
+        ? row.bucket || "Unknown"
+        : row[dimension] || "Unknown";
+  return (
+    <Panel
+      title="Compare your application groups"
+      description="Explore outcomes by source, company, role, CV version, or recorded match score."
+    >
+      <div className="cohort-controls">
+        <label className="field">
+          <span>Group by</span>
+          <select
+            value={dimension}
+            onChange={(event) => {
+              setDimension(event.target.value);
+              setPage(0);
+            }}
+          >
+            {dimensions.map((value) => (
+              <option key={value.value} value={value.value}>
+                {value.label}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="field">
+          <span>Outcome</span>
+          <select
+            value={outcome}
+            onChange={(event) => setOutcome(event.target.value)}
+          >
+            {outcomes.map((value) => (
+              <option key={value.value} value={value.value}>
+                {value.label}
+              </option>
+            ))}
+          </select>
+        </label>
+        <p>
+          Every rate shows its recorded submission sample. Small groups are
+          flagged so their percentages are not mistaken for reliable
+          predictions.
+        </p>
+      </div>
+      {rows.length ? (
+        <>
+          <div className="table-scroll">
+            <table>
+              <thead>
+                <tr>
+                  <th>{grouping.label}</th>
+                  <th>Applications</th>
+                  <th>Submitted</th>
+                  <th>{metric.label}</th>
+                  <th>{label(outcome)} rate</th>
+                  <th>Average match</th>
+                  <th>Sample</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.slice(page * 50, (page + 1) * 50).map((row, index) => (
+                  <tr key={`${rowName(row)}-${index}`}>
+                    <td>
+                      <strong>{rowName(row)}</strong>
+                    </td>
+                    <td>{row.applications ?? 0}</td>
+                    <td>{row.submitted ?? 0}</td>
+                    <td>{row[metric.count] ?? 0}</td>
+                    <td>
+                      <strong>{formatRate(row[`${outcome}_rate`])}</strong>
+                      {row[`${outcome}_rate`] != null && (
+                        <div className="bar-track cohort-bar">
+                          <div
+                            style={{
+                              width: `${Math.max(0, Math.min(100, Number(row[`${outcome}_rate`])))}%`,
+                            }}
+                          />
+                        </div>
+                      )}
+                    </td>
+                    <td>
+                      {row.average_match == null
+                        ? "—"
+                        : Number(row.average_match).toFixed(1)}
+                    </td>
+                    <td>
+                      <Tag tone={row.small_sample ? "amber" : "neutral"}>
+                        {row.sample_size ?? row.submitted ?? 0} submitted
+                        {row.small_sample ? " · small sample" : ""}
+                      </Tag>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <Pagination page={page} total={rows.length} onChange={setPage} />
+        </>
+      ) : (
+        <Empty
+          icon={<Target size={24} />}
+          title="No groups to compare yet"
+          description="These comparisons appear as applications and their supporting evidence are recorded."
+        />
+      )}
+    </Panel>
   );
 }
 export function Activity({ ctx }: { ctx: AppContext }) {

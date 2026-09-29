@@ -2171,14 +2171,28 @@ export function Email({ ctx }: { ctx: AppContext }) {
   const [page, setPage] = useState(0),
     r = useResource(`/emails?limit=50&offset=${page * 50}`, ctx.refresh),
     integrations = useResource("/integrations", ctx.refresh),
+    mailStatus = useResource("/email/status", ctx.refresh),
     [edit, setEdit] = useState<Data | null>(null);
   const providers = ["gmail", "outlook", "imap"];
   const reloadIntegrations = integrations.reload;
+  const reloadMailStatus = mailStatus.reload;
+  const reloadMessages = r.reload;
+  const syncRevision = items(integrations.data)
+    .map((item) => item.last_sync || "")
+    .join("|");
   useEffect(() => {
     // OAuth completes in the system browser; refresh its outcome on return.
     window.addEventListener("focus", reloadIntegrations);
     return () => window.removeEventListener("focus", reloadIntegrations);
   }, [reloadIntegrations]);
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      reloadIntegrations();
+      reloadMailStatus();
+    }, 2500);
+    return () => window.clearInterval(timer);
+  }, [reloadIntegrations, reloadMailStatus]);
+  useEffect(() => reloadMessages(), [syncRevision, reloadMessages]);
   return (
     <>
       <SectionTitle
@@ -2196,14 +2210,28 @@ export function Email({ ctx }: { ctx: AppContext }) {
             />
             <Button
               secondary
-              loading={ctx.busy === "email-sync"}
-              onClick={() =>
-                ctx.act(
-                  "email-sync",
-                  () => api("/email/sync", "POST", {}),
-                  "Email sync completed.",
-                )
+              loading={
+                ctx.busy === "email-sync" || Boolean(mailStatus.data?.syncing)
               }
+              onClick={async () => {
+                const result = await ctx.act("email-sync", () =>
+                  api("/email/sync", "POST", {}),
+                );
+                reloadIntegrations();
+                reloadMailStatus();
+                reloadMessages();
+                if (result) {
+                  const failed = Boolean(result.errors?.length);
+                  ctx.toast(
+                    failed
+                      ? "Email sync needs attention. Check the account message below."
+                      : result.status === "already_running"
+                        ? "Email sync is already running. Progress is shown below."
+                        : `Email sync completed. ${result.imported || 0} new messages imported.`,
+                    failed,
+                  );
+                }
+              }}
             >
               <RefreshCw size={15} />
               Sync inbox
@@ -2211,6 +2239,22 @@ export function Email({ ctx }: { ctx: AppContext }) {
           </>
         }
       />
+      {mailStatus.data?.phase !== "idle" && mailStatus.data?.phase && (
+        <Panel>
+          <div role="status" aria-live="polite">
+            <strong>
+              {mailStatus.data.phase === "waiting_for_keychain"
+                ? "Waiting for macOS Keychain"
+                : "Reading your email"}
+            </strong>
+            <p>
+              {mailStatus.data.phase === "waiting_for_keychain"
+                ? "If macOS asks to let meridian-backend access its saved credential, choose Allow. This permission is separate from signing in to your email account."
+                : `${mailStatus.data.messages_read || 0} messages read. The first sync can take a few minutes.`}
+            </p>
+          </div>
+        </Panel>
+      )}
       <div className="integration-grid">
         {providers.map((p) => {
           const i = items(integrations.data).find((v) => v.provider === p);
@@ -2223,11 +2267,7 @@ export function Email({ ctx }: { ctx: AppContext }) {
                   </span>
                   <Status
                     value={
-                      i?.last_error
-                        ? "error"
-                        : i?.status === "connected" && !i?.last_sync
-                          ? "awaiting first sync"
-                          : i?.status || "not connected"
+                      i?.last_error ? "error" : i?.status || "not connected"
                     }
                   />
                 </div>
@@ -2239,6 +2279,11 @@ export function Email({ ctx }: { ctx: AppContext }) {
                       : "IMAP over TLS"}
                 </h3>
                 <p>{i?.last_error || `Last sync: ${time(i?.last_sync)}`}</p>
+                {i?.status === "connected" &&
+                  !i?.last_sync &&
+                  !i?.last_error && (
+                    <p>Account connected. First sync pending.</p>
+                  )}
                 {i?.config?.account_email && (
                   <p>Verified account: {i.config.account_email}</p>
                 )}

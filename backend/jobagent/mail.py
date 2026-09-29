@@ -17,6 +17,7 @@ from urllib.parse import urlencode
 from uuid import uuid4
 
 import httpx
+from keyring.errors import KeyringError
 from dateutil import parser as dateparser
 
 from .security import SecretStore
@@ -301,11 +302,44 @@ def oauth_exchange_error(provider: str, response: httpx.Response) -> str:
     return f"{name} token exchange failed (HTTP {response.status_code}). Check the OAuth client configuration and try again."
 
 
+class MailCredentialError(ValueError):
+    pass
+
+
 class MailService:
     def __init__(self, db, secrets_store: SecretStore):
         self.db, self.secrets = db, secrets_store
         self.pending: dict[str, dict] = {}
         self.lock = asyncio.Lock()
+        self.credential_waits: dict[object, str] = {}
+        self.sync_provider: str | None = None
+        self.messages_read = 0
+
+    def status(self):
+        return {
+            "syncing": self.lock.locked(),
+            "phase": "waiting_for_keychain"
+            if self.credential_waits
+            else "reading_mail"
+            if self.lock.locked()
+            else "idle",
+            "provider": next(iter(self.credential_waits.values()), self.sync_provider),
+            "messages_read": self.messages_read,
+        }
+
+    async def credential(self, operation, name, *values):
+        # Keychain can wait for a protected macOS permission dialog. Never block
+        # the API event loop: health, connection state and progress must stay readable.
+        request = object()
+        self.credential_waits[request] = name.split(":", 1)[0]
+        try:
+            return await asyncio.to_thread(getattr(self.secrets, operation), name, *values)
+        except KeyringError:
+            raise MailCredentialError(
+                "macOS Keychain did not allow credential access. Allow Meridian in the Keychain prompt, then try again."
+            ) from None
+        finally:
+            self.credential_waits.pop(request, None)
 
     def config(self, provider):
         row = self.db.one("SELECT * FROM integrations WHERE provider=?", (provider,))
@@ -388,7 +422,7 @@ class MailService:
             "code_verifier": pending["verifier"],
             "redirect_uri": pending["redirect_uri"],
         }
-        client_secret = self.secrets.get(f"{provider}:client_secret")
+        client_secret = await self.credential("get", f"{provider}:client_secret")
         if client_secret:
             data["client_secret"] = client_secret
         async with httpx.AsyncClient(timeout=30) as client:
@@ -431,7 +465,7 @@ class MailService:
         if self.config(provider) != config:
             raise ValueError("Email configuration changed during authorization. Start connection again.")
         tokens["expires_at"] = time.time() + tokens.get("expires_in", 3600)
-        self.secrets.set(f"{provider}:tokens", json.dumps(tokens))
+        await self.credential("set", f"{provider}:tokens", json.dumps(tokens))
         if account_email:
             config["account_email"] = account_email
         self.db.execute(
@@ -441,7 +475,7 @@ class MailService:
         return provider
 
     async def token(self, provider):
-        raw = self.secrets.get(f"{provider}:tokens")
+        raw = await self.credential("get", f"{provider}:tokens")
         if not raw:
             raise ValueError("Connect this email account first")
         tokens = json.loads(raw)
@@ -453,7 +487,7 @@ class MailService:
             "refresh_token": tokens.get("refresh_token", ""),
             "client_id": config["client_id"],
         }
-        client_secret = self.secrets.get(f"{provider}:client_secret")
+        client_secret = await self.credential("get", f"{provider}:client_secret")
         if client_secret:
             data["client_secret"] = client_secret
         async with httpx.AsyncClient(timeout=30) as client:
@@ -462,13 +496,13 @@ class MailService:
                 raise ValueError("Email authorization expired. Reconnect the account.")
             tokens.update(response.json())
         tokens["expires_at"] = time.time() + tokens.get("expires_in", 3600)
-        self.secrets.set(f"{provider}:tokens", json.dumps(tokens))
+        await self.credential("set", f"{provider}:tokens", json.dumps(tokens))
         return tokens["access_token"]
 
     async def fetch(self, provider):
         config = self.config(provider)
         if provider == "imap":
-            password = self.secrets.get("imap:secret")
+            password = await self.credential("get", "imap:secret")
             if not password:
                 raise ValueError("Store the IMAP app password in Keychain first")
             return await asyncio.to_thread(self._imap, config, password)
@@ -505,6 +539,7 @@ class MailService:
                         message.update(external_id=item["id"])
                         message["metadata"]["thread_id"] = record.get("threadId")
                         messages.append(message)
+                        self.messages_read += 1
                     page_token = payload.get("nextPageToken")
                     if not page_token:
                         return messages
@@ -582,12 +617,14 @@ class MailService:
         if self.lock.locked():
             return {"status": "already_running", "imported": 0, "errors": []}
         async with self.lock:
+            self.messages_read = 0
             results, errors = [], []
             integrations = self.db.query(
                 "SELECT provider FROM integrations WHERE provider IN ('gmail','outlook','imap') AND status='connected'"
             )
             for row in integrations:
                 provider = row["provider"]
+                self.sync_provider = provider
                 started = utcnow()
                 try:
                     messages = await self.fetch(provider)
@@ -604,7 +641,13 @@ class MailService:
                         "UPDATE integrations SET last_sync=?,last_error=NULL WHERE provider=?", (started, provider)
                     )
                 except Exception as exc:
-                    error = f"{type(exc).__name__}: sync failed; check account authorization and server settings"
+                    error = (
+                        str(exc)
+                        if isinstance(exc, MailCredentialError)
+                        else f"{type(exc).__name__}: sync failed; check account authorization and server settings"
+                    )
                     errors.append({"provider": provider, "error": error})
                     self.db.execute("UPDATE integrations SET last_error=? WHERE provider=?", (error, provider))
+                finally:
+                    self.sync_provider = None
             return {"imported": sum(not r.get("duplicate") for r in results), "results": results, "errors": errors}

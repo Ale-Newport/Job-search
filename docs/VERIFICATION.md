@@ -15,6 +15,7 @@ Meridian 0.1.0 está instalada en `/Users/alejandro/Applications/Meridian.app`. 
 | Preguntas humanas | Respuestas manuales verificadas tienen provenance. Una respuesta sensible autoriza solamente esa pregunta en esa candidatura; no concede consentimiento global futuro. |
 | Email | Mensajes `.eml`, transportes simulados Gmail/Graph/IMAP, clasificación, enlace ambiguo, deduplicación, fechas y transición a prueba técnica/interview/rejection. Confirmaciones tardías no revierten fases posteriores. |
 | Recuperación OAuth | Se detectó un client secret ausente y se guardó desde el JSON local del mismo cliente Desktop, exclusivamente en el Llavero. Google confirmó intercambio de tokens y cuenta con HTTP 200. Los rechazos conocidos ahora tienen instrucciones concretas, se guardan sin incluir respuestas privadas del proveedor y aparecen en la app al volver del navegador. Estado OAuth de un solo uso y denegaciones con state inválido comprobados. |
+| Estado Gmail y Llavero | Muestreo del proceso real confirmó que `SecItemCopyMatching` retenía el hilo principal. El acceso al Llavero se ejecuta ahora fuera del bucle de la API. Una prueba con credenciales bloqueadas verifica que health, cuenta, progreso y onboarding siguen respondiendo y que no se inicia una segunda sincronización. La app instalada muestra Gmail conectado y la espera del Llavero por separado; no se ha completado todavía la primera sincronización real. |
 | Recuperación | Envío incierto bloquea reintentos; hechos históricos permanecen; backup cifrado, contraseña errónea rechazada, restauración pausada y migración de copias antiguas antes de sustituir datos. |
 | Navegador empaquetado | Desde la app nativa se abrió un sitio local en Chrome. Estado observado: `running=true`, `channel=chrome`, `last_error=null`, perfil separado bajo Application Support/Meridian. |
 | Laya instalado | Runtime MLX y modelo instalados fuera del checkout, en Application Support/Meridian. Inferencia real desde el botón de la app: `TYPE_TEXT`, target correcto, 1421,88 ms en esa ejecución. |
@@ -38,6 +39,8 @@ make build
 ```
 
 Tras corregir la conexión Gmail, **41 pruebas dirigidas** de correo, API y onboarding correctas, incluyendo fallos de OAuth, respuestas malformadas, redacción de datos privados y denegaciones. Ruff, ESLint y TypeScript correctos. Backend e interfaz recompilados e instalados; firma, hashes y checksum del nuevo DMG verificados.
+
+Después de separar la espera del Llavero: **43 pruebas dirigidas correctas**, más `frontend/tests/email_connection_e2e.py` con todas las respuestas API interceptadas. Comprueba que una autorización externa se refleja sin recargar, que se muestra el progreso del Llavero, que un error no genera un aviso de éxito y que la sincronización satisfactoria actualiza la cuenta. Ruff, ESLint y TypeScript correctos. Estado Connected y espera de permiso observados en la app nativa instalada con la cuenta real.
 
 Para las pruebas UI, arrancar en dos terminales un backend **aislado** y Vite antes de ejecutar `make test-ui`:
 

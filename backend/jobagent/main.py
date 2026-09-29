@@ -216,7 +216,7 @@ def create_app(data_dir: Path | None = None, token: str | None = None, secret_st
             raise ValueError("Use the secret field for credentials; config is stored in SQLite")
         if "secret" in payload and payload["secret"]:
             secret_name = f"{provider}:client_secret" if provider in ("gmail", "outlook") else f"{provider}:secret"
-            store.set(secret_name, payload["secret"])
+            await app.state.mail.credential("set", secret_name, payload["secret"])
         existing = app.state.db.one("SELECT * FROM integrations WHERE provider=?", (provider,))
         status = existing["status"] if existing else "configured"
         previous_config = json.loads(existing["config"]) if existing else {}
@@ -285,6 +285,10 @@ def create_app(data_dir: Path | None = None, token: str | None = None, secret_st
             "<h1>Email connected</h1><p>Return to Meridian and choose Sync inbox to complete the first sync.</p>",
             headers={"Cache-Control": "no-store", "Referrer-Policy": "no-referrer"},
         )
+
+    @app.get("/api/email/status")
+    async def email_status():
+        return app.state.mail.status()
 
     @app.post("/api/email/sync")
     async def email_sync():

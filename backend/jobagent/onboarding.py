@@ -146,6 +146,8 @@ def onboarding_status(db):
             mail_ready,
             "Connected email has completed a successful sync."
             if mail_ready
+            else "Email account connected. Complete the first sync in Email."
+            if connected
             else "Authorize an email account and complete its first sync.",
             started=bool(connected),
             attention=any(row["last_error"] for row in connected),

@@ -1,31 +1,31 @@
 {
-  "verified_at": "2026-09-29T15:56:15.439466+00:00",
-  "source_commit": "d4fd2c710b71052e1c7599c68484d43df8cb9943",
+  "verified_at": "2026-09-29T17:19:44.604369+00:00",
+  "source_commit": "773427e86897beb5f89b2f987b6862795263d286",
   "version": "0.1.0",
   "platform": "macOS 15+, Apple Silicon arm64",
   "installed_app": "/Users/alejandro/Applications/Meridian.app",
   "dmg": "/Users/alejandro/Projects/Job-search/src-tauri/target/release/bundle/dmg/Meridian_0.1.0_aarch64.dmg",
-  "dmg_sha256": "fae6ca25053c89a63c4cb3bee286c1589c149ce35bec8f380b9a6972a31cbaa4",
-  "dmg_bytes": 88058036,
+  "dmg_sha256": "7cbcd8e69f478e9b59817f394d7b7c32d82a0dfc42fc9b7b02e4632d23a277fb",
+  "dmg_bytes": 88103129,
   "executables": {
     "meridian": {
-      "sha256": "f15e353fcb2f3e5df168c093c9e611227bbff0fb34bd633c7cec316882e14b32",
+      "sha256": "788481d7027d6434110a82f67bd428bbc2cad1f61293edc095310b736587b5c8",
       "installed_copy_matches_build": true
     },
     "meridian-backend": {
-      "sha256": "500c25f67e7021a3cc49b6af03f4b756596668e1a6b3040b8f8657c4ad4598cc",
+      "sha256": "0d505d03f313d69f6c2ad2f2de6063b4ec265336e131cc7a899bcb6f75fcded1",
       "installed_copy_matches_build": true
     }
   },
   "database_revision": "0003_notifications",
   "production_record_counts": {
     "facts": 102,
-    "jobs": 124,
+    "jobs": 1636,
     "applications": 0,
-    "email_messages": 0
+    "email_messages": 45
   },
   "validation": {
-    "python_tests_passed": 159,
+    "python_tests_passed": 184,
     "rust_tests_passed": 3,
     "ui_e2e_flows_passed": 3,
     "lint": "passed",
@@ -39,7 +39,11 @@
     "brand_vectors_and_native_ui": "passed",
     "email_oauth_targeted_tests_passed": 43,
     "email_connection_ui_flow": "passed",
-    "native_email_keychain_progress": "passed"
+    "native_email_keychain_progress": "passed",
+    "daily_tracking_targeted_tests_passed": 19,
+    "daily_tracking_ui_manual": "passed",
+    "public_source_import": "passed",
+    "native_daily_and_tracker": "passed"
   },
   "signing": "ad hoc, not notarized",
   "real_applications_sent": 0,
@@ -48,7 +52,12 @@
     "sha256": "256719178a8e8542c13de8728a646e43332f8da62d4c8b9323425a9de9b5338e",
     "installed_copy_matches_build": true
   },
-  "validation_note": "Earlier suites are documented in VERIFICATION.md. This change passed 43 mail/API/onboarding tests and an isolated email UI regression. Native Gmail displays Connected and a separate macOS Keychain wait; the API stays responsive. Real initial mailbox sync still requires Keychain permission. Installed artifact hashes, signature and DMG checksum verified.",
+  "validation_note": "Daily tracking release: 184 Python and 3 Rust tests; final targeted 19 checks; three isolated UI flows and manual daily tracker/email-stage verification. Installed native Today and Tracker verified with 1,636 jobs, 704 matches and the top 50 daily. Public Trackr and GitHub sources and existing Indeed alerts imported into production. Gmail first sync imported 45 messages; the updated binary is waiting for macOS Keychain permission for its next sync. LinkedIn awaits inbox job alerts. No real applications sent.",
   "gmail_account_verified": true,
-  "real_email_initial_sync_verified": false
+  "real_email_initial_sync_verified": true,
+  "daily_recommendations": {
+    "matching_jobs": 704,
+    "visible_daily_limit": 50
+  },
+  "gmail_next_sync_waiting_for_keychain": true
 }

@@ -1,3 +1,4 @@
+import { OpportunityActions } from "./tracking";
 import { useEffect, useRef, useState } from "react";
 import {
   ArrowDownToLine,
@@ -116,9 +117,17 @@ export function JobDetail({ id, ctx }: { id: string; ctx: AppContext }) {
             </div>
           </div>
           <div className="detail-actions">
-            <Button onClick={() => setPrepare(true)}>
-              <BriefcaseIcon />
-              Prepare application
+            <OpportunityActions
+              job={{
+                ...j,
+                submitted:
+                  !!j.application &&
+                  !["PREPARING", "NEEDS_REVIEW"].includes(j.application.status),
+              }}
+              ctx={ctx}
+            />
+            <Button secondary onClick={() => setPrepare(true)}>
+              Prepare documents
             </Button>
             <Button secondary onClick={() => setGenerate(true)}>
               <Sparkles size={15} />
@@ -126,7 +135,11 @@ export function JobDetail({ id, ctx }: { id: string; ctx: AppContext }) {
             </Button>
             <Button
               secondary
-              onClick={() => ctx.act("external", () => openExternal(j.url))}
+              onClick={() =>
+                ctx.act("external", () =>
+                  openExternal(j.application_url || j.url),
+                )
+              }
             >
               <ExternalLink size={15} />
               View posting
@@ -153,6 +166,46 @@ export function JobDetail({ id, ctx }: { id: string; ctx: AppContext }) {
           </div>
           <div className="detail-grid">
             <div>
+              {j.metadata?.company_description && (
+                <Panel
+                  title="About the company"
+                  description={`Source: ${j.metadata.company_source || j.source}`}
+                >
+                  <p className="panel-copy">{j.metadata.company_description}</p>
+                  {j.metadata.company_url && (
+                    <Button
+                      secondary
+                      onClick={() =>
+                        ctx.act("company-site", () =>
+                          openExternal(j.metadata.company_url),
+                        )
+                      }
+                    >
+                      Company careers site <ExternalLink size={14} />
+                    </Button>
+                  )}
+                </Panel>
+              )}
+              <Panel title="Application details">
+                <KeyValues
+                  data={{
+                    deadline:
+                      j.metadata?.application_deadline || "Not supplied",
+                    cv_required:
+                      j.metadata?.cv_required == null
+                        ? "Not supplied"
+                        : j.metadata.cv_required
+                          ? "Yes"
+                          : "No",
+                    cover_letter: j.metadata?.cover_letter || "Not supplied",
+                    written_answers:
+                      j.metadata?.written_answers || "Not supplied",
+                    sponsorship: j.metadata?.sponsorship || "Not supplied",
+                    recruitment_process:
+                      j.metadata?.recruitment_process || "Not supplied",
+                  }}
+                />
+              </Panel>
               <Panel title="Role overview">
                 <div className="prose-text">
                   {j.description ||
@@ -252,9 +305,6 @@ export function JobDetail({ id, ctx }: { id: string; ctx: AppContext }) {
       )}
     </Resource>
   );
-}
-function BriefcaseIcon() {
-  return <FileText size={15} />;
 }
 function MatchBreakdown({ data }: { data: Data }) {
   const d = data.details || data.match_details || data;
@@ -609,71 +659,77 @@ export function ApplicationDetail({
             </Button>
           </div>
           <div className="detail-actions">
-            {["needs_review", "ready_for_review"].includes(
-              a.runs?.at(-1)?.status,
-            ) ? (
-              <Button onClick={() => setApprove(true)}>
-                <ShieldCheck size={15} />
-                Review & approve submission
-              </Button>
-            ) : (
-              ![
-                "APPLIED",
-                "CONFIRMED",
-                "OFFER",
-                "REJECTED",
-                "WITHDRAWN",
-                "INTERVIEW",
-                "FINAL_INTERVIEW",
-              ].includes(a.status) && (
+            {a.mode !== "manual" && (
+              <>
+                {["needs_review", "ready_for_review"].includes(
+                  a.runs?.at(-1)?.status,
+                ) ? (
+                  <Button onClick={() => setApprove(true)}>
+                    <ShieldCheck size={15} />
+                    Review & approve submission
+                  </Button>
+                ) : (
+                  ![
+                    "APPLIED",
+                    "CONFIRMED",
+                    "OFFER",
+                    "REJECTED",
+                    "WITHDRAWN",
+                    "INTERVIEW",
+                    "FINAL_INTERVIEW",
+                  ].includes(a.status) && (
+                    <Button
+                      loading={ctx.busy === "apply"}
+                      onClick={() =>
+                        ctx.act(
+                          "apply",
+                          () => api(`/applications/${id}/apply`, "POST", {}),
+                          "Browser run started.",
+                        )
+                      }
+                    >
+                      <Play size={15} />
+                      Apply
+                    </Button>
+                  )
+                )}
                 <Button
-                  loading={ctx.busy === "apply"}
+                  secondary
                   onClick={() =>
                     ctx.act(
-                      "apply",
-                      () => api(`/applications/${id}/apply`, "POST", {}),
-                      "Browser run started.",
+                      "takeover",
+                      () => api(`/applications/${id}/takeover`, "POST", {}),
+                      "Agent paused. Your browser is ready for manual control.",
+                    )
+                  }
+                >
+                  <Hand size={15} />
+                  Take control
+                </Button>
+                <Button
+                  secondary
+                  onClick={() =>
+                    ctx.act(
+                      "resume",
+                      () => api(`/applications/${id}/resume`, "POST", {}),
+                      "Agent resumed from a fresh observation.",
                     )
                   }
                 >
                   <Play size={15} />
-                  Apply
+                  Resume agent
                 </Button>
-              )
-            )}
-            <Button
-              secondary
-              onClick={() =>
-                ctx.act(
-                  "takeover",
-                  () => api(`/applications/${id}/takeover`, "POST", {}),
-                  "Agent paused. Your browser is ready for manual control.",
-                )
-              }
-            >
-              <Hand size={15} />
-              Take control
-            </Button>
-            <Button
-              secondary
-              onClick={() =>
-                ctx.act(
-                  "resume",
-                  () => api(`/applications/${id}/resume`, "POST", {}),
-                  "Agent resumed from a fresh observation.",
-                )
-              }
-            >
-              <Play size={15} />
-              Resume agent
-            </Button>
-            {a.runs?.some((run) =>
-              ["interrupted", "unconfirmed", "submitting"].includes(run.status),
-            ) && (
-              <Button secondary onClick={() => setReconcile(true)}>
-                <ShieldCheck size={15} />
-                Reconcile submission
-              </Button>
+                {a.runs?.some((run) =>
+                  ["interrupted", "unconfirmed", "submitting"].includes(
+                    run.status,
+                  ),
+                ) && (
+                  <Button secondary onClick={() => setReconcile(true)}>
+                    <ShieldCheck size={15} />
+                    Reconcile submission
+                  </Button>
+                )}
+              </>
             )}
             <Button
               secondary
@@ -684,20 +740,21 @@ export function ApplicationDetail({
             </Button>
           </div>
           <div className="tabs">
-            {["overview", "answers", "documents", "email", "automation"].map(
-              (t) => (
-                <button
-                  key={t}
-                  className={tab === t ? "active" : ""}
-                  onClick={() => setTab(t)}
-                >
-                  {label(t)}
-                  {t === "answers" && a.answers?.length
-                    ? ` (${a.answers.length})`
-                    : ""}
-                </button>
-              ),
-            )}
+            {(a.mode === "manual"
+              ? ["overview", "documents", "email"]
+              : ["overview", "answers", "documents", "email", "automation"]
+            ).map((t) => (
+              <button
+                key={t}
+                className={tab === t ? "active" : ""}
+                onClick={() => setTab(t)}
+              >
+                {label(t)}
+                {t === "answers" && a.answers?.length
+                  ? ` (${a.answers.length})`
+                  : ""}
+              </button>
+            ))}
           </div>
           {tab === "overview" && (
             <div className="detail-grid">

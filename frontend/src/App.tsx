@@ -15,9 +15,8 @@ import {
   Mail,
   Menu,
   Moon,
-  Pause,
-  Play,
   Search,
+  RefreshCw,
   Settings2,
   ShieldCheck,
   Sun,
@@ -36,9 +35,9 @@ import {
   Discover,
   Documents,
   Email,
-  Jobs,
   Profile,
 } from "./pages";
+import { Daily, Tracker } from "./tracking";
 import { Automation, Settings } from "./settings";
 import { Detail } from "./details";
 import {
@@ -51,17 +50,17 @@ import {
   Tag,
 } from "./components";
 const navigation = [
-  { id: "dashboard", label: "Overview", icon: LayoutDashboard },
-  { id: "discover", label: "Discover", icon: Compass },
-  { id: "jobs", label: "Jobs", icon: BriefcaseBusiness },
-  { id: "applications", label: "Applications", icon: LayoutDashboard },
+  { id: "dashboard", label: "Today", icon: LayoutDashboard },
+  { id: "discover", label: "Sources", icon: Compass },
+  { id: "jobs", label: "Opportunities", icon: BriefcaseBusiness },
+  { id: "applications", label: "Tracker", icon: LayoutDashboard },
   { id: "review", label: "Review queue", icon: ShieldCheck },
   { id: "companies", label: "Companies", icon: Building2 },
   { id: "profile", label: "Profile", icon: GraduationCap },
   { id: "documents", label: "Documents", icon: FileText },
   { id: "email", label: "Email", icon: Mail },
   { id: "analytics", label: "Analytics", icon: TrendingUp },
-  { id: "automation", label: "Automation", icon: Zap },
+  { id: "automation", label: "Advanced automation", icon: Zap },
   { id: "activity", label: "Activity", icon: ActivityIcon },
   { id: "settings", label: "Settings", icon: Settings2 },
 ] as const;
@@ -170,22 +169,36 @@ export default function App() {
     localStorage.setItem("meridian-theme", value);
   }, []);
   const attention = items(tasks.data).filter(
-      (t) =>
-        !["resolved", "completed"].includes(String(t.status).toLowerCase()),
-    ).length,
-    paused = automation.data?.paused ?? true;
+    (t) => !["resolved", "completed"].includes(String(t.status).toLowerCase()),
+  ).length;
   return (
     <div className="app-shell">
       <aside className={`sidebar ${sidebar ? "shown" : ""}`}>
         <div className="brand" data-tauri-drag-region>
           <span className="brand-symbol" aria-hidden="true">
-            <img className="brand-on-light" src="/brand/meridian-symbol.svg" alt="" />
-            <img className="brand-on-dark" src="/brand/meridian-symbol-light.svg" alt="" />
+            <img
+              className="brand-on-light"
+              src="/brand/meridian-symbol.svg"
+              alt=""
+            />
+            <img
+              className="brand-on-dark"
+              src="/brand/meridian-symbol-light.svg"
+              alt=""
+            />
           </span>
           <div>
             <span className="brand-wordmark" aria-label="Meridian" role="img">
-              <img className="brand-on-light" src="/brand/meridian-wordmark.svg" alt="" />
-              <img className="brand-on-dark" src="/brand/meridian-wordmark-light.svg" alt="" />
+              <img
+                className="brand-on-light"
+                src="/brand/meridian-wordmark.svg"
+                alt=""
+              />
+              <img
+                className="brand-on-dark"
+                src="/brand/meridian-wordmark-light.svg"
+                alt=""
+              />
             </span>
             <span>YOUR CAREER WORKSPACE</span>
           </div>
@@ -276,30 +289,23 @@ export default function App() {
               <span>Search anything</span>
               <kbd>⌘ K</kbd>
             </button>
-            <span className={`automation-state ${paused ? "" : "is-active"}`}>
+            <span className="automation-state">
               <span className="status-dot" />
-              {paused ? "Paused" : "Active"}
+              Daily job search
             </span>
             <Button
-              secondary={!paused}
-              danger={!paused}
-              loading={busy === "global-pause"}
-              disabled={!automation.data}
+              secondary
+              loading={busy === "global-refresh"}
               onClick={() =>
                 act(
-                  "global-pause",
-                  () =>
-                    api(
-                      `/automation/${paused ? "resume" : "pause"}`,
-                      "POST",
-                      {},
-                    ),
-                  paused ? "Automation resumed." : "Automation paused.",
+                  "global-refresh",
+                  () => api("/daily/refresh", "POST", {}),
+                  "Checking your job sources.",
                 )
               }
             >
-              {paused ? <Play size={14} /> : <Pause size={14} />}
-              <span>{paused ? "Resume" : "Pause automation"}</span>
+              <RefreshCw size={14} />
+              <span>Refresh jobs</span>
             </Button>
             <IconButton
               title={`${attention} items need attention`}
@@ -324,13 +330,17 @@ export default function App() {
             </div>
           )}
           {page === "dashboard" ? (
-            <Dashboard ctx={ctx} />
+            target === "setup" ? (
+              <Dashboard ctx={ctx} />
+            ) : (
+              <Daily ctx={ctx} />
+            )
           ) : page === "jobs" ? (
-            <Jobs ctx={ctx} />
+            <Tracker ctx={ctx} opportunities />
           ) : page === "discover" ? (
             <Discover ctx={ctx} />
           ) : page === "applications" ? (
-            <Applications ctx={ctx} />
+            <Tracker ctx={ctx} />
           ) : page === "review" ? (
             <Applications ctx={ctx} review />
           ) : page === "companies" ? (

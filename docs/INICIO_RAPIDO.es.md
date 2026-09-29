@@ -1,17 +1,14 @@
-# Empezar con Meridian
+# Meridian: ofertas diarias y seguimiento
 
-Abre **Meridian.app** en tu carpeta de Aplicaciones. Los datos se guardan en `~/Library/Application Support/Meridian/`. La app comienza con automatización pausada.
+Abre **Meridian.app** en Aplicaciones. **Today** muestra una selección diaria de ofertas según tus preferencias; **Refresh jobs** consulta las fuentes en ese momento. La búsqueda programada funciona mientras la app está abierta y se pone al día después del reposo. Cerrar la ventana conserva la app en la barra de menús; **Quit Meridian** la detiene.
 
-1. En **Documents**, importa tu CV PDF/DOCX/texto. En **Profile**, corrige y verifica los hechos. Añade explícitamente contacto y permisos de trabajo.
-2. En **Discover**, crea un perfil con roles, ubicaciones y preferencias. Añade fuentes públicas o páginas de empresas y pulsa **Run search**. Para salarios, indica mínimo anual y moneda; importes incompatibles quedan como desconocidos.
-3. En **Automation**, abre el navegador dedicado e inicia sesión tú mismo donde sea necesario. Las sesiones quedan separadas de tu Chrome habitual.
-4. En **Email**, conecta Gmail, Outlook o IMAP siguiendo [README](../README.md#email-setup). También puedes importar un `.eml` para asociarlo a una candidatura.
-5. Selecciona una oferta, revisa su encaje y pulsa **Prepare**. Selecciona o genera un CV, comprueba el diff y aprueba el documento.
-6. Reanuda la automatización y usa **Review**. Responde las preguntas pendientes. Revisa las respuestas y documentos antes de **Approve & Submit**.
-7. Consulta **Applications**, la timeline y **Analytics**. Los cambios detectados por correo aparecen como eventos automáticos.
+1. Consulta **Today**: puesto, empresa, ubicación, fuente y enlace original. **Save** guarda para después; **Pass** aparta una oferta y permite restaurarla desde **Tracker → Ignored**.
+2. Pulsa **Open application** y presenta la candidatura en la web del empleador. Después, **Mark applied → Save as applied** registra la fecha y tus notas. Abrir el enlace por sí solo no equivale a haber aplicado.
+3. En **Tracker** tienes empresa, puesto, ubicación, fuente, fase, fecha de envío, plazos, último correo y notas. Filtra **To apply**, **Saved for later** o **Applied**. Puedes cambiar la fase y abrir **Timeline & notes**.
+4. **Email** muestra la cuenta y su última sincronización. Los correos de confirmación, pruebas, entrevistas y decisiones actualizan candidaturas cuando la relación es clara. Los ambiguos requieren revisión. Una confirmación con empresa y título completos e inequívocos puede registrar la candidatura automáticamente.
+5. **Sources** permite editar tus 27 roles, países/ciudades y fuentes. GitHub y Trackr se consultan directamente; las alertas compatibles de Indeed y LinkedIn se importan desde el buzón. LinkedIn requiere recibir sus alertas para que esa fuente tenga ofertas. La app mantiene visibles los errores de cada fuente.
+6. **Profile** conserva los hechos verificados de tu CV. **Documents** permite consultar o preparar documentación. El navegador y el envío asistido quedan como opciones en **Advanced automation**, fuera del flujo diario.
 
-Laya ya está instalado localmente. Puedes comprobarlo en **Settings → AI & providers → Test engine**. No hace falta configurar una API de pago para usar el perfil, documentos, discovery público, matching, navegador determinista, email o Laya.
+Los datos permanecen en `~/Library/Application Support/Meridian/`. No se envían candidaturas automáticamente con esta configuración. La información de empresa y los requisitos se muestran con su fuente; los campos que la fuente no publica quedan como desconocidos. Una oferta puede cerrar después de importarse: comprueba su disponibilidad al abrir el enlace.
 
-Cerrar la ventana mantiene Meridian en la barra de menús. **Quit Meridian** detiene los servicios. Activa el scheduler en Settings cuando quieras consultas periódicas. Conserva una copia cifrada desde **Backup & restore**.
-
-Ante un envío incierto, comprueba la página y tu correo antes de reconciliar el estado; no vuelvas a enviar a ciegas. Los formularios no reconocidos, MFA y CAPTCHA requieren tu intervención.
+Gmail ya completó la primera lectura. Si macOS solicita permiso del llavero tras una actualización, hay que responder personalmente al aviso; **Email** muestra esa espera sin bloquear la búsqueda de ofertas.

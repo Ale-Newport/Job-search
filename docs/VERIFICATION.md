@@ -1,3 +1,18 @@
+# Verificación de la versión de seguimiento diario — 29 de septiembre de 2026
+
+La pantalla principal es **Today** y **Tracker** reúne oportunidades y candidaturas. Se verificó en una copia aislada el alta manual, la marca de envío sin documentos, la persistencia, la incorporación de un correo de prueba y el cambio a prueba técnica con plazo. La configuración de producción conserva los hechos del CV y las preferencias; pausa los envíos, activa una consulta por día y añade GitHub, Trackr y fuentes de alertas.
+
+- Backend: 184 pruebas Python y 3 Rust superadas. Incluyen registro idempotente, correos ambiguos, asociación posterior, fechas, tablas Markdown/HTML y alertas sin parámetros personales.
+- Fuentes públicas: dos repositorios de GitHub y Trackr importados con respuestas reales, además de los ocho ATS existentes. El primer ensayo incorporó 1.371 ofertas nuevas; los enlaces se obtienen de las filas originales.
+- Indeed: 254 apariciones de ofertas en las alertas existentes se redujeron a 141 ofertas únicas en la copia de prueba. Los boletines dejan de crear tareas falsas de candidatura.
+- Gmail: primera sincronización real confirmada a las 16:34:50 UTC del 29 de septiembre, 45 mensajes importados en ese momento; cuenta conectada y sin error. Esto sustituye el bloqueo del llavero documentado en el historial.
+- No se envió ninguna candidatura real. Las modificaciones de fases durante QA se hicieron exclusivamente en una base separada.
+- Limitaciones explícitas: LinkedIn está preparado para alertas recibidas pero todavía no hay alertas verificadas de esa fuente. La búsqueda funciona mientras Meridian está ejecutándose y no despierta el Mac. La geografía sigue sin limitarse hasta que el usuario indique su preferencia. Las descripciones, fases y requisitos no publicados se mantienen desconocidos.
+
+El manifiesto de release registra los recuentos finales de producción, hashes del paquete instalado y la validación del DMG. Los registros que siguen son históricos y corresponden a versiones anteriores.
+
+## Historial de verificaciones anteriores
+
 # Meridian: verificación y límites observados
 
 Fecha de verificación: 29 de septiembre de 2026. Equipo: Apple M2 Max, 64 GB, macOS 15.7.3, arm64. El producto arranca sin ofertas, candidaturas ni hechos profesionales ficticios. Los datos sintéticos se usan exclusivamente en directorios temporales o `.local-data/qa`.

@@ -481,7 +481,7 @@ export function Settings({
                     const shown = await ctx.act("onboarding", () =>
                       api("/onboarding", "PATCH", { hidden: false }),
                     );
-                    if (shown) ctx.navigate("dashboard");
+                    if (shown) ctx.navigate("dashboard", "setup");
                   }}
                 >
                   Show guide

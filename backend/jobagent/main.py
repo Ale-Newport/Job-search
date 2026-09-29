@@ -86,7 +86,11 @@ def create_app(data_dir: Path | None = None, token: str | None = None, secret_st
             from .core import get_settings
 
             settings = get_settings(app.state.db)
-            if settings.get("browser_engine") in ("laya", "hybrid") and settings.get("laya_autostart", True):
+            if (
+                not settings.get("tracking_first", True)
+                and settings.get("browser_engine") in ("laya", "hybrid")
+                and settings.get("laya_autostart", True)
+            ):
                 state = await app.state.laya_runtime.status()
                 if state["installed"]:
                     await app.state.laya_runtime.start()
@@ -115,6 +119,12 @@ def create_app(data_dir: Path | None = None, token: str | None = None, secret_st
             scheduler.cancel()
             with contextlib.suppress(asyncio.CancelledError):
                 await scheduler
+        for name in ("daily_refresh_task", "mail_sync_task"):
+            task = getattr(app.state, name, None)
+            if task:
+                task.cancel()
+                with contextlib.suppress(asyncio.CancelledError):
+                    await task
         if model_start:
             model_start.cancel()
             with contextlib.suppress(asyncio.CancelledError):
@@ -187,6 +197,9 @@ def create_app(data_dir: Path | None = None, token: str | None = None, secret_st
     from .onboarding import router as onboarding_router, record_ai_probe, record as onboarding_record
 
     app.include_router(onboarding_router, prefix="/api")
+    from .tracking import router as tracking_router
+
+    app.include_router(tracking_router, prefix="/api")
 
     @app.get("/api/health")
     async def health():
@@ -604,7 +617,15 @@ async def schedule(app):
             continue
         current = asyncio.get_running_loop().time()
         try:
-            if (
+            if settings.get("tracking_first", True):
+                from datetime import datetime
+                from .tracking import refresh_daily
+
+                daily = settings.get("daily_last_refresh") or {}
+                if daily.get("day") != datetime.now().astimezone().date().isoformat() and current - last_search >= 60:
+                    last_search = current
+                    await refresh_daily(app.state.db, app.state.data_dir)
+            elif (
                 not settings.get("automation_paused", True)
                 and current - last_search >= max(15, int(settings.get("discovery_interval_minutes", 120))) * 60
             ):
@@ -618,7 +639,16 @@ async def schedule(app):
                 >= max(5, int(settings.get("email_interval_minutes", settings.get("email_poll_minutes", 10)))) * 60
             ):
                 last_mail = current
-                await app.state.mail.sync()
+                task = getattr(app.state, "mail_sync_task", None)
+                if task is None or task.done():
+
+                    async def sync_mail():
+                        try:
+                            await app.state.mail.sync()
+                        except Exception:
+                            logger.warning("scheduled_mail_failed", exc_info=False)
+
+                    app.state.mail_sync_task = asyncio.create_task(sync_mail())
         except Exception:
             logger.warning("scheduler_task_failed", exc_info=False)
 

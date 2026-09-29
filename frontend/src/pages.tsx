@@ -472,6 +472,7 @@ const sourceFields: Field[] = [
       "workday",
       "careers",
       "github",
+      "trackr",
       "linkedin",
       "indeed",
       "json",
@@ -788,19 +789,29 @@ export function Discover({ ctx }: { ctx: AppContext }) {
                           value={
                             !s.enabled
                               ? "paused"
-                              : s.last_error
-                                ? "error"
-                                : s.last_checked
-                                  ? "connected"
-                                  : "not checked"
+                              : s.config?.delivery === "email"
+                                ? s.last_checked
+                                  ? "receiving alerts"
+                                  : "awaiting alerts"
+                                : s.last_error
+                                  ? "error"
+                                  : s.last_checked
+                                    ? "connected"
+                                    : "not checked"
                           }
                         />
                       </td>
                       <td>
                         <div className="actions">
                           <IconButton
-                            title={`Run ${s.name}`}
-                            disabled={!!ctx.busy}
+                            title={
+                              s.config?.delivery === "email"
+                                ? "Received through inbox sync"
+                                : `Run ${s.name}`
+                            }
+                            disabled={
+                              !!ctx.busy || s.config?.delivery === "email"
+                            }
                             onClick={() =>
                               ctx.act(
                                 `source:${s.id}`,

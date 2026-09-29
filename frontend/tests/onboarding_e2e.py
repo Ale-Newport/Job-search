@@ -30,7 +30,7 @@ async def main():
         page.on("pageerror", lambda error: errors.append(str(error)))
         health = await page.request.get(base + "/api/health", headers=headers)
         assert health.ok, await health.text()
-        assert (await health.json())["data_dir"].rstrip("/").endswith(("/.local-data/qa", "/.local-data/onboarding-ui-qa")), "Refusing to modify a non-QA workspace"
+        assert (await health.json())["data_dir"].rstrip("/").endswith(("/.local-data/qa", "/.local-data/onboarding-ui-qa", "/.local-data/tracking-qa")), "Refusing to modify a non-QA workspace"
         response = await page.request.get(base + "/api/onboarding", headers=headers)
         assert response.ok, await response.text()
         original = await response.json()
@@ -40,6 +40,8 @@ async def main():
         try:
             print("Checking guide evidence and visibility", flush=True)
             await page.goto(base)
+            await page.get_by_role("navigation").get_by_role("button", name="Settings", exact=True).click()
+            await page.get_by_role("button", name="Show guide", exact=True).click()
             await expect(page.locator("[data-step]")).to_have_count(8)
             for step in original["steps"]:
                 await expect(page.locator(f'[data-step="{step["id"]}"]')).to_have_attribute("data-status", step["status"])
@@ -60,17 +62,19 @@ async def main():
             assert await preset.get_by_label("Output price per million tokens (USD)", exact=True).input_value() == "1.2"
             assert await preset.get_by_label("DeepSeek API key", exact=True).input_value() == ""
             await preset.get_by_role("button", name="Cancel", exact=True).click()
-            await page.get_by_role("navigation").get_by_role("button", name="Overview", exact=True).click()
+            await page.get_by_role("navigation").get_by_role("button", name="Settings", exact=True).click()
+            await page.get_by_role("button", name="Show guide", exact=True).click()
             await page.locator('[data-step="profile"]').click()
             assert await page.get_by_label("Fact verification", exact=True).input_value() == "unverified"
-            await page.get_by_role("navigation").get_by_role("button", name="Overview", exact=True).click()
+            await page.get_by_role("navigation").get_by_role("button", name="Settings", exact=True).click()
+            await page.get_by_role("button", name="Show guide", exact=True).click()
             await page.locator('[data-step="boundaries"]').click()
             await page.get_by_role("heading", name="Application safety & scheduling", exact=True).wait_for()
             await page.get_by_role("button", name=re.compile(r"^(I have reviewed these boundaries|Confirm boundaries again)$")).click()
             await page.get_by_role("button", name="Record my review", exact=True).click()
             await page.get_by_role("button", name="Confirm boundaries again", exact=True).wait_for()
             print("Checking explicit browser confirmation and IMAP connect contract", flush=True)
-            await page.get_by_role("navigation").get_by_role("button", name="Automation", exact=True).click()
+            await page.get_by_role("navigation").get_by_role("button", name="Advanced automation", exact=True).click()
             await page.get_by_role("button", name=re.compile(r"^(Confirm I am signed in|Update sign-in confirmation)$")).click()
             account = page.get_by_role("dialog", name="Confirm browser sign-in", exact=True)
             checkbox = account.get_by_role("checkbox")
@@ -124,7 +128,8 @@ async def main():
             assert reimported["version"]["id"] == imported["version"]["id"]
             await page.get_by_role("heading", name="Extraction is up to date", exact=True).wait_for()
             await page.screenshot(path=str(output / "import-fact-review.png"), full_page=True)
-            await page.get_by_role("navigation").get_by_role("button", name="Overview", exact=True).click()
+            await page.get_by_role("navigation").get_by_role("button", name="Settings", exact=True).click()
+            await page.get_by_role("button", name="Show guide", exact=True).click()
             await expect(page.locator("[data-step]")).to_have_count(8)
             await page.screenshot(path=str(output / "onboarding-progress.png"), full_page=True)
             if errors:

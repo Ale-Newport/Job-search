@@ -76,6 +76,8 @@ DEFAULT_SETTINGS = {
     "email_interval_minutes": 10,
     "discovery_interval_minutes": 120,
     "scheduler_enabled": False,
+    "tracking_first": True,
+    "daily_min_match": 50,
     "rules": [],
     "sensitive_policies": {},
 }
@@ -664,6 +666,7 @@ class SourcePayload(Payload):
         "lever",
         "ashby",
         "github",
+        "trackr",
         "json",
         "csv",
         "url",
@@ -1273,7 +1276,7 @@ async def settings_patch(payload: dict, request: Request):
             not isinstance(value, (int, float)) or not 0.5 <= value <= 1
         ):
             raise HTTPException(422, "Confidence must be between 0.5 and 1")
-        if key == "min_match" and (not isinstance(value, (int, float)) or not 0 <= value <= 100):
+        if key in {"min_match", "daily_min_match"} and (not isinstance(value, (int, float)) or not 0 <= value <= 100):
             raise HTTPException(422, "Minimum match must be between 0 and 100")
         if key == "monthly_budget" and (not isinstance(value, (int, float)) or value < 0):
             raise HTTPException(422, "Budget must be nonnegative")

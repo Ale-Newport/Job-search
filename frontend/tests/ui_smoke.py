@@ -22,10 +22,10 @@ async def main():
         page = await browser.new_page(viewport={'width': 1440, 'height': 1080})
         page.on('pageerror', lambda error: errors.append(str(error)))
         await page.goto(args.base_url)
-        await page.get_by_role('heading', name='A clearer path to your next role.').wait_for()
-        await page.get_by_text('Jobs discovered', exact=True).wait_for()
+        await page.get_by_role('heading', name='A new day. Your next opportunity.').wait_for()
+        await page.get_by_text('new matches today', exact=True).wait_for()
         await page.screenshot(path=str(output / 'dashboard.png'), full_page=True)
-        pages = [('Discover', 'Discover'), ('Jobs', 'Jobs'), ('Applications', 'Applications'), ('Review queue', 'Review queue'), ('Companies', 'Companies'), ('Profile', 'Your profile'), ('Documents', 'Documents'), ('Email', 'Email'), ('Analytics', 'Analytics'), ('Automation', 'Automation'), ('Activity', 'Activity'), ('Settings', 'Settings')]
+        pages = [('Sources', 'Discover'), ('Opportunities', 'Opportunities'), ('Tracker', 'Application tracker'), ('Review queue', 'Review queue'), ('Companies', 'Companies'), ('Profile', 'Your profile'), ('Documents', 'Documents'), ('Email', 'Email'), ('Analytics', 'Analytics'), ('Advanced automation', 'Automation'), ('Activity', 'Activity'), ('Settings', 'Settings')]
         for nav, heading in pages:
             print(f'Checking view: {nav}', flush=True)
             await page.get_by_role('navigation').get_by_role('button', name=nav, exact=False).click()
@@ -43,7 +43,7 @@ async def main():
         await page.get_by_text('UI smoke rule', exact=True).wait_for()
         await page.get_by_role('button', name='Remove UI smoke rule', exact=True).click()
         await page.get_by_role('button', name='Remove rule', exact=True).click()
-        await page.get_by_role('navigation').get_by_role('button', name='Discover', exact=True).click()
+        await page.get_by_role('navigation').get_by_role('button', name='Sources', exact=True).click()
         print('Checking source configuration CRUD', flush=True)
         await page.get_by_role('button', name='Add source', exact=True).first.click()
         await page.get_by_role('textbox', name='Source name', exact=True).fill('UI smoke source')
@@ -94,7 +94,7 @@ async def main():
         await page.get_by_role('button', name='Search anything').click()
         await page.get_by_role('dialog', name='Search your workspace').wait_for()
         await page.keyboard.press('Escape')
-        await page.get_by_role('navigation').get_by_role('button', name='Overview', exact=True).click()
+        await page.get_by_role('navigation').get_by_role('button', name='Today', exact=True).click()
         await page.get_by_role('button', name='Toggle appearance', exact=True).click()
         await page.wait_for_timeout(200)
         await page.screenshot(path=str(output / 'dashboard-dark.png'), full_page=True)

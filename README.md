@@ -1,6 +1,6 @@
 # Meridian
 
-A private macOS workspace for a personal job search: a verified candidate knowledge base, versioned documents, public job discovery, explainable matching, review-first browser assistance, application history and read-only recruitment email tracking.
+A private macOS workspace for daily job recommendations, direct application links and a table of every opportunity and application. Public ATS boards, GitHub lists, Trackr and inbox alerts feed the list. You apply externally, record the submission, and matching recruitment emails update the timeline. Verified CV facts and optional document assistance support this workflow.
 
 [Guía de inicio en español](docs/INICIO_RAPIDO.es.md) · [Verification and observed limitations](docs/VERIFICATION.md)
 
@@ -23,14 +23,14 @@ For frontend development without Tauri, run `make backend` and `make dev-web` in
 
 1. Import a PDF, DOCX or text CV in Documents. Review proposed facts in Profile, correct them and mark the facts verified. Import does not verify facts automatically.
 2. Add contact details, education, experience, projects, skills and work authorization. A locked fact cannot be changed without unlocking it. Add relationships between facts as evidence for skills.
-3. Configure search profiles and public sources. For a Greenhouse, Lever or Ashby source, provide its board URL and board identifier. SmartRecruiters, JSON, CSV, RSS, GitHub lists and company career pages are also supported. Company watchlist entries create monitored sources.
-4. Run a search or paste a job URL. Inspect score components, missing evidence and exclusions. A missing skill is not automatically a rejection.
-5. Select a job and prepare an application. Choose a document version or preview a grounded CV/cover letter and its difference from the base. Approve the resulting document before autonomous use.
-6. Open the dedicated browser to sign into a platform yourself. Passwords never pass through Meridian's profile forms. Chrome sessions stay inside Meridian's separate browser profile.
-7. Resume automation, then Apply in Review mode. Known, verified fields are filled. Unknown or sensitive questions create human tasks. Resolve a question, save the answer and resume. Review the exact answers and documents before **Approve & Submit**.
-8. Connect recruitment email or import an `.eml` message. Confident links update the timeline; ambiguous links wait for your decision.
+3. Configure search profiles and public sources. For a Greenhouse, Lever or Ashby source, provide its board URL and board identifier. SmartRecruiters, JSON, CSV, RSS, GitHub Markdown/HTML tables, Trackr and company career pages are also supported. Company watchlist entries create monitored sources.
+4. Open **Today** for up to 50 recommendations, ranked by freshness, graduate/junior suitability and profile match. **Refresh jobs** checks sources immediately. With scheduling enabled, discovery runs once per local calendar day and catches up after sleep or reopening.
+5. Choose **Open application** to visit the original posting. Opening a link never marks it submitted. Use **Mark applied** after submitting externally, with the actual date and optional notes. Save promising roles for later or pass on them.
+6. Use **Tracker** for company, role, location, source, stage, application date, next deadline, last email, notes and the application link. Filter prospective, saved, applied and ignored roles; edit stages or open the timeline. Company descriptions, materials and deadlines retain source attribution; missing fields remain unknown.
+7. Connect recruitment email or import an `.eml`. A unique full company/title confirmation can create a tracked application; ambiguous messages wait for review. Older unlinked emails are reconsidered when you record an application. Email job alerts add opportunities, not application events.
+8. Optional document tailoring and browser assistance remain under the role detail and **Advanced automation**. **Settings → Show guide** opens the full setup guide. Daily discovery operates independently of paused submission automation.
 
-Manual mode prepares only. Review mode fills but requires submission approval. Auto mode additionally requires an explicit global opt-in, exact approved domain, sufficient match/confidence, approved documents, verified answers, no sensitive fields and rate limits. Rules can prepare matching jobs; automatic rules use the same submission gates. Select a default approved CV for rules that should proceed without document selection.
+Externally recorded applications use manual tracking and need no CV approval or browser session. The optional browser engine’s manual mode prepares only. Review mode fills but requires submission approval. Auto mode additionally requires an explicit global opt-in, exact approved domain, sufficient match/confidence, approved documents, verified answers, no sensitive fields and rate limits. Rules can prepare matching jobs; automatic rules use the same submission gates. Select a default approved CV for rules that should proceed without document selection.
 
 **Pause automation** prevents subsequent browser actions. It cannot undo a network request already sent to a website. **Take control** lets you interact with the visible browser. After an uncertain submission or process interruption, reconcile what actually happened before retrying. Meridian never assumes that clicking Submit means the application succeeded.
 
@@ -38,7 +38,7 @@ Manual mode prepares only. Review mode fills but requires submission approval. A
 
 Public ATS APIs are preferred over scraping. The supported application adapters identify Greenhouse, Lever, Ashby, Workday, SmartRecruiters, Workable, Teamtailor, iCIMS and Taleo and reuse guarded semantic form handling. Adapter identification is not a promise that every employer's custom form can be completed unattended. Unsupported widgets, ambiguous navigation, validation errors, CAPTCHA and MFA stop for human takeover.
 
-LinkedIn and Indeed use manual browser handoff. There is no stealth, CAPTCHA bypass, fingerprint spoofing or rate-limit evasion. Company pages without structured job data may require a direct public ATS source or manual job entry. Source health records the actual fetch result/error.
+LinkedIn and Indeed feed discovery through supported email alerts and manual posting entry; the app does not claim an active source before an alert arrives. Indeed plain-text alerts and LinkedIn/Indeed HTML job links are parsed conservatively, with personalized tracking parameters removed from saved job URLs. Alerts with insufficient detail remain available in Email. Browser assistance for those sites uses manual handoff. There is no stealth, CAPTCHA bypass, fingerprint spoofing or rate-limit evasion. Company pages without structured job data may require a direct public ATS source or manual job entry. Source health records the actual fetch result/error.
 
 Search profiles include editable scoring weights and explicit role, technology, industry, arrangement, contract, posting-age and sponsorship preferences. Unknown evidence is reported rather than invented. Salary minimums are annual and compared only when the posting explicitly specifies an annual period in the same configured currency. Analytics uses recorded submission and response milestones, with denominators, response times and source/company/role/CV/match cohorts; small samples are marked.
 
@@ -117,3 +117,14 @@ If the app bundle succeeds but Tauri's Finder styling step fails while making th
 - **Offline:** local profile, documents, jobs, history and analytics remain available. Network operations report their errors without removing saved data.
 
 See [ARCHITECTURE.md](ARCHITECTURE.md), [SECURITY.md](SECURITY.md), [CONTRIBUTING.md](CONTRIBUTING.md) and [verification evidence](docs/VERIFICATION.md) for boundaries, implementation details and observed test results.
+
+## Daily source configuration
+
+`scripts/configure_daily_tracker.py --data-dir PATH --refresh` enables daily tracking, pauses submission automation, installs two GitHub feeds, the UK Tech graduate Trackr feed, and LinkedIn/Indeed inbox-alert sources. It preserves existing ATS sources and candidate data. The release installation backs up the database before applying this configuration.
+
+- [SpeedyApply international new-grad jobs](https://github.com/speedyapply/2027-SWE-College-Jobs): `NEW_GRAD_INTL.md`.
+- [New Grad 2027](https://github.com/vanshb03/New-Grad-2027): `README.md`.
+- [Trackr UK Tech graduate programmes](https://app.the-trackr.com/uk-tech/graduate-programmes): the public programme list; the configured season can be edited in Sources. No Trackr login is needed to read this public list.
+- [LinkedIn job alerts](https://www.linkedin.com/help/linkedin/answer/a511279/job-alerts-on-linkedin?lang=en) and [Indeed job alerts](https://support.indeed.com/hc/en-ca/articles/204488890-Starting-Stopping-and-Managing-Job-Alerts) require alerts on the respective account. Meridian reads incoming alerts from the connected inbox; it does not subscribe you automatically.
+
+The daily selection excludes ignored, submitted, explicitly closed and not-yet-open offers, and unsaved listings posted more than 90 days ago when no application deadline is supplied. It prioritizes graduate/junior roles without inventing eligibility, location or work rights. All stored opportunities remain accessible in the table. A source link may point to a programme’s employer search page when that is the destination supplied by its publisher.

@@ -241,6 +241,9 @@ def ingest_job(db, raw: dict, source_id: str | None = None) -> tuple[dict, bool]
                 "INSERT OR IGNORE INTO job_duplicates VALUES(?,?,?,?,?)",
                 (uid(), job_id, job["url"], "Canonical URL, ATS identity or identical cross-post", stamp),
             )
+            supplementary = json.loads(existing["metadata"] or "{}")
+            supplementary.update({k: v for k, v in job["metadata"].items() if v not in (None, [], "")})
+            conn.execute("UPDATE jobs SET metadata=? WHERE id=?", (dumps(supplementary), job_id))
             # A refresh may add a better description without resetting pipeline state.
             if len(job["description"]) >= len(existing["description"]):
                 merged_metadata = json.loads(existing["metadata"] or "{}")
@@ -289,6 +292,17 @@ def ingest_job(db, raw: dict, source_id: str | None = None) -> tuple[dict, bool]
                 conn.execute("INSERT OR IGNORE INTO skills(id,name) VALUES(?,?)", (uid(), skill))
                 skill_id = conn.execute("SELECT id FROM skills WHERE name=?", (skill,)).fetchone()[0]
                 conn.execute("INSERT OR IGNORE INTO job_skills VALUES(?,?,0)", (job_id, skill_id))
+        metadata = json.loads(conn.execute("SELECT metadata FROM jobs WHERE id=?", (job_id,)).fetchone()[0] or "{}")
+        provenance = metadata.get("discovery_sources", [])
+        entry = {
+            "name": job["source"],
+            "source_id": source_id,
+            "url": job["metadata"].get("listing_source_url") or job["url"],
+        }
+        if entry not in provenance:
+            provenance.append(entry)
+        metadata["discovery_sources"] = provenance
+        conn.execute("UPDATE jobs SET metadata=? WHERE id=?", (dumps(metadata), job_id))
         conn.execute(
             "INSERT OR IGNORE INTO job_sources VALUES(?,?,?,?,?,?)",
             (uid(), job_id, source_id, job["url"], raw.get("external_id"), stamp),
@@ -646,7 +660,9 @@ async def discover(source: dict) -> list[dict]:
         paths = config.get("paths", ["README.md"])
         if isinstance(paths, str):
             paths = [paths]
-        jobs, links = [], set()
+        from .feeds import parse_github_tables
+
+        jobs = []
         for path in paths[:10]:
             body, _, _ = await fetch(
                 f"https://raw.githubusercontent.com/{repository}/{branch}/{quote(str(path), safe='/')}"
@@ -659,18 +675,25 @@ async def discover(source: dict) -> list[dict]:
             elif parser == "csv":
                 jobs.extend(list(csv.DictReader(io.StringIO(text))))
             else:
-                links.update(re.findall(r"https?://[^\s<>\]\)\"']+", text))
-        for link in sorted(links)[:40]:
-            if ats_identity(link)[1]:
-                try:
-                    body, _, final = await fetch(link)
-                    jobs.extend(parse_jsonld(body.decode("utf-8", errors="replace"), final))
-                except (ValueError, httpx.HTTPError):
-                    continue
-        if links and not jobs:
-            raise ValueError(
-                "GitHub links were found but no structured job listings were extractable; use a JSON/CSV feed or direct public ATS source"
-            )
+                jobs.extend(parse_github_tables(text, f"https://github.com/{repository}/blob/{branch}/{path}"))
+        if not jobs:
+            raise ValueError("No job rows found. Configure a Markdown/HTML job table, JSON or CSV path.")
+    elif kind == "trackr":
+        from .feeds import parse_trackr
+
+        params = {
+            "region": config.get("region", "UK"),
+            "industry": config.get("industry", "Tech"),
+            "season": str(config.get("season", datetime.now().year + 1)),
+            "type": config.get("programme_type", "graduate-programmes"),
+        }
+        body, _, _ = await fetch("https://api.the-trackr.com/programmes?" + urlencode(params))
+        jobs = parse_trackr(json.loads(body), url)
+        if not jobs:
+            raise ValueError("Trackr returned no open programme links for this season and category")
+    elif kind in {"linkedin", "indeed"} and config.get("delivery") == "email":
+        # Inbound mail imports these; a daily public-web refresh must not claim a sync.
+        return []
     elif kind in {
         "json",
         "csv",
@@ -759,6 +782,8 @@ async def _run_sources(db, data_dir=None, source_id=None, due_only=False):
         raise ValueError("Enabled source not found")
     results = []
     for source in sources:
+        if json.loads(source["config"] or "{}").get("delivery") == "email":
+            continue
         if due_only and source["last_checked"]:
             try:
                 elapsed = (datetime.now(timezone.utc) - datetime.fromisoformat(source["last_checked"])).total_seconds()

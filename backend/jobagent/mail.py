@@ -63,7 +63,11 @@ CATEGORIES = {
     "FOLLOW_UP": (None, [r"following up", r"follow.up on"]),
     "RECRUITER_MESSAGE": (
         "RECRUITER_SCREEN",
-        [r"recruiter", r"recruitment", r"talent acquisition", r"discuss.{0,30}(?:role|opportunity)"],
+        [
+            r"(?:i am|i.m|we are|we.re).{0,30}(?:recruiter|recruiting)",
+            r"(?:like|love) to discuss.{0,30}(?:role|opportunity)",
+            r"reaching out.{0,60}(?:role|opportunity)",
+        ],
     ),
 }
 
@@ -82,6 +86,15 @@ def parse_message(raw: bytes) -> dict:
         from bs4 import BeautifulSoup
 
         content = BeautifulSoup(content, "html.parser").get_text(" ", strip=True)
+    from .job_alerts import alert_links
+
+    html_body = (
+        message.get_body(preferencelist=("html",))
+        if message.is_multipart()
+        else (body if body and body.get_content_type() == "text/html" else None)
+    )
+    html_content = html_body.get_content() if html_body else ""
+    extracted_links = alert_links(html_content) if isinstance(html_content, str) else []
     try:
         received = parsedate_to_datetime(str(message["Date"]))
         if received.tzinfo is None:
@@ -94,7 +107,7 @@ def parse_message(raw: bytes) -> dict:
         "sender": str(message.get("From", "")),
         "body": content[:200000],
         "received_at": received.isoformat(),
-        "metadata": {"thread_id": str(message.get("In-Reply-To", ""))},
+        "metadata": {"thread_id": str(message.get("In-Reply-To", "")), "job_alert_links": extracted_links},
     }
 
 
@@ -184,10 +197,36 @@ def ingest_message(db, message: dict, provider: str = "import") -> dict:
     )
     if existing:
         return {"id": existing["id"], "duplicate": True}
+    from .job_alerts import ingest_alert, is_job_alert
+
     classification = classify_message(message["subject"], message["body"], message.get("received_at"))
-    application_id, link_confidence = link_candidate(db, message)
+    alert = is_job_alert(message)
+    if alert:
+        classification.update(
+            category="OTHER", status=None, confidence=1, evidence="Job alert, not an application update"
+        )
+    application_id, link_confidence = (None, 0) if alert else link_candidate(db, message)
+    alert_job_ids = ingest_alert(db, message) if alert else []
+    if not application_id and classification["category"] == "APPLICATION_CONFIRMATION":
+        # Only a unique exact company AND complete role title can create a record.
+        text = re.sub(r"\W+", " ", f"{message['subject']} {message['body']}").casefold()
+        matches = []
+        for job in db.query("SELECT id,title,company FROM jobs WHERE id NOT IN (SELECT job_id FROM applications)"):
+            company = re.sub(r"\W+", " ", job["company"]).casefold().strip()
+            title = re.sub(r"\W+", " ", job["title"]).casefold().strip()
+            if len(company) >= 3 and len(title) >= 10 and f" {company} " in f" {text} " and f" {title} " in f" {text} ":
+                matches.append(job)
+        if len(matches) == 1:
+            from .tracking import record_application
+
+            application_id = record_application(db, matches[0]["id"], message.get("received_at"), origin="email")["id"]
+            link_confidence = 0.95
     message_id = str(uuid4())
-    metadata = message.get("metadata", {}) | {"analysis": classification, "link_confidence": link_confidence}
+    metadata = message.get("metadata", {}) | {
+        "analysis": classification,
+        "link_confidence": link_confidence,
+        "alert_job_ids": alert_job_ids,
+    }
     with db.transaction() as conn:
         existing = conn.execute(
             "SELECT id FROM email_messages WHERE provider=? AND external_id=?", (provider, message["external_id"])
@@ -304,6 +343,38 @@ def oauth_exchange_error(provider: str, response: httpx.Response) -> str:
 
 class MailCredentialError(ValueError):
     pass
+
+
+def reconcile_unlinked(db):
+    """Link old messages after a manual record, preserving each original message timestamp."""
+    for row in db.query(
+        "SELECT * FROM email_messages WHERE application_id IS NULL AND classification != 'OTHER' ORDER BY received_at LIMIT 2000"
+    ):
+        message = dict(row)
+        message["metadata"] = json.loads(message["metadata"] or "{}")
+        app_id, confidence = link_candidate(db, message)
+        if not app_id:
+            continue
+        analysis = classify_message(message["subject"], message["body"], message["received_at"])
+        with db.transaction() as conn:
+            changed = conn.execute(
+                "UPDATE email_messages SET application_id=?,metadata=json_set(metadata,'$.link_confidence',?) WHERE id=? AND application_id IS NULL",
+                (app_id, confidence, message["id"]),
+            ).rowcount
+            if not changed:
+                continue
+            if analysis["status"] and analysis["confidence"] >= 0.9:
+                db.event(
+                    app_id,
+                    analysis["status"],
+                    f"Email: {message['subject']} — {analysis['evidence']}",
+                    origin="email",
+                    conn=conn,
+                )
+            conn.execute(
+                "UPDATE human_tasks SET status='resolved',answer='Linked to recorded application',updated_at=? WHERE kind='EMAIL_LINK' AND question LIKE ?",
+                (utcnow(), f"%{message['id']}%"),
+            )
 
 
 class MailService:

@@ -10,7 +10,7 @@ import signal
 import httpx
 
 
-OLLAMA_MODEL = "llama3.2:3b-instruct-q4_K_M"
+OLLAMA_MODEL = "qwen2.5:7b-instruct-q4_K_M"
 
 
 class OllamaRuntime:
@@ -58,7 +58,8 @@ class OllamaRuntime:
         managed = self._process is not None and self._process.returncode is None
         foreign = probe is not None and not managed
         running = managed and bool(probe and probe.get("ok"))
-        manifest = self.models_dir / "manifests/registry.ollama.ai/library/llama3.2/3b-instruct-q4_K_M"
+        model_name, model_tag = OLLAMA_MODEL.split(":", 1)
+        manifest = self.models_dir / "manifests/registry.ollama.ai/library" / model_name / model_tag
         downloaded = bool(probe.get("model_available")) if running else manifest.is_file()
         error = self._error
         if foreign:

@@ -46,6 +46,27 @@ async def test_text_runtime_missing_install_does_not_download_or_spawn(tmp_path,
     assert not runtime.models_dir.exists()
 
 
+async def test_text_runtime_reports_only_current_model_downloaded_when_stopped(tmp_path, monkeypatch):
+    runtime = OllamaRuntime(tmp_path)
+
+    async def probe():
+        return None
+
+    monkeypatch.setattr(runtime, "_probe", probe)
+    old_manifest = runtime.models_dir / "manifests/registry.ollama.ai/library/llama3.2/3b-instruct-q4_K_M"
+    old_manifest.parent.mkdir(parents=True)
+    old_manifest.write_text("{}")
+    assert (await runtime.status())["model_downloaded"] is False
+    model_name, model_tag = OLLAMA_MODEL.split(":", 1)
+    current_manifest = runtime.models_dir / "manifests/registry.ollama.ai/library" / model_name / model_tag
+    current_manifest.parent.mkdir(parents=True)
+    current_manifest.write_text("{}")
+    status = await runtime.status()
+    assert status["model_downloaded"] is True
+    assert status["model"] == "qwen2.5:7b-instruct-q4_K_M"
+    assert status["ready"] is False
+
+
 async def test_text_runtime_owns_one_local_only_process_and_closes_its_session(tmp_path, monkeypatch):
     runtime = OllamaRuntime(tmp_path)
     process = SimpleNamespace(pid=987654, returncode=None)

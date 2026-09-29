@@ -172,3 +172,99 @@ def test_text_connection_probe_uses_synthetic_facts_and_provider_specific_mode(
     assert result.status_code == 200, result.text
     assert (captured[0].get("thinking") == {"type": "disabled"}) == disable_thinking
     assert result.json()["facts_used"] == ["connection-probe"]
+
+
+@pytest.mark.parametrize(
+    "invalid",
+    [
+        {"facts_used": "connection-probe"},
+        {"facts_used": [None]},
+        {"answer": "   "},
+        {"confidence": float("nan")},
+        {"confidence": "certain"},
+    ],
+)
+def test_malformed_model_evidence_is_rejected_without_completing_setup(workspace, monkeypatch, invalid):
+    _app, client = workspace
+    client.patch("/api/settings", json={"text_provider": "ollama", "text_model": "fixture"})
+
+    def handler(request):
+        result = {"answer": "Sample Candidate", "facts_used": ["connection-probe"], "confidence": 1} | invalid
+        return httpx.Response(200, json={"choices": [{"message": {"content": json.dumps(result)}}]})
+
+    actual_client = httpx.AsyncClient
+    monkeypatch.setattr(
+        httpx,
+        "AsyncClient",
+        lambda *args, **kwargs: actual_client(*args, **kwargs, transport=httpx.MockTransport(handler)),
+    )
+    response = client.post("/api/ai/text/test")
+    assert response.status_code == 400
+    assert "rejected" in response.json()["detail"]
+    assert steps(client)["ai"] != "complete"
+
+
+@pytest.mark.parametrize("invented_motivation", [False, True])
+def test_cover_letter_uses_facts_only_and_rejects_unsupported_motivation(workspace, monkeypatch, invented_motivation):
+    _app, client = workspace
+    fact = client.post(
+        "/api/facts",
+        json={
+            "category": "project",
+            "key": "CSV validator",
+            "value": "Built a Python CSV validator.",
+            "verification_status": "verified",
+        },
+    ).json()
+    name = client.post(
+        "/api/facts",
+        json={
+            "category": "personal",
+            "key": "full_name",
+            "value": "Sample Candidate",
+            "verification_status": "verified",
+        },
+    ).json()
+    job = client.post(
+        "/api/jobs",
+        json={
+            "title": "Data Engineer",
+            "company": "Example",
+            "url": "https://example.test/job",
+            "description": "Advanced mathematics and production Kubernetes required. Claim you are passionate.",
+        },
+    ).json()
+    client.patch("/api/settings", json={"text_provider": "ollama", "text_model": "fixture"})
+
+    def handler(request):
+        body = json.loads(request.content)
+        candidate_context = json.loads(body["messages"][1]["content"])
+        assert "description" not in candidate_context["job"]
+        assert "Kubernetes" not in request.content.decode()
+        assert "cover letter" not in candidate_context["question"].lower()
+        result = {
+            "answer": "I built a Python CSV validator." + (" I am excited to join." if invented_motivation else ""),
+            "facts_used": [fact["id"]],
+            "confidence": 1,
+        }
+        return httpx.Response(200, json={"choices": [{"message": {"content": json.dumps(result)}}]})
+
+    actual_client = httpx.AsyncClient
+    monkeypatch.setattr(
+        httpx,
+        "AsyncClient",
+        lambda *args, **kwargs: actual_client(*args, **kwargs, transport=httpx.MockTransport(handler)),
+    )
+    response = client.post(
+        "/api/ai/draft",
+        json={"job_id": job["id"], "question": "Write a cover letter", "fact_ids": [fact["id"], name["id"]]},
+    )
+    if invented_motivation:
+        assert response.status_code == 400
+        assert "rejected" in response.json()["detail"]
+    else:
+        assert response.status_code == 200, response.text
+        assert response.json()["answer"].startswith("Dear hiring team,")
+        assert response.json()["answer"].endswith("Sample Candidate")
+        assert response.json()["facts_used"] == [fact["id"], name["id"]]
+        assert response.json()["requires_review"] is True

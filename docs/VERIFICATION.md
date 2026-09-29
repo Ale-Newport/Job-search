@@ -2,7 +2,7 @@
 
 Fecha de verificación: 29 de septiembre de 2026. Equipo: Apple M2 Max, 64 GB, macOS 15.7.3, arm64. El producto arranca sin ofertas, candidaturas ni hechos profesionales ficticios. Los datos sintéticos se usan exclusivamente en directorios temporales o `.local-data/qa`.
 
-Meridian 0.1.0 está instalada en `/Users/alejandro/Applications/Meridian.app` y se dejó abierta en Overview, con automatización pausada. La copia instalada coincide por SHA-256 con los ejecutables del build. `codesign --verify --deep --strict` y la comprobación del DMG con `hdiutil verify` terminaron correctamente. La base de producción está en revisión `0003_notifications`, con cero hechos, ofertas, candidaturas y mensajes. [Manifest del release y hashes](release-manifest.json).
+Meridian 0.1.0 está instalada en `/Users/alejandro/Applications/Meridian.app`. La configuración personal posterior al primer release conserva el CV original y sus versiones, 50 hechos contrastados con ese documento, un perfil con 27 roles y 124 ofertas recuperadas de ocho fuentes públicas. Las 52 propuestas del detector anterior se conservan rechazadas con historial. No hay candidaturas enviadas ni correo autenticado. El onboarding registra seis pasos completados y mantiene pendientes las autenticaciones de navegador y correo. Los detalles personales y las auditorías del CV permanecen en almacenamiento local excluido de Git. [Manifest del release y hashes](release-manifest.json).
 
 ## Evidencia del flujo principal
 
@@ -18,12 +18,15 @@ Meridian 0.1.0 está instalada en `/Users/alejandro/Applications/Meridian.app` y
 | Navegador empaquetado | Desde la app nativa se abrió un sitio local en Chrome. Estado observado: `running=true`, `channel=chrome`, `last_error=null`, perfil separado bajo Application Support/Meridian. |
 | Laya instalado | Runtime MLX y modelo instalados fuera del checkout, en Application Support/Meridian. Inferencia real desde el botón de la app: `TYPE_TEXT`, target correcto, 1421,88 ms en esa ejecución. |
 | Ciclo de vida | Quit Meridian cerró el backend, Chrome gestionado y Laya gestionado; puertos locales del backend/modelo quedaron libres. |
+| Importador corregido | DOCX conserva orden, tablas, listas, fechas, métricas y destinos de hipervínculos. Reimportar crea una versión inmutable nueva, preserva hechos verificados/bloqueados y sólo sustituye propuestas sin revisar. Reintentar no duplica versiones. CV real contrastado visualmente y mediante cobertura de párrafos; original intacto. |
+| Onboarding | Ocultar la guía no completa pasos. Guardar una cuenta no equivale a conectarla. La cuenta Gmail se contrasta con `/users/me/profile`; cambios de cuenta/configuración invalidan evidencia. IMAP guarda y conecta antes de mostrar éxito. |
+| Texto local | Ollama oficial 0.34.4 y Qwen 2.5 7B Q4_K_M, nube desactivada, localhost, contexto 8192. Pruebas reales de JSON y borrador con referencias a los hechos. El borrador final conserva métricas del CV y sigue requiriendo revisión. |
 
 La prueba de navegador usa una oferta sintética local. No se ha enviado ninguna candidatura real ni ningún mensaje a terceros.
 
 ## Resultados reproducibles
 
-Resultado final: **125 pruebas Python y 3 pruebas Rust correctas**, lint limpio, TypeScript y Rust correctos, y los dos flujos E2E de interfaz completos. La suite Python incluye los tests reales de Chrome/ATS local. Hay un aviso de deprecación de Starlette sobre su transporte de pruebas `httpx`, sin fallos de ejecución. Los comandos son:
+Resultado de la suite completa: **159 pruebas Python y 3 pruebas Rust correctas**. Después de reforzar la redacción se ejecutaron **25 pruebas dirigidas**, incluyendo dos casos nuevos sobre cartas y motivaciones sin evidencia. Lint limpio, TypeScript y Rust correctos, y tres flujos E2E de interfaz aprobados, con una repetición específica de reimportación tras añadir esa acción. La suite Python incluye los tests reales de Chrome/ATS local. Hay un aviso de deprecación de Starlette sobre su transporte de pruebas `httpx`, sin fallos de ejecución. Los comandos son:
 
 ```sh
 make test
@@ -48,11 +51,11 @@ Evidencia adicional: [discovery real](discovery-smoke.json), [benchmark Laya](lo
 
 ## Qué requiere configuración del usuario
 
-- Importar y verificar su CV, contacto y autorización laboral. El perfil aproximado del encargo no se convirtió en hechos verificados.
+- Confirmar preferencias de ubicación, modalidad, disponibilidad y autorización laboral/patrocinio. Estos datos no se deducen del CV. La revisión de los 50 hechos acredita fidelidad de extracción respecto al documento proporcionado, no una certificación independiente de empleadores.
 - Registrar/conectar Gmail u Outlook, o configurar IMAP TLS, con consentimiento y credenciales propios. Los flujos están implementados y probados con transportes controlados; no se ha autenticado una cuenta real del usuario.
 - Iniciar sesión personalmente en los portales y completar MFA/CAPTCHA. Los widgets o rutas no reconocidos se detienen para intervención.
-- Activar búsquedas periódicas, elegir fuentes/perfiles y, si se desea, autorizar dominios y límites para modo Auto. La instalación permanece inicialmente pausada.
-- Configurar cualquier proveedor remoto y su presupuesto. Jev y los proveedores de texto no se han probado con una cuenta de pago. El modo extractivo y Laya funcionan sin claves remotas.
+- El modo Review está configurado, con búsquedas cada seis horas mientras la app está abierta; no hay reglas de envío automático ni dominios autorizados para Auto. Los límites son cinco candidaturas al día, dos por empresa y 120 segundos de intervalo.
+- Configurar cualquier proveedor remoto y su presupuesto si se desea utilizarlo. Jev y los proveedores de texto remotos no se han probado con una cuenta de pago. Laya y Qwen funcionan localmente sin claves remotas.
 
 ## Alcance y límites
 
@@ -63,7 +66,7 @@ Evidencia adicional: [discovery real](discovery-smoke.json), [benchmark Laya](lo
 - El matching explica evidencia, vocabulario semántico, filtros y pesos. No representa una probabilidad de contratación. No descarga un modelo de embeddings. Los datos desconocidos se muestran como desconocidos; la autorización laboral nunca se deduce de estudios o nacionalidad.
 - Los filtros de industria, contrato, modalidad, antigüedad y patrocinio dependen de datos publicados. La experiencia numérica necesita un hecho verificado explícito de años profesionales totales y un requisito comparable; los proyectos no se convierten en empleo. La formación utiliza un vocabulario limitado de grados y disciplinas.
 - La deduplicación fusiona URLs/identidades ATS equivalentes y anuncios con empresa, título, ubicación y descripción idénticos. No fusiona automáticamente anuncios cuya descripción sólo sea semánticamente similar; conviene revisar esos casos antes de preparar candidaturas separadas.
-- CVs y cartas se construyen desde hechos seleccionados. La generación remota/local opcional produce borradores revisables; la existencia de un fact ID no demuestra por sí sola cada frase generada.
+- CVs y cartas se construyen desde hechos seleccionados. Las pruebas detectaron requisitos laborales y motivaciones inventados en borradores iniciales. Se excluyó la descripción de la oferta del contexto de escritura, se añadió una plantilla neutral para cartas y se rechazan expresiones comunes de motivación sin respaldo. La existencia de un fact ID y estos filtros no demuestran por sí solos cada frase generada: los borradores siguen sujetos a revisión.
 - El proceso permanece en la barra de menús al cerrar la ventana. La búsqueda y el correo periódicos requieren que siga ejecutándose y que el Mac esté despierto. No se instala un LaunchAgent global.
 - Los avisos de revisión, novedades, buenos matches y plazos próximos se deduplican en SQLite. Su presentación depende de las preferencias de notificaciones de macOS. La información también queda visible dentro de la app.
 

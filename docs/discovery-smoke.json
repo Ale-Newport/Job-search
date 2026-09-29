@@ -1,0 +1,28 @@
+{
+  "tested_at": "2026-09-29T11:59:29.503877+00:00",
+  "method": "Meridian discovery.discover fetched public read-only ATS endpoints; first returned job normalized and persisted into an isolated temporary SQLite database. No applications or candidate data were sent.",
+  "results": [
+    {
+      "kind": "greenhouse",
+      "url": "https://boards-api.greenhouse.io/v1/boards/anthropic/jobs?content=true",
+      "jobs": 629,
+      "sample_title": "Account Executive, AI Native",
+      "persisted": true
+    },
+    {
+      "kind": "ashby",
+      "url": "https://api.ashbyhq.com/posting-api/job-board/openai?includeCompensation=true",
+      "jobs": 840,
+      "sample_title": "Technical Program Manager, Compute Infrastructure",
+      "persisted": true
+    },
+    {
+      "kind": "lever",
+      "url": "https://api.lever.co/v0/postings/palantir?mode=json&limit=100&skip=0",
+      "jobs": 320,
+      "sample_title": "Administrative Business Partner",
+      "persisted": true
+    }
+  ],
+  "finding_corrected": "Initial 8 MB cap rejected the two largest feeds; official public ATS feeds now have a bounded 64 MB cap. Arbitrary pages remain capped at 8 MB. Counts are time-specific, not seeded into the product."
+}

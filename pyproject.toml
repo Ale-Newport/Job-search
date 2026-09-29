@@ -1,0 +1,31 @@
+[build-system]
+requires = ["setuptools>=75", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "meridian-job-agent"
+version = "0.1.0"
+description = "Private local-first job search desktop application"
+requires-python = ">=3.12,<3.15"
+dependencies = [
+  "fastapi>=0.115,<1", "uvicorn>=0.34,<1", "pydantic>=2.10,<3", "httpx>=0.28,<1",
+  "beautifulsoup4>=4.13,<5", "pypdf>=5,<7", "python-docx>=1.1,<2", "reportlab>=4.3,<5",
+  "alembic>=1.15,<2", "sqlalchemy>=2.0,<3", "keyring>=25,<27", "cryptography>=44,<49",
+  "python-multipart>=0.0.20,<1", "playwright>=1.51,<2", "python-dateutil>=2.9,<3",
+]
+[project.optional-dependencies]
+dev = ["pytest>=8,<10", "pytest-asyncio>=0.25,<2", "ruff>=0.11,<1", "pyinstaller>=6.12,<7"]
+[project.scripts]
+meridian-backend = "jobagent.main:run"
+[tool.setuptools.packages.find]
+where = ["backend"]
+[tool.pytest.ini_options]
+testpaths = ["backend/tests"]
+asyncio_mode = "auto"
+[tool.ruff]
+line-length = 120
+target-version = "py312"
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F"]
+[tool.setuptools.package-data]
+jobagent = ["automation/*.js"]

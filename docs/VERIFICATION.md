@@ -2,7 +2,7 @@
 
 Fecha de verificación: 29 de septiembre de 2026. Equipo: Apple M2 Max, 64 GB, macOS 15.7.3, arm64. El producto arranca sin ofertas, candidaturas ni hechos profesionales ficticios. Los datos sintéticos se usan exclusivamente en directorios temporales o `.local-data/qa`.
 
-Meridian 0.1.0 está instalada en `/Users/alejandro/Applications/Meridian.app`. La configuración personal posterior al primer release conserva el CV original y sus versiones, 50 hechos contrastados con ese documento, un perfil con 27 roles y 124 ofertas recuperadas de ocho fuentes públicas. Las 52 propuestas del detector anterior se conservan rechazadas con historial. No hay candidaturas enviadas ni correo autenticado. El onboarding registra seis pasos completados y mantiene pendientes las autenticaciones de navegador y correo. Los detalles personales y las auditorías del CV permanecen en almacenamiento local excluido de Git. [Manifest del release y hashes](release-manifest.json).
+Meridian 0.1.0 está instalada en `/Users/alejandro/Applications/Meridian.app`. La configuración personal posterior al primer release conserva el CV original y sus versiones, 50 hechos contrastados con ese documento, un perfil con 27 roles y 124 ofertas recuperadas de ocho fuentes públicas. Las 52 propuestas del detector anterior se conservan rechazadas con historial. No hay candidaturas enviadas. Gmail ha completado la autorización OAuth real y la verificación de la cuenta esperada; la primera sincronización se comprueba por separado. La autenticación del navegador sigue pendiente. Los detalles personales y las auditorías del CV permanecen en almacenamiento local excluido de Git. [Manifest del release y hashes](release-manifest.json).
 
 ## Evidencia del flujo principal
 
@@ -14,6 +14,7 @@ Meridian 0.1.0 está instalada en `/Users/alejandro/Applications/Meridian.app`. 
 | Candidatura | Test de aceptación con Chrome y un ATS local: documento exacto y hash conservados, formulario rellenado, cero envíos antes de aprobar y un único envío después, confirmación independiente y bloqueo de duplicados. |
 | Preguntas humanas | Respuestas manuales verificadas tienen provenance. Una respuesta sensible autoriza solamente esa pregunta en esa candidatura; no concede consentimiento global futuro. |
 | Email | Mensajes `.eml`, transportes simulados Gmail/Graph/IMAP, clasificación, enlace ambiguo, deduplicación, fechas y transición a prueba técnica/interview/rejection. Confirmaciones tardías no revierten fases posteriores. |
+| Recuperación OAuth | Se detectó un client secret ausente y se guardó desde el JSON local del mismo cliente Desktop, exclusivamente en el Llavero. Google confirmó intercambio de tokens y cuenta con HTTP 200. Los rechazos conocidos ahora tienen instrucciones concretas, se guardan sin incluir respuestas privadas del proveedor y aparecen en la app al volver del navegador. Estado OAuth de un solo uso y denegaciones con state inválido comprobados. |
 | Recuperación | Envío incierto bloquea reintentos; hechos históricos permanecen; backup cifrado, contraseña errónea rechazada, restauración pausada y migración de copias antiguas antes de sustituir datos. |
 | Navegador empaquetado | Desde la app nativa se abrió un sitio local en Chrome. Estado observado: `running=true`, `channel=chrome`, `last_error=null`, perfil separado bajo Application Support/Meridian. |
 | Laya instalado | Runtime MLX y modelo instalados fuera del checkout, en Application Support/Meridian. Inferencia real desde el botón de la app: `TYPE_TEXT`, target correcto, 1421,88 ms en esa ejecución. |
@@ -36,6 +37,8 @@ make typecheck
 make build
 ```
 
+Tras corregir la conexión Gmail, **41 pruebas dirigidas** de correo, API y onboarding correctas, incluyendo fallos de OAuth, respuestas malformadas, redacción de datos privados y denegaciones. Ruff, ESLint y TypeScript correctos. Backend e interfaz recompilados e instalados; firma, hashes y checksum del nuevo DMG verificados.
+
 Para las pruebas UI, arrancar en dos terminales un backend **aislado** y Vite antes de ejecutar `make test-ui`:
 
 ```sh
@@ -53,7 +56,7 @@ Evidencia adicional: [discovery real](discovery-smoke.json), [benchmark Laya](lo
 ## Qué requiere configuración del usuario
 
 - Confirmar preferencias de ubicación, modalidad, disponibilidad y autorización laboral/patrocinio. Estos datos no se deducen del CV. La revisión de los 50 hechos acredita fidelidad de extracción respecto al documento proporcionado, no una certificación independiente de empleadores.
-- Registrar/conectar Gmail u Outlook, o configurar IMAP TLS, con consentimiento y credenciales propios. Los flujos están implementados y probados con transportes controlados; no se ha autenticado una cuenta real del usuario.
+- Gmail ya ha autenticado y verificado una cuenta real. El acceso a sus credenciales depende del Llavero y la primera sincronización debe completarse antes de dar por terminado ese paso. Outlook e IMAP se han probado con transportes controlados; requieren sus propias cuentas y credenciales si se desean usar.
 - Iniciar sesión personalmente en los portales y completar MFA/CAPTCHA. Los widgets o rutas no reconocidos se detienen para intervención.
 - El modo Review está configurado, con búsquedas cada seis horas mientras la app está abierta; no hay reglas de envío automático ni dominios autorizados para Auto. Los límites son cinco candidaturas al día, dos por empresa y 120 segundos de intervalo.
 - Configurar cualquier proveedor remoto y su presupuesto si se desea utilizarlo. Jev y los proveedores de texto remotos no se han probado con una cuenta de pago. Laya y Qwen funcionan localmente sin claves remotas.
@@ -71,4 +74,4 @@ Evidencia adicional: [discovery real](discovery-smoke.json), [benchmark Laya](lo
 - El proceso permanece en la barra de menús al cerrar la ventana. La búsqueda y el correo periódicos requieren que siga ejecutándose y que el Mac esté despierto. No se instala un LaunchAgent global.
 - Los avisos de revisión, novedades, buenos matches y plazos próximos se deduplican en SQLite. Su presentación depende de las preferencias de notificaciones de macOS. La información también queda visible dentro de la app.
 
-La aceptación completa con una candidatura y correo reales requiere las cuentas del usuario y su aprobación de esa candidatura concreta; esa parte no se presenta como validada.
+La aceptación completa con una candidatura real requiere las cuentas del usuario y su aprobación de esa candidatura concreta; no se ha enviado ninguna como parte de esta validación.

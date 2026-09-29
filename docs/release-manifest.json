@@ -1,19 +1,19 @@
 {
-  "verified_at": "2026-09-29T15:25:55.974649+00:00",
-  "source_commit": "3a4fe75200e142002f1d7930ef8351a31c9c5715",
+  "verified_at": "2026-09-29T15:44:57.485117+00:00",
+  "source_commit": "c9905172abb042edb133b941b93f98d0a7248e54",
   "version": "0.1.0",
   "platform": "macOS 15+, Apple Silicon arm64",
   "installed_app": "/Users/alejandro/Applications/Meridian.app",
   "dmg": "/Users/alejandro/Projects/Job-search/src-tauri/target/release/bundle/dmg/Meridian_0.1.0_aarch64.dmg",
-  "dmg_sha256": "0955f6b29cdc0940e480126fb7529f9ef48cb144a530774b87b289cd9c148a3c",
-  "dmg_bytes": 88052341,
+  "dmg_sha256": "1ea92aff67e87ee9a0e2be7937d314d0b0254fa6a43bce336eb5b40957ed6678",
+  "dmg_bytes": 88055480,
   "executables": {
     "meridian": {
-      "sha256": "2040c48135ad543278df187f89883f802bd64f81bf4fdaf4eb209a1b16e49b8c",
+      "sha256": "282edc9e24a44581c511c1066c8da60658983860b7dbc25e1b6fb0c0d164b936",
       "installed_copy_matches_build": true
     },
     "meridian-backend": {
-      "sha256": "ed08fc0292dfdf3999773e2aea1afa76efc66819dba5a885bf611f2b66d57c13",
+      "sha256": "fb617175b0a08b384cd79a5f73ca2b1fd30c00531052b461753da96485e2caed",
       "installed_copy_matches_build": true
     }
   },
@@ -36,14 +36,17 @@
     "codesign_deep_strict": "passed",
     "dmg_checksum": "passed",
     "python_followup_targeted_tests_passed": 25,
-    "brand_vectors_and_native_ui": "passed"
+    "brand_vectors_and_native_ui": "passed",
+    "email_oauth_targeted_tests_passed": 41
   },
   "signing": "ad hoc, not notarized",
   "real_applications_sent": 0,
-  "real_email_accounts_tested": false,
+  "real_email_accounts_tested": true,
   "app_icon": {
     "sha256": "256719178a8e8542c13de8728a646e43332f8da62d4c8b9323425a9de9b5338e",
     "installed_copy_matches_build": true
   },
-  "validation_note": "Test-suite results include the onboarding and writing validation documented in VERIFICATION.md. The branding-only change was checked with frontend build/lint, Rust check/format, native visual inspection, code signature, installed artifact hashes and DMG checksum."
+  "validation_note": "See VERIFICATION.md for earlier full suites. The email correction passed 41 targeted mail/API/onboarding tests, Ruff, ESLint, TypeScript and a complete native rebuild. Installed signatures/hashes and DMG checksum verified. Real Google token exchange and expected account verification succeeded; initial mailbox sync is reported separately.",
+  "gmail_account_verified": true,
+  "real_email_initial_sync_verified": false
 }

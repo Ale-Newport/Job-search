@@ -25,3 +25,6 @@ test-results/
 
 .build-cache/
 *.spec
+
+src-tauri/gen/
+*.tsbuildinfo

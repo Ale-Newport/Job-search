@@ -1,0 +1,13 @@
+{
+  "name": "meridian-desktop",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "tauri dev",
+    "build": "tauri build",
+    "build:app": "tauri build --bundles app",
+    "typecheck": "npm --prefix frontend run typecheck",
+    "lint": "npm --prefix frontend run lint"
+  },
+  "devDependencies": {"@tauri-apps/cli": "^2.0.0"}
+}

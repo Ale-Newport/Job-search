@@ -114,6 +114,14 @@ def restore_backup(db, data_dir: Path, raw: bytes, password: str):
                 )
             restored.execute("UPDATE integrations SET status='disconnected'")
             restored.execute("INSERT OR REPLACE INTO settings(key,value) VALUES('automation_paused','true')")
+        # Upgrade the staged copy before replacing live data. A newer/unsupported
+        # revision fails here while the existing workspace remains intact.
+        from .db import Database
+
+        try:
+            Database(snapshot)
+        except Exception as exc:
+            raise ValueError("The backup schema cannot be upgraded by this version of Meridian") from exc
         # Immutable filenames let existing files coexist; copy before database replacement.
         for file in (staging / "documents").rglob("*"):
             if file.is_file():

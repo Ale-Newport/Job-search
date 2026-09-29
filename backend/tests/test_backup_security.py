@@ -38,3 +38,16 @@ def test_internal_urls_rejected(url):
 
 def test_explicit_local_fixture_urls():
     assert public_url("http://127.0.0.1:9999/form", allow_local=True).endswith("/form")
+
+
+def test_old_backup_migrates_before_replacing_current_workspace(tmp_path):
+    for child in ("database", "cache", "documents", "backups"):
+        (tmp_path / child).mkdir()
+    db = Database(tmp_path / "database/meridian.sqlite3")
+    db.execute("DROP TABLE notification_receipts")
+    db.execute("UPDATE alembic_version SET version_num='0002_fact_history'")
+    old_backup = export_backup(db, tmp_path, "old-backup-test-password")
+    Database(db.path)
+    restore_backup(db, tmp_path, old_backup.read_bytes(), "old-backup-test-password")
+    assert db.one("SELECT version_num FROM alembic_version")["version_num"] == "0003_notifications"
+    assert db.query("SELECT * FROM notification_receipts") == []

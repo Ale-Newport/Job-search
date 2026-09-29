@@ -24,7 +24,7 @@ from .backup import export_backup, restore_backup
 from .config import APP_NAME, data_directory
 from .db import Database, decode_row, now
 from .mail import MailService, classify_message, ingest_message, parse_message
-from .security import RedactingFilter, SecretStore
+from .security import JsonFormatter, RedactingFilter, SecretStore
 from .text_ai import TextService
 
 logger = logging.getLogger("meridian")
@@ -38,7 +38,12 @@ ALLOWED_ORIGINS = {
 PROVIDERS = {"gmail", "outlook", "imap", "jev", "openai", "anthropic", "gemini", "openai-compatible", "ollama"}
 
 
-async def notify(title: str, message: str):
+async def notify(title: str, message: str, db=None):
+    if db is not None:
+        from .core import get_settings
+
+        if not get_settings(db).get("notifications_enabled", True):
+            return
     if os.environ.get("MERIDIAN_TEST") or os.environ.get("MERIDIAN_NO_NOTIFICATIONS"):
         return
     script = "on run argv\n display notification (item 2 of argv) with title (item 1 of argv)\nend run"
@@ -203,6 +208,10 @@ def create_app(data_dir: Path | None = None, token: str | None = None, secret_st
             app.state.db.execute("UPDATE integrations SET status='connected',last_error=NULL WHERE provider='imap'")
             return {"connected": True, "messages": len(messages)}
         redirect = str(request.base_url).rstrip("/") + "/api/oauth/callback"
+        if provider == "outlook":
+            # Microsoft ignores the ephemeral port for registered localhost redirects.
+            port = request.url.port
+            redirect = f"http://localhost{':' + str(port) if port else ''}/api/oauth/callback"
         return {"url": app.state.mail.connect(provider, redirect), "redirect_uri": redirect}
 
     @app.get("/api/oauth/callback", response_class=HTMLResponse)
@@ -218,7 +227,11 @@ def create_app(data_dir: Path | None = None, token: str | None = None, secret_st
     async def email_sync():
         result = await app.state.mail.sync()
         if result.get("imported"):
-            await notify(APP_NAME, f"{result['imported']} new email messages checked. Review your recruitment inbox.")
+            await notify(
+                APP_NAME,
+                f"{result['imported']} new email messages checked. Review your recruitment inbox.",
+                app.state.db,
+            )
         return result
 
     @app.get("/api/emails")
@@ -294,7 +307,9 @@ def create_app(data_dir: Path | None = None, token: str | None = None, secret_st
             raise ValueError("Explicit approval is required")
         result = await app.state.automation.approve(application_id)
         await notify(
-            APP_NAME, "Application confirmed" if result.get("status") == "confirmed" else "Application needs attention"
+            APP_NAME,
+            "Application confirmed" if result.get("status") == "confirmed" else "Application needs attention",
+            app.state.db,
         )
         return result
 
@@ -363,9 +378,13 @@ def create_app(data_dir: Path | None = None, token: str | None = None, secret_st
         from .usage import decision_settings
 
         settings = decision_settings(app.state.db, settings | {"browser_engine": engine}, store)
-        return await probe_engine(
+        result = await probe_engine(
             engine=engine, settings=settings, api_key=store.get("jev:secret") if engine in ("jev", "hybrid") else None
         )
+        if engine in ("laya", "hybrid"):
+            runtime = await app.state.laya_runtime.status()
+            result.update({key: runtime[key] for key in ("memory_mb", "memory_measurement", "model")})
+        return result
 
     @app.get("/api/ai/local/status")
     async def local_ai_status():
@@ -393,9 +412,13 @@ def create_app(data_dir: Path | None = None, token: str | None = None, secret_st
         from .usage import decision_settings
 
         settings = decision_settings(app.state.db, settings | {"browser_engine": engine}, store)
-        return await benchmark_engine(
+        result = await benchmark_engine(
             engine=engine, settings=settings, api_key=store.get("jev:secret") if engine in ("jev", "hybrid") else None
         )
+        if engine in ("laya", "hybrid"):
+            runtime = await app.state.laya_runtime.status()
+            result.update({key: runtime[key] for key in ("memory_mb", "memory_measurement", "model")})
+        return result
 
     @app.post("/api/ai/draft")
     async def ai_draft(payload: dict = Body(...)):
@@ -465,6 +488,7 @@ def create_app(data_dir: Path | None = None, token: str | None = None, secret_st
 async def schedule(app):
     from .core import get_settings
     from .discovery import run_sources
+    from .notifications import collect_notifications
 
     last_search, last_mail = 0.0, 0.0
     while True:
@@ -472,6 +496,11 @@ async def schedule(app):
         if app.state.restoring:
             continue
         settings = get_settings(app.state.db)
+        try:
+            for message in collect_notifications(app.state.db):
+                await notify(APP_NAME, message, app.state.db)
+        except Exception:
+            logger.warning("notification_scan_failed", exc_info=False)
         if not settings.get("scheduler_enabled", False):
             continue
         current = asyncio.get_running_loop().time()
@@ -490,32 +519,28 @@ async def schedule(app):
                 >= max(5, int(settings.get("email_interval_minutes", settings.get("email_poll_minutes", 10)))) * 60
             ):
                 last_mail = current
-                result = await app.state.mail.sync()
-                significant = [
-                    r
-                    for r in result.get("results", [])
-                    if not r.get("duplicate")
-                    and r.get("classification", {}).get("category")
-                    in ("OFFER", "CODING_TEST", "INTERVIEW_REQUEST", "ASSESSMENT_INVITATION")
-                ]
-                if significant:
-                    await notify(APP_NAME, f"{len(significant)} recruitment updates need your attention")
+                await app.state.mail.sync()
         except Exception:
             logger.warning("scheduler_task_failed", exc_info=False)
 
 
 def run():
-    logging.basicConfig(
-        level=logging.INFO, format='{"time":"%(asctime)s","level":"%(levelname)s","event":"%(message)s"}'
-    )
+    logging.basicConfig(level=logging.INFO)
     for handler in logging.getLogger().handlers:
         handler.addFilter(RedactingFilter())
+        handler.setFormatter(JsonFormatter())
     if not os.environ.get("MERIDIAN_API_TOKEN"):
         if os.environ.get("MERIDIAN_DEV") == "1":
             os.environ["MERIDIAN_API_TOKEN"] = "meridian-development-token"
         else:
             raise SystemExit("Start Meridian from the desktop app, or use MERIDIAN_DEV=1 for local development")
-    uvicorn.run(create_app(), host="127.0.0.1", port=int(os.environ.get("MERIDIAN_PORT", "8765")), access_log=False)
+    uvicorn.run(
+        create_app(),
+        host="127.0.0.1",
+        port=int(os.environ.get("MERIDIAN_PORT", "8765")),
+        access_log=False,
+        log_config=None,
+    )
 
 
 if __name__ == "__main__":

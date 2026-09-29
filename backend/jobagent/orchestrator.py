@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import copy
 import hashlib
 import json
 from datetime import datetime, timezone
@@ -240,6 +241,30 @@ class Orchestrator:
                         raise ValueError("Selected document is missing or outside the document vault")
                 config = settings_for(self.db)
                 config["resume_existing"] = resume
+                # An explicit answer authorizes only this question in this application.
+                # Retain the verified manual fact as the browser's evidence source.
+                from .automation.answers import normalize
+
+                policies = copy.deepcopy(config.get("sensitive_policies", {}))
+                question_policies = policies.setdefault("questions", {})
+                trusted_by_id = {fact["id"]: fact for fact in facts}
+                for answer in self.db.query(
+                    "SELECT question,answer,fact_ids FROM application_answers WHERE application_id=? AND verified=1 ORDER BY created_at",
+                    (application["id"],),
+                ):
+                    for fact_id in json.loads(answer["fact_ids"]):
+                        fact = trusted_by_id.get(fact_id)
+                        if (
+                            fact
+                            and fact["category"] == "saved_answer"
+                            and fact["source"].startswith("manual_answer:")
+                            and fact["value"] == answer["answer"]
+                            and normalize(fact["key"]) == normalize(answer["question"])
+                        ):
+                            question_policies[normalize(answer["question"])] = {
+                                "action": "saved_answer", "fact_id": fact_id
+                            }
+                config["sensitive_policies"] = policies
                 from .security import SecretStore
                 from .usage import decision_settings
 

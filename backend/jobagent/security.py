@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import ipaddress
+import json
 import logging
 import re
 import socket
+from datetime import datetime, timezone
 from urllib.parse import urlparse
 
 import httpx
@@ -43,6 +45,19 @@ class RedactingFilter(logging.Filter):
         )
         record.msg, record.args = text, ()
         return True
+
+
+class JsonFormatter(logging.Formatter):
+    def format(self, record):
+        return json.dumps(
+            {
+                "time": datetime.fromtimestamp(record.created, timezone.utc).isoformat(),
+                "level": record.levelname,
+                "event": record.getMessage(),
+                "logger": record.name,
+            },
+            ensure_ascii=False,
+        )
 
 
 def public_url(url: str, allow_local: bool = False) -> str:

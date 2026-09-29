@@ -1,19 +1,19 @@
 {
-  "verified_at": "2026-09-29T15:44:57.485117+00:00",
-  "source_commit": "c9905172abb042edb133b941b93f98d0a7248e54",
+  "verified_at": "2026-09-29T15:56:15.439466+00:00",
+  "source_commit": "d4fd2c710b71052e1c7599c68484d43df8cb9943",
   "version": "0.1.0",
   "platform": "macOS 15+, Apple Silicon arm64",
   "installed_app": "/Users/alejandro/Applications/Meridian.app",
   "dmg": "/Users/alejandro/Projects/Job-search/src-tauri/target/release/bundle/dmg/Meridian_0.1.0_aarch64.dmg",
-  "dmg_sha256": "1ea92aff67e87ee9a0e2be7937d314d0b0254fa6a43bce336eb5b40957ed6678",
-  "dmg_bytes": 88055480,
+  "dmg_sha256": "fae6ca25053c89a63c4cb3bee286c1589c149ce35bec8f380b9a6972a31cbaa4",
+  "dmg_bytes": 88058036,
   "executables": {
     "meridian": {
-      "sha256": "282edc9e24a44581c511c1066c8da60658983860b7dbc25e1b6fb0c0d164b936",
+      "sha256": "f15e353fcb2f3e5df168c093c9e611227bbff0fb34bd633c7cec316882e14b32",
       "installed_copy_matches_build": true
     },
     "meridian-backend": {
-      "sha256": "fb617175b0a08b384cd79a5f73ca2b1fd30c00531052b461753da96485e2caed",
+      "sha256": "500c25f67e7021a3cc49b6af03f4b756596668e1a6b3040b8f8657c4ad4598cc",
       "installed_copy_matches_build": true
     }
   },
@@ -37,7 +37,9 @@
     "dmg_checksum": "passed",
     "python_followup_targeted_tests_passed": 25,
     "brand_vectors_and_native_ui": "passed",
-    "email_oauth_targeted_tests_passed": 41
+    "email_oauth_targeted_tests_passed": 43,
+    "email_connection_ui_flow": "passed",
+    "native_email_keychain_progress": "passed"
   },
   "signing": "ad hoc, not notarized",
   "real_applications_sent": 0,
@@ -46,7 +48,7 @@
     "sha256": "256719178a8e8542c13de8728a646e43332f8da62d4c8b9323425a9de9b5338e",
     "installed_copy_matches_build": true
   },
-  "validation_note": "See VERIFICATION.md for earlier full suites. The email correction passed 41 targeted mail/API/onboarding tests, Ruff, ESLint, TypeScript and a complete native rebuild. Installed signatures/hashes and DMG checksum verified. Real Google token exchange and expected account verification succeeded; initial mailbox sync is reported separately.",
+  "validation_note": "Earlier suites are documented in VERIFICATION.md. This change passed 43 mail/API/onboarding tests and an isolated email UI regression. Native Gmail displays Connected and a separate macOS Keychain wait; the API stays responsive. Real initial mailbox sync still requires Keychain permission. Installed artifact hashes, signature and DMG checksum verified.",
   "gmail_account_verified": true,
   "real_email_initial_sync_verified": false
 }

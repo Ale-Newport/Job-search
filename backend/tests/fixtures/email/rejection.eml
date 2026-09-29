@@ -1,0 +1,8 @@
+From: Recruitment <jobs@arc.example>
+To: Candidate <candidate@example.test>
+Message-ID: <rejection@arc.example>
+Date: Tue, 29 Sep 2026 12:00:00 +0000
+Subject: Arc Systems - rejection
+Content-Type: text/plain; charset=utf-8
+
+We have decided not to progress your application for Graduate Software Engineer at Arc Systems.

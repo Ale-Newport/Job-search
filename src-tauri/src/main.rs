@@ -248,7 +248,13 @@ fn main() {
             let resume = MenuItem::with_id(app, "resume", "Resume automation", true, None::<&str>)?;
             let quit = MenuItem::with_id(app, "quit", "Quit Meridian", true, None::<&str>)?;
             let menu = Menu::with_items(app, &[&open, &search, &pause, &resume, &quit])?;
-            let mut tray = TrayIconBuilder::new()
+            let tray = TrayIconBuilder::new()
+                .icon(tauri::image::Image::new(
+                    include_bytes!("../icons/tray-icon.rgba"),
+                    44,
+                    44,
+                ))
+                .icon_as_template(true)
                 .tooltip("Meridian · private career workspace")
                 .menu(&menu)
                 .on_menu_event(|app, event| match event.id.as_ref() {
@@ -272,9 +278,6 @@ fn main() {
                         });
                     }
                 });
-            if let Some(icon) = app.default_window_icon() {
-                tray = tray.icon(icon.clone());
-            }
             tray.build(app)?;
             Ok(())
         })

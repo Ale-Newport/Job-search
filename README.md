@@ -102,6 +102,8 @@ For `make test-ui`, run an isolated QA backend (`MERIDIAN_TEST=1 MERIDIAN_DATA_D
 
 Build output: `src-tauri/target/release/bundle/macos/Meridian.app` and `src-tauri/target/release/bundle/dmg/`. Copy the app into Applications or run it from the build directory. Local builds are ad-hoc signed, not notarized. The embedded Python runtime requires the narrowly scoped `disable-library-validation` entitlement to load its extracted native libraries; hardened runtime otherwise stays enabled. The bundled Homebrew Python requires macOS 15 or newer. For distribution, configure an Apple Developer signing identity and notarization credentials through the documented Tauri process; never commit certificates or credentials. See [Tauri signing documentation](https://v2.tauri.app/distribute/sign/macos/).
 
+If the app bundle succeeds but Tauri's Finder styling step fails while making the DMG, run `bash scripts/create_dmg.sh`. It verifies the signed app and produces a headless DMG with the app and Applications shortcut, then verifies the disk image checksum.
+
 ## Troubleshooting
 
 - **Service unavailable:** allow a few seconds for the bundled Python service to start, retry, then inspect `logs/backend.log`. The port/token are regenerated each launch.

@@ -178,11 +178,15 @@ export default function App() {
     <div className="app-shell">
       <aside className={`sidebar ${sidebar ? "shown" : ""}`}>
         <div className="brand" data-tauri-drag-region>
-          <span className="brand-symbol">
-            <Compass size={25} strokeWidth={1.7} />
+          <span className="brand-symbol" aria-hidden="true">
+            <img className="brand-on-light" src="/brand/meridian-symbol.svg" alt="" />
+            <img className="brand-on-dark" src="/brand/meridian-symbol-light.svg" alt="" />
           </span>
           <div>
-            <strong>meridian</strong>
+            <span className="brand-wordmark" aria-label="Meridian" role="img">
+              <img className="brand-on-light" src="/brand/meridian-wordmark.svg" alt="" />
+              <img className="brand-on-dark" src="/brand/meridian-wordmark-light.svg" alt="" />
+            </span>
             <span>YOUR CAREER WORKSPACE</span>
           </div>
         </div>

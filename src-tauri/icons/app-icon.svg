@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024" role="img" aria-label="Meridian app icon"><title>Meridian app icon</title><defs>
+  <linearGradient id="plate" x1="0" y1="0" x2=".8" y2="1"><stop stop-color="#28594C"/><stop offset=".48" stop-color="#153E35"/><stop offset="1" stop-color="#0B2723"/></linearGradient>
+  <linearGradient id="ribbon" x1="0" y1="0" x2=".85" y2="1"><stop stop-color="#C9F3DB"/><stop offset=".55" stop-color="#A8E4CE"/><stop offset="1" stop-color="#72BFA9"/></linearGradient>
+  <linearGradient id="edge" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#FFFFFF" stop-opacity=".2"/><stop offset="1" stop-color="#FFFFFF" stop-opacity=".02"/></linearGradient>
+  <filter id="shadow" x="-.3" y="-.3" width="1.6" height="1.6"><feGaussianBlur stdDeviation="13"/></filter>
+</defs>
+<rect x="82" y="91" width="860" height="860" rx="192" fill="#031411" opacity=".22" filter="url(#shadow)"/>
+<rect x="80" y="68" width="864" height="864" rx="192" fill="url(#plate)"/>
+<rect x="82" y="70" width="860" height="860" rx="190" fill="none" stroke="url(#edge)" stroke-width="3"/>
+<g transform="translate(64 102) scale(7)" opacity=".18"><path fill="#001C15" d="M19 102V57C19 42 30 31 44 31C58 31 69 42 69 57V102H53V58C53 52 49 47 44 47C39 47 35 52 35 58V102Z"/><path fill="#001C15" d="M53 102V44C53 28 65 16 81 16C97 16 109 28 109 44V72H93V44C93 37 88 32 81 32C74 32 69 37 69 44V102Z"/><circle cx="101" cy="94" r="8" fill="#001C15"/></g>
+<g transform="translate(64 90) scale(7)"><path fill="url(#ribbon)" d="M19 102V57C19 42 30 31 44 31C58 31 69 42 69 57V102H53V58C53 52 49 47 44 47C39 47 35 52 35 58V102Z"/><path fill="url(#ribbon)" d="M53 102V44C53 28 65 16 81 16C97 16 109 28 109 44V72H93V44C93 37 88 32 81 32C74 32 69 37 69 44V102Z"/><circle cx="101" cy="94" r="8" fill="#D6B782"/></g></svg>

@@ -186,30 +186,46 @@ tbody tr:hover {
   height: 89px;
   display: flex;
   align-items: center;
-  padding: 0 26px;
-  gap: 10px;
+  padding: 0 22px;
+  gap: 8px;
   flex: none;
 }
 .brand-symbol {
-  background: #284f45;
-  color: #e6f2d9;
-  border-radius: 10px;
-  width: 36px;
-  height: 38px;
+  width: 43px;
+  height: 43px;
+  flex: none;
   display: grid;
   place-items: center;
 }
-.brand strong {
-  font-size: 25px;
-  font-weight: 650;
-  letter-spacing: -1.3px;
+.brand-symbol img {
+  width: 100%;
+  height: 100%;
+}
+.brand-wordmark {
+  display: block;
+  width: 133px;
+  height: 28px;
+}
+.brand-wordmark img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+.brand .brand-on-dark {
+  display: none;
+}
+[data-theme="dark"] .brand .brand-on-light {
+  display: none;
+}
+[data-theme="dark"] .brand .brand-on-dark {
+  display: block;
 }
 .brand > div {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 1px;
 }
-.brand > div > span {
+.brand > div > span:last-child {
   font-size: 7px;
   letter-spacing: 1.35px;
   color: var(--muted);
@@ -2121,7 +2137,15 @@ kbd {
     gap: 11px;
   }
   .brand {
-    padding: 0 23px;
+    padding: 0 18px;
+    gap: 6px;
+  }
+  .brand-symbol {
+    width: 37px;
+    height: 37px;
+  }
+  .brand-wordmark {
+    width: 124px;
   }
   .workspace-switch {
     margin-left: 14px;

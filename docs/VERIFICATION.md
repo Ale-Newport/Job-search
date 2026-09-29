@@ -21,6 +21,7 @@ Meridian 0.1.0 está instalada en `/Users/alejandro/Applications/Meridian.app`. 
 | Importador corregido | DOCX conserva orden, tablas, listas, fechas, métricas y destinos de hipervínculos. Reimportar crea una versión inmutable nueva, preserva hechos verificados/bloqueados y sólo sustituye propuestas sin revisar. Reintentar no duplica versiones. CV real contrastado visualmente y mediante cobertura de párrafos; original intacto. |
 | Onboarding | Ocultar la guía no completa pasos. Guardar una cuenta no equivale a conectarla. La cuenta Gmail se contrasta con `/users/me/profile`; cambios de cuenta/configuración invalidan evidencia. IMAP guarda y conecta antes de mostrar éxito. |
 | Texto local | Ollama oficial 0.34.4 y Qwen 2.5 7B Q4_K_M, nube desactivada, localhost, contexto 8192. Pruebas reales de JSON y borrador con referencias a los hechos. El borrador final conserva métricas del CV y sigue requiriendo revisión. |
+| Identidad visual | Símbolo y logotipo vectoriales propios, variantes clara/oscura/monocroma, icono ICNS y plantilla de barra de menús. Compilación y lint de frontend, comprobación/formato de Rust y revisión visual en la app instalada correctos. Firma, hashes de la copia instalada y checksum del DMG final verificados. [Archivos y guía de marca](brand/README.md). |
 
 La prueba de navegador usa una oferta sintética local. No se ha enviado ninguna candidatura real ni ningún mensaje a terceros.
 

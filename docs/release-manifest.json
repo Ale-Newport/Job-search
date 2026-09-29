@@ -1,42 +1,49 @@
 {
-  "verified_at": "2026-09-29T12:45:47.309949+00:00",
-  "source_commit": "1c5814978eff1a68a116941efd588ee590c5a98c",
+  "verified_at": "2026-09-29T15:25:55.974649+00:00",
+  "source_commit": "3a4fe75200e142002f1d7930ef8351a31c9c5715",
   "version": "0.1.0",
   "platform": "macOS 15+, Apple Silicon arm64",
   "installed_app": "/Users/alejandro/Applications/Meridian.app",
   "dmg": "/Users/alejandro/Projects/Job-search/src-tauri/target/release/bundle/dmg/Meridian_0.1.0_aarch64.dmg",
-  "dmg_sha256": "5034523b2d54fd65dc29c68755dd813977d9f4826ad68feb0a7400e05f84cd80",
-  "dmg_bytes": 85973832,
+  "dmg_sha256": "0955f6b29cdc0940e480126fb7529f9ef48cb144a530774b87b289cd9c148a3c",
+  "dmg_bytes": 88052341,
   "executables": {
     "meridian": {
-      "sha256": "8476560f6b3a7cfc9630a7ceb68d540cceb344b3dc8b8cb300ff043fb9fbea3c",
+      "sha256": "2040c48135ad543278df187f89883f802bd64f81bf4fdaf4eb209a1b16e49b8c",
       "installed_copy_matches_build": true
     },
     "meridian-backend": {
-      "sha256": "934a4699a6460d5840602e8457210274fcb156ee3434526201183854154ae805",
+      "sha256": "ed08fc0292dfdf3999773e2aea1afa76efc66819dba5a885bf611f2b66d57c13",
       "installed_copy_matches_build": true
     }
   },
   "database_revision": "0003_notifications",
   "production_record_counts": {
-    "facts": 0,
-    "jobs": 0,
+    "facts": 102,
+    "jobs": 124,
     "applications": 0,
     "email_messages": 0
   },
   "validation": {
-    "python_tests_passed": 125,
+    "python_tests_passed": 159,
     "rust_tests_passed": 3,
-    "ui_e2e_flows_passed": 2,
+    "ui_e2e_flows_passed": 3,
     "lint": "passed",
     "typecheck": "passed",
     "native_launch": "passed",
     "chrome_from_packaged_app": "passed",
     "laya_from_packaged_app": "passed",
     "codesign_deep_strict": "passed",
-    "dmg_checksum": "passed"
+    "dmg_checksum": "passed",
+    "python_followup_targeted_tests_passed": 25,
+    "brand_vectors_and_native_ui": "passed"
   },
   "signing": "ad hoc, not notarized",
   "real_applications_sent": 0,
-  "real_email_accounts_tested": false
+  "real_email_accounts_tested": false,
+  "app_icon": {
+    "sha256": "256719178a8e8542c13de8728a646e43332f8da62d4c8b9323425a9de9b5338e",
+    "installed_copy_matches_build": true
+  },
+  "validation_note": "Test-suite results include the onboarding and writing validation documented in VERIFICATION.md. The branding-only change was checked with frontend build/lint, Rust check/format, native visual inspection, code signature, installed artifact hashes and DMG checksum."
 }

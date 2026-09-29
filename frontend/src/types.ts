@@ -78,7 +78,8 @@ export interface Selection {
 }
 export interface AppContext {
   refresh: number;
-  navigate: (page: Page) => void;
+  navigate: (page: Page, target?: string) => void;
+  target?: string;
   select: (selection: Selection | null) => void;
   act: (
     label: string,

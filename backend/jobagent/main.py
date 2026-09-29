@@ -74,9 +74,11 @@ def create_app(data_dir: Path | None = None, token: str | None = None, secret_st
     async def lifespan(app):
         from .orchestrator import Orchestrator
         from .automation.local_runtime import LayaRuntime
+        from .automation.text_runtime import OllamaRuntime
 
         app.state.automation = Orchestrator(app.state.db, root)
         app.state.laya_runtime = LayaRuntime(root)
+        app.state.ollama_runtime = OllamaRuntime(root)
         scheduler = asyncio.create_task(schedule(app)) if start_scheduler else None
 
         async def start_local_model():
@@ -88,10 +90,24 @@ def create_app(data_dir: Path | None = None, token: str | None = None, secret_st
                 if state["installed"]:
                     await app.state.laya_runtime.start()
 
+        async def start_text_model():
+            from .core import get_settings
+
+            settings = get_settings(app.state.db)
+            if settings.get("text_provider") == "ollama" and settings.get("text_base_url", "").rstrip("/") in (
+                "",
+                "http://127.0.0.1:11434/v1",
+                "http://localhost:11434/v1",
+            ):
+                await app.state.ollama_runtime.start()
+
         model_start = (
             asyncio.create_task(start_local_model())
             if start_scheduler and not os.environ.get("MERIDIAN_TEST")
             else None
+        )
+        text_start = (
+            asyncio.create_task(start_text_model()) if start_scheduler and not os.environ.get("MERIDIAN_TEST") else None
         )
         yield
         if scheduler:
@@ -102,8 +118,13 @@ def create_app(data_dir: Path | None = None, token: str | None = None, secret_st
             model_start.cancel()
             with contextlib.suppress(asyncio.CancelledError):
                 await model_start
+        if text_start:
+            text_start.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await text_start
         await app.state.automation.close()
         await app.state.laya_runtime.close()
+        await app.state.ollama_runtime.close()
 
     app = FastAPI(title=APP_NAME, version="0.1.0", lifespan=lifespan, docs_url=None, redoc_url=None, openapi_url=None)
     app.state.data_dir = root
@@ -162,6 +183,9 @@ def create_app(data_dir: Path | None = None, token: str | None = None, secret_st
     from .core import router
 
     app.include_router(router, prefix="/api")
+    from .onboarding import router as onboarding_router, record_ai_probe, record as onboarding_record
+
+    app.include_router(onboarding_router, prefix="/api")
 
     @app.get("/api/health")
     async def health():
@@ -182,6 +206,10 @@ def create_app(data_dir: Path | None = None, token: str | None = None, secret_st
         if not isinstance(config, dict):
             raise ValueError("Integration config must be an object")
         validate_config_tree(config)
+        config = dict(config)
+        # Account identity is established by authentication, never a form field.
+        if provider in {"gmail", "outlook", "imap"}:
+            config.pop("account_email", None)
         secret_keys = {"password", "api_key", "access_token", "refresh_token", "secret", "client_secret", "token"}
         if any(key.lower() in secret_keys for key in config):
             raise ValueError("Use the secret field for credentials; config is stored in SQLite")
@@ -190,22 +218,44 @@ def create_app(data_dir: Path | None = None, token: str | None = None, secret_st
             store.set(secret_name, payload["secret"])
         existing = app.state.db.one("SELECT * FROM integrations WHERE provider=?", (provider,))
         status = existing["status"] if existing else "configured"
+        previous_config = json.loads(existing["config"]) if existing else {}
+        previous_account = previous_config.pop("account_email", None)
+        changed = not existing or config != previous_config or bool(payload.get("secret"))
+        if not changed and previous_account:
+            config["account_email"] = previous_account
         # Changing account or OAuth client invalidates the previous authorization.
-        if existing and config != json.loads(existing["config"]):
+        if changed:
             status = "configured"
         app.state.db.execute(
             "INSERT INTO integrations(id,provider,config,status) VALUES(?,?,?,?) ON CONFLICT(provider) DO UPDATE SET config=excluded.config,status=excluded.status",
             (str(uuid4()), provider, json.dumps(config), status),
         )
+        if changed:
+            app.state.db.execute("UPDATE integrations SET last_sync=NULL,last_error=NULL WHERE provider=?", (provider,))
+            if provider == "jev":
+                onboarding_record(app.state.db, "ai_browser", None)
+            elif provider not in {"gmail", "outlook", "imap"}:
+                onboarding_record(app.state.db, "ai_text", None)
         return decode_row(app.state.db.one("SELECT * FROM integrations WHERE provider=?", (provider,)))
 
     @app.post("/api/integrations/{provider}/connect")
     async def integration_connect(provider: str, request: Request):
         if provider == "imap":
-            messages = await app.state.mail.fetch("imap")
-            for message in messages:
-                ingest_message(app.state.db, message, "imap")
-            app.state.db.execute("UPDATE integrations SET status='connected',last_error=NULL WHERE provider='imap'")
+            if app.state.mail.lock.locked():
+                raise HTTPException(409, "Wait for the current email operation before reconnecting")
+            async with app.state.mail.lock:
+                messages = await app.state.mail.fetch("imap")
+                for message in messages:
+                    ingest_message(app.state.db, message, "imap")
+                config = app.state.mail.config("imap")
+                if messages:
+                    generation, last_uid = messages[-1]["external_id"].rsplit(":", 2)[-2:]
+                    config.update(uidvalidity=generation, last_uid=int(last_uid))
+                config["account_email"] = config.get("username")
+                app.state.db.execute(
+                    "UPDATE integrations SET config=?,status='connected',last_error=NULL,last_sync=? WHERE provider='imap'",
+                    (json.dumps(config), now()),
+                )
             return {"connected": True, "messages": len(messages)}
         redirect = str(request.base_url).rstrip("/") + "/api/oauth/callback"
         if provider == "outlook":
@@ -384,6 +434,8 @@ def create_app(data_dir: Path | None = None, token: str | None = None, secret_st
         if engine in ("laya", "hybrid"):
             runtime = await app.state.laya_runtime.status()
             result.update({key: runtime[key] for key in ("memory_mb", "memory_measurement", "model")})
+        if engine == get_settings(app.state.db).get("browser_engine"):
+            record_ai_probe(app.state.db, "browser", result)
         return result
 
     @app.get("/api/ai/local/status")
@@ -418,7 +470,36 @@ def create_app(data_dir: Path | None = None, token: str | None = None, secret_st
         if engine in ("laya", "hybrid"):
             runtime = await app.state.laya_runtime.status()
             result.update({key: runtime[key] for key in ("memory_mb", "memory_measurement", "model")})
+        if result.get("runs") and engine == get_settings(app.state.db).get("browser_engine"):
+            record_ai_probe(app.state.db, "browser", result["runs"][-1])
         return result
+
+    @app.post("/api/ai/text/test")
+    async def text_ai_test():
+        from .core import get_settings
+
+        await ensure_text_runtime()
+        result = await app.state.text_ai.test(get_settings(app.state.db))
+        record_ai_probe(app.state.db, "text", result)
+        return result
+
+    async def ensure_text_runtime():
+        from .core import get_settings
+
+        settings = get_settings(app.state.db)
+        if (
+            not os.environ.get("MERIDIAN_TEST")
+            and settings.get("text_provider") == "ollama"
+            and settings.get("text_base_url", "").rstrip("/")
+            in ("", "http://127.0.0.1:11434/v1", "http://localhost:11434/v1")
+        ):
+            state = await app.state.ollama_runtime.start()
+            if not state.get("ready"):
+                raise ValueError(state.get("error") or "Download the configured local text model before using it")
+
+    @app.get("/api/ai/text/local/status")
+    async def local_text_status():
+        return await app.state.ollama_runtime.status()
 
     @app.post("/api/ai/draft")
     async def ai_draft(payload: dict = Body(...)):
@@ -427,6 +508,7 @@ def create_app(data_dir: Path | None = None, token: str | None = None, secret_st
         job = app.state.db.one("SELECT * FROM jobs WHERE id=?", (payload.get("job_id"),))
         if not job:
             raise ValueError("Select a job before generating an answer")
+        await ensure_text_runtime()
         return await app.state.text_ai.draft(
             get_settings(app.state.db), payload.get("question", ""), job, payload.get("fact_ids", [])
         )

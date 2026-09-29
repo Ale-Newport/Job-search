@@ -21,6 +21,7 @@ from .documents import (
     document_path,
     generate_document,
     import_document,
+    reimport_document,
     select_facts,
 )
 from .matching import normalized
@@ -392,6 +393,16 @@ def documents_list(request: Request, limit: int = Query(100, ge=1, le=500), offs
             ],
         )
     return result
+
+
+@router.post("/documents/{document_id}/reimport")
+def document_reimport(document_id: str, request: Request):
+    db = get_db(request)
+    required(db, "documents", document_id)
+    try:
+        return reimport_document(db, request.app.state.data_dir, document_id)
+    except ValueError as exc:
+        raise HTTPException(422, str(exc)) from exc
 
 
 @router.get("/documents/{document_id}/versions")

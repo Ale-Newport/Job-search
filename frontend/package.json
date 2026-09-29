@@ -10,7 +10,7 @@
     "lint": "eslint .",
     "preview": "vite preview --host 127.0.0.1",
     "format": "prettier --write \"src/**/*.{ts,tsx,css}\"",
-    "test:ui": "../.venv/bin/python tests/ui_smoke.py && ../.venv/bin/python tests/workflow_e2e.py"
+    "test:ui": "../.venv/bin/python tests/ui_smoke.py && ../.venv/bin/python tests/workflow_e2e.py && ../.venv/bin/python tests/onboarding_e2e.py"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.8.0",

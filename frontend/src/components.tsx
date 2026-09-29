@@ -64,10 +64,24 @@ export function Tag({
 }
 export function Status({ value }: { value?: string }) {
   const s = (value || "unknown").toLowerCase();
+  const positive = new Set([
+    "applied",
+    "verified",
+    "offer",
+    "connected",
+    "success",
+    "succeeded",
+    "complete",
+    "completed",
+    "confirmed",
+    "interview",
+    "final_interview",
+    "recruiter_screen",
+  ]);
   return (
     <Tag
       tone={
-        /applied|verified|offer|connected|success|completed|interview/.test(s)
+        positive.has(s)
           ? "green"
           : /error|reject|failed|blocked/.test(s)
             ? "red"
@@ -185,12 +199,14 @@ export function SectionTitle({
   );
 }
 export function Panel({
+  id,
   title,
   description,
   children,
   action,
   className = "",
 }: {
+  id?: string;
   title?: string;
   description?: string;
   children: ReactNode;
@@ -198,7 +214,7 @@ export function Panel({
   className?: string;
 }) {
   return (
-    <section className={`panel ${className}`}>
+    <section id={id} className={`panel ${className}`}>
       {title && (
         <div className="panel-heading">
           <div>
@@ -426,6 +442,7 @@ export function Editor({
                 <input
                   aria-label={f.label}
                   type="checkbox"
+                  required={f.required}
                   checked={!!values[f.key]}
                   onChange={(e) =>
                     setValues({ ...values, [f.key]: e.target.checked })

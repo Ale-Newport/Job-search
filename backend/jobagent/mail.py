@@ -277,12 +277,23 @@ class MailService:
             raise ValueError("Configure this integration first")
         return json.loads(row["config"] or "{}")
 
+    @staticmethod
+    def expected_gmail_address(config):
+        expected = config.get("expected_email") or ""
+        if not isinstance(expected, str):
+            raise ValueError("Expected Gmail address must be an email address")
+        expected = expected.strip()
+        if expected and (len(expected) > 254 or not re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", expected)):
+            raise ValueError("Expected Gmail address must be an email address")
+        return expected
+
     def connect(self, provider, redirect_uri):
         if provider not in OAUTH:
             raise ValueError("OAuth is available for Gmail and Outlook")
         config = self.config(provider)
         if not config.get("client_id"):
             raise ValueError("An OAuth client ID registered for a desktop application is required")
+        expected_email = self.expected_gmail_address(config) if provider == "gmail" else ""
         state, verifier = secrets.token_urlsafe(32), secrets.token_urlsafe(48)
         self.pending = {key: value for key, value in self.pending.items() if value["expires"] > time.time()}
         self.pending[state] = {
@@ -290,6 +301,8 @@ class MailService:
             "verifier": verifier,
             "redirect_uri": redirect_uri,
             "expires": time.time() + 600,
+            "client_id": config["client_id"],
+            "expected_email": expected_email.casefold(),
         }
         challenge = base64.urlsafe_b64encode(hashlib.sha256(verifier.encode()).digest()).rstrip(b"=").decode()
         params = {
@@ -303,6 +316,8 @@ class MailService:
         }
         if provider == "gmail":
             params.update(access_type="offline", prompt="consent")
+            if expected_email:
+                params["login_hint"] = expected_email
         return OAUTH[provider]["authorize"] + "?" + urlencode(params)
 
     async def callback(self, state, code):
@@ -311,6 +326,9 @@ class MailService:
             raise ValueError("OAuth state is invalid or expired. Start connection again.")
         provider = pending["provider"]
         config = self.config(provider)
+        expected_email = self.expected_gmail_address(config) if provider == "gmail" else ""
+        if config.get("client_id") != pending["client_id"] or expected_email.casefold() != pending["expected_email"]:
+            raise ValueError("Email configuration changed during authorization. Start connection again.")
         data = {
             "grant_type": "authorization_code",
             "code": code,
@@ -326,9 +344,43 @@ class MailService:
             if response.status_code != 200:
                 raise ValueError("OAuth token exchange failed. Check the registered client and redirect URI.")
             tokens = response.json()
+            if (
+                not isinstance(tokens, dict)
+                or not isinstance(tokens.get("access_token"), str)
+                or not tokens["access_token"]
+            ):
+                raise ValueError("OAuth token exchange did not return a usable access token.")
+            account_email = None
+            if provider == "gmail":
+                try:
+                    profile = await client.get(
+                        "https://gmail.googleapis.com/gmail/v1/users/me/profile",
+                        headers={"Authorization": f"Bearer {tokens['access_token']}"},
+                    )
+                    profile.raise_for_status()
+                    profile_data = profile.json()
+                    account_email = profile_data.get("emailAddress") if isinstance(profile_data, dict) else None
+                    if not isinstance(account_email, str) or not account_email.strip():
+                        raise ValueError("Missing email address")
+                    account_email = self.expected_gmail_address({"expected_email": account_email})
+                except (httpx.HTTPError, ValueError):
+                    raise ValueError(
+                        "Gmail account verification failed. No new authorization was saved; reconnect the account."
+                    ) from None
+                if expected_email and account_email.casefold() != expected_email.casefold():
+                    raise ValueError(
+                        "Authorized Gmail account does not match the configured email. Choose the expected account and reconnect."
+                    )
+        if self.config(provider) != config:
+            raise ValueError("Email configuration changed during authorization. Start connection again.")
         tokens["expires_at"] = time.time() + tokens.get("expires_in", 3600)
         self.secrets.set(f"{provider}:tokens", json.dumps(tokens))
-        self.db.execute("UPDATE integrations SET status='connected',last_error=NULL WHERE provider=?", (provider,))
+        if account_email:
+            config["account_email"] = account_email
+        self.db.execute(
+            "UPDATE integrations SET config=?,status='connected',last_error=NULL WHERE provider=?",
+            (json.dumps(config), provider),
+        )
         return provider
 
     async def token(self, provider):

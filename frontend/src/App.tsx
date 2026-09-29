@@ -67,6 +67,7 @@ const navigation = [
 ] as const;
 export default function App() {
   const [page, setPage] = useState<Page>("dashboard"),
+    [target, setTarget] = useState<string | undefined>(),
     [selection, setSelection] = useState<Selection | null>(null),
     [refresh, setRefresh] = useState(0),
     [busy, setBusy] = useState<string | null>(null),
@@ -84,8 +85,9 @@ export default function App() {
   const reloadHealth = health.reload,
     reloadAutomation = automation.reload,
     reloadTasks = tasks.reload;
-  const navigate = useCallback((p: Page) => {
+  const navigate = useCallback((p: Page, destination?: string) => {
     setPage(p);
+    setTarget(destination);
     setSelection(null);
     setSidebar(false);
     window.scrollTo({ top: 0 });
@@ -115,8 +117,16 @@ export default function App() {
     [],
   );
   const ctx = useMemo<AppContext>(
-    () => ({ refresh, navigate, select: setSelection, act, busy, toast }),
-    [refresh, navigate, act, busy, toast],
+    () => ({
+      refresh,
+      navigate,
+      target,
+      select: setSelection,
+      act,
+      busy,
+      toast,
+    }),
+    [refresh, navigate, target, act, busy, toast],
   );
   useEffect(() => {
     const media = window.matchMedia("(prefers-color-scheme: dark)");
@@ -296,7 +306,7 @@ export default function App() {
             </IconButton>
           </div>
         </header>
-        <div className="page-content">
+        <div className="page-content" key={`${page}:${target || ""}`}>
           {health.error && (
             <div className="offline-banner">
               <span className="connection-dot offline" />

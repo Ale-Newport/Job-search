@@ -66,7 +66,15 @@ The runtime uses MLX on Apple Silicon and PyTorch on Intel. It is pinned to a re
 
 Jev is a hosted TypeSafe service. Store its key in Keychain and select Jev or explicitly enable the hybrid hosted fallback. That sends the scoped page observation to TypeSafe. Hosted usage requires a provider account.
 
-For local text generation, install [Ollama](https://ollama.com), download a model you choose, then configure provider `ollama`, model name and `http://127.0.0.1:11434/v1`. OpenAI, Anthropic, Gemini and other OpenAI-compatible endpoints are also configurable. Remote text generation requires a Keychain API key, configured token prices and a positive monthly budget. Only selected candidate facts and limited job context are sent. A citation to an existing fact is not proof of every generated sentence; generated text remains subject to review.
+For local text generation, install the official [Ollama macOS app](https://ollama.com) in `~/Applications` or `/Applications`. Meridian manages a loopback-only service when provider `ollama` and `http://127.0.0.1:11434/v1` are selected, disables cloud inference, and stores models under its own `models/ollama` directory. The bundled runtime configuration uses `llama3.2:3b-instruct-q4_K_M` with an 8192-token context; download that model into the Meridian cache before use. Meridian never stops or takes over an existing service on port 11434. Its own service and runner stop when Meridian quits. Test connection uses a synthetic candidate, not your CV.
+
+OpenAI, Anthropic, Gemini and other OpenAI-compatible endpoints are also configurable. The DeepSeek preset supplies its endpoint, model and token prices but neither supplies a key nor enables spending. Remote text generation requires a Keychain API key, configured token prices and a positive monthly budget. Only selected candidate facts and limited job context are sent. A citation to an existing fact is not proof of every generated sentence; generated text remains subject to review.
+
+## Evidence-based onboarding
+
+Setup progress comes from saved evidence: an imported document, reviewed facts, configured roles, explicit browser-login confirmation, an authorized mailbox with a successful sync, actual AI probes, reviewed automation boundaries and a successful source fetch. Dismissing the guide only hides it. Changing a provider, credential or automation boundary invalidates the corresponding evidence.
+
+DOCX import preserves hyperlinks, table order, list items and complete education, employment and project entries. Skills are deduplicated and languages remain separate. Every proposal includes its source version and line context; importing does not automatically verify claims. Dates and metrics are retained exactly, while work rights, total experience and missing identity details are never inferred. Re-extracting a document creates a new immutable version and supersedes only older unreviewed, unlocked proposals.
 
 ## Storage and backup
 

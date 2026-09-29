@@ -15,6 +15,7 @@ test:
 test-ui:
 	$(PYTHON) frontend/tests/ui_smoke.py
 	$(PYTHON) frontend/tests/workflow_e2e.py
+	$(PYTHON) frontend/tests/onboarding_e2e.py
 lint:
 	.venv/bin/ruff check backend scripts
 	npm --prefix frontend run lint

@@ -21,8 +21,18 @@ class TextService:
         async with self.lock:
             return await self._draft(settings, question, job, fact_ids)
 
-    async def _draft(self, settings: dict, question: str, job: dict, fact_ids: list[str]):
-        facts = []
+    async def test(self, settings: dict):
+        async with self.lock:
+            return await self._draft(
+                settings,
+                "Write one short sentence naming the sample candidate. This is only a connection test.",
+                {"title": "Connection test", "company": "Local test", "description": "Synthetic data only."},
+                [],
+                _probe_facts=[{"id": "connection-probe", "key": "full_name", "value": "Sample Candidate"}],
+            )
+
+    async def _draft(self, settings: dict, question: str, job: dict, fact_ids: list[str], *, _probe_facts=None):
+        facts = list(_probe_facts or [])
         for fact_id in fact_ids[:30]:
             fact = self.db.one(
                 "SELECT * FROM facts WHERE id=? AND (verification_status='verified' OR locked=1)", (fact_id,)
@@ -102,16 +112,21 @@ class TextService:
                     },
                 )
             else:
+                request_body = {
+                    "model": model,
+                    "max_tokens": 1500,
+                    "temperature": 0.2,
+                    "messages": [{"role": "system", "content": prompt}, {"role": "user", "content": payload}],
+                    "response_format": {"type": "json_object"},
+                }
+                if parsed.hostname == "api.deepseek.com":
+                    # A small writing task should return its JSON within the output
+                    # budget instead of spending it on the provider's default reasoning.
+                    request_body["thinking"] = {"type": "disabled"}
                 response = await client.post(
                     base.rstrip("/") + "/chat/completions",
                     headers=headers,
-                    json={
-                        "model": model,
-                        "max_tokens": 1500,
-                        "temperature": 0.2,
-                        "messages": [{"role": "system", "content": prompt}, {"role": "user", "content": payload}],
-                        "response_format": {"type": "json_object"},
-                    },
+                    json=request_body,
                 )
             if response.status_code != 200:
                 raise ValueError(f"Text provider returned HTTP {response.status_code}; check provider configuration")

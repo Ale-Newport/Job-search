@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   ArrowDownToLine,
   ArrowRight,
@@ -22,7 +22,6 @@ import {
   RefreshCw,
   Search,
   ShieldCheck,
-  Sparkles,
   Target,
   Trash2,
   TrendingUp,
@@ -68,6 +67,7 @@ import {
   UploadButton,
 } from "./components";
 import type { Field } from "./components";
+import { SetupGuide } from "./onboarding";
 
 const STATUS = [
   "DISCOVERED",
@@ -90,35 +90,8 @@ const STATUS = [
   "GHOSTED",
   "ERROR",
 ];
-const onboardingSteps = [
-  ["Import your CV", "Bring your experience into your workspace.", "documents"],
-  ["Review your profile", "Verify facts before they are used.", "profile"],
-  [
-    "Set your job preferences",
-    "Define the roles and locations that matter.",
-    "discover",
-  ],
-  [
-    "Connect browser accounts",
-    "Sign in once in your dedicated browser.",
-    "automation",
-  ],
-  ["Connect application email", "Keep your timeline up to date.", "email"],
-  ["Configure AI", "Choose your local or remote providers.", "settings"],
-  [
-    "Set automation boundaries",
-    "Start in Review mode, with you in control.",
-    "settings",
-  ],
-  [
-    "Run your first search",
-    "Turn your preferences into opportunities.",
-    "discover",
-  ],
-] as const;
 export function Dashboard({ ctx }: { ctx: AppContext }) {
   const resource = useResource("/dashboard", ctx.refresh),
-    settings = useResource("/settings", ctx.refresh),
     d = resource.data || {},
     s = d.stats || {};
   const cards = [
@@ -198,47 +171,7 @@ export function Dashboard({ ctx }: { ctx: AppContext }) {
             </button>
           ))}
         </div>
-        {!settings.data?.onboarding_completed && (
-          <Panel className="onboarding-card">
-            <div className="onboarding-intro">
-              <div className="onboarding-symbol">
-                <Sparkles size={24} />
-              </div>
-              <div>
-                <span className="eyebrow">MAKE MERIDIAN YOURS</span>
-                <h3>Start with what makes you, you.</h3>
-                <p>
-                  Build your profile, connect the tools you use, and set your
-                  boundaries. You can complete these steps in any order.
-                </p>
-              </div>
-              <MoreLink
-                onClick={() =>
-                  ctx.act(
-                    "onboarding",
-                    () =>
-                      api("/settings", "PATCH", { onboarding_completed: true }),
-                    "Setup guide hidden. Reopen it from Settings.",
-                  )
-                }
-              >
-                Dismiss guide
-              </MoreLink>
-            </div>
-            <div className="onboarding-steps">
-              {onboardingSteps.map(([title, desc, page], i) => (
-                <button key={title} onClick={() => ctx.navigate(page)}>
-                  <span className="step-number">{i + 1}</span>
-                  <div>
-                    <strong>{title}</strong>
-                    <p>{desc}</p>
-                  </div>
-                  <ArrowRight size={14} />
-                </button>
-              ))}
-            </div>
-          </Panel>
-        )}
+        <SetupGuide ctx={ctx} />
         <div className="two-col">
           <Panel
             title="Recent activity"
@@ -705,6 +638,12 @@ export function Discover({ ctx }: { ctx: AppContext }) {
       null,
     ),
     [result, setResult] = useState<Data | null>(null);
+  useEffect(() => {
+    if (ctx.target === "sources")
+      document
+        .getElementById("discovery-sources")
+        ?.scrollIntoView({ block: "start" });
+  }, [ctx.target]);
   return (
     <>
       <SectionTitle
@@ -804,6 +743,7 @@ export function Discover({ ctx }: { ctx: AppContext }) {
         </Resource>
       </Panel>
       <Panel
+        id="discovery-sources"
         title="Discovery sources"
         description="Public job boards, company pages, and curated repositories"
         action={
@@ -1552,6 +1492,7 @@ const factFields: Field[] = [
       "project",
       "skill",
       "language",
+      "certification",
       "link",
       "availability",
       "location",
@@ -1559,6 +1500,7 @@ const factFields: Field[] = [
       "preference",
       "salary",
       "answer",
+      "imported",
       "other",
     ],
     required: true,
@@ -1583,6 +1525,9 @@ const factFields: Field[] = [
 export function Profile({ ctx }: { ctx: AppContext }) {
   const [q, setQ] = useState(""),
     [category, setCategory] = useState(""),
+    [verification, setVerification] = useState(
+      ctx.target === "review" ? "unverified" : "",
+    ),
     [edit, setEdit] = useState<Data | null>(null),
     [del, setDel] = useState<Fact | null>(null),
     [relationship, setRelationship] = useState(false),
@@ -1592,6 +1537,7 @@ export function Profile({ ctx }: { ctx: AppContext }) {
     filtered = facts.filter(
       (f) =>
         (!category || f.category === category) &&
+        (!verification || f.verification_status === verification) &&
         `${f.key} ${pretty(f.value)} ${f.category}`
           .toLowerCase()
           .includes(q.toLowerCase()),
@@ -1644,6 +1590,16 @@ export function Profile({ ctx }: { ctx: AppContext }) {
           onChange={setQ}
           placeholder="Search facts, skills, or experience"
         />
+        <select
+          aria-label="Fact verification"
+          value={verification}
+          onChange={(e) => setVerification(e.target.value)}
+        >
+          <option value="">All verification states</option>
+          <option value="unverified">Needs review</option>
+          <option value="verified">Verified</option>
+          <option value="rejected">Rejected</option>
+        </select>
         <select
           aria-label="Fact category"
           value={category}
@@ -1876,6 +1832,7 @@ export function Profile({ ctx }: { ctx: AppContext }) {
 export function Documents({ ctx }: { ctx: AppContext }) {
   const r = useResource("/documents", ctx.refresh),
     [imported, setImported] = useState<Data | null>(null),
+    [reimport, setReimport] = useState<Document | null>(null),
     documents = items<Document>(r.data);
   return (
     <>
@@ -1896,7 +1853,14 @@ export function Documents({ ctx }: { ctx: AppContext }) {
       />
       {imported && (
         <Panel
-          title="Import complete"
+          id="document-import-review"
+          title={
+            imported.already_current
+              ? "Extraction is up to date"
+              : imported.reextracted
+                ? "Facts re-extracted"
+                : "Import complete"
+          }
           description="Extracted information remains unverified until you review it."
           action={
             <MoreLink onClick={() => ctx.navigate("profile")}>
@@ -1913,17 +1877,32 @@ export function Documents({ ctx }: { ctx: AppContext }) {
                   "Your document is in the library."}
               </strong>
               <p>
-                {(imported.proposed_facts || []).length} facts proposed for
-                review.
+                {(imported.proposed_facts || []).length} facts{" "}
+                {imported.reextracted ? "available" : "proposed"} for review.
               </p>
+              {imported.reextracted && (
+                <p>
+                  {imported.already_current
+                    ? "This version already uses the current extractor; no new version was created."
+                    : `Version ${imported.version?.version ?? "created"} saved. ${imported.superseded_fact_ids?.length ?? imported.superseded ?? 0} older unreviewed proposals superseded. Verified and locked facts were kept.`}
+                </p>
+              )}
             </div>
           </div>
-          {imported.warnings && (
-            <JsonDetails title="Import notes" data={imported.warnings} />
+          {(imported.warnings || []).length > 0 && (
+            <div className="import-warnings">
+              <strong>Import notes</strong>
+              <ul>
+                {imported.warnings.map((warning: string, index: number) => (
+                  <li key={index}>{warning}</li>
+                ))}
+              </ul>
+            </div>
           )}
-          <JsonDetails
-            title="Extracted facts"
-            data={imported.proposed_facts || []}
+          <ImportedFacts
+            key={imported.version?.id || imported.document?.id}
+            ctx={ctx}
+            initial={imported.proposed_facts || []}
           />
         </Panel>
       )}
@@ -1943,7 +1922,7 @@ export function Documents({ ctx }: { ctx: AppContext }) {
                 </thead>
                 <tbody>
                   {documents.map((d) => (
-                    <tr key={d.id}>
+                    <tr key={d.id} data-document-id={d.id}>
                       <td>
                         <button
                           className="table-title"
@@ -1968,15 +1947,27 @@ export function Documents({ ctx }: { ctx: AppContext }) {
                           1}
                       </td>
                       <td>
-                        <Button
-                          secondary
-                          onClick={() =>
-                            ctx.select({ kind: "document", id: d.id })
-                          }
-                        >
-                          View versions
-                          <ArrowRight size={14} />
-                        </Button>
+                        <div className="actions">
+                          <Button
+                            secondary
+                            onClick={() =>
+                              ctx.select({ kind: "document", id: d.id })
+                            }
+                          >
+                            View versions
+                            <ArrowRight size={14} />
+                          </Button>
+                          {d.kind === "import" && (
+                            <Button
+                              secondary
+                              aria-label={`Re-extract facts from ${d.name || d.filename || "document"}`}
+                              onClick={() => setReimport(d)}
+                            >
+                              <RefreshCw size={14} />
+                              Re-extract facts
+                            </Button>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -2012,7 +2003,168 @@ export function Documents({ ctx }: { ctx: AppContext }) {
           </p>
         </div>
       </div>
+      {reimport && (
+        <Confirm
+          title="Re-extract facts from this document?"
+          description={`Run the current extractor on ${reimport.name || reimport.filename || "this imported document"}. When extraction needs updating, this creates a new immutable document version and supersedes only older unverified, unlocked proposals from this document. Original versions and verified or locked facts are preserved. New proposals still require your review.`}
+          button="Re-extract facts"
+          onClose={() => setReimport(null)}
+          onConfirm={async () => {
+            const result = await api(
+              `/documents/${reimport.id}/reimport`,
+              "POST",
+              {},
+            );
+            setImported({ ...result, reextracted: true });
+            await ctx.act(
+              "refresh",
+              () => Promise.resolve({}),
+              result.already_current
+                ? "This document already uses the current extractor."
+                : "Facts re-extracted. Review the new proposals.",
+            );
+            requestAnimationFrame(() =>
+              document
+                .getElementById("document-import-review")
+                ?.scrollIntoView({ block: "start" }),
+            );
+          }}
+        />
+      )}
     </>
+  );
+}
+function ImportedFacts({ ctx, initial }: { ctx: AppContext; initial: Fact[] }) {
+  const [facts, setFacts] = useState(initial);
+  const [editing, setEditing] = useState<Fact | null>(null);
+  const [category, setCategory] = useState("");
+  const updateFact = async (fact: Fact, values: Data) => {
+    const updated = await api<Fact>(`/facts/${fact.id}`, "PATCH", values);
+    setFacts((current) =>
+      current.map((entry) => (entry.id === fact.id ? updated : entry)),
+    );
+    return updated;
+  };
+  if (!facts.length)
+    return (
+      <p className="panel-copy">
+        No structured facts were extracted. Open the document to inspect it and
+        add supported facts from Profile.
+      </p>
+    );
+  return (
+    <div className="import-facts">
+      <div className="toolbar">
+        <strong>Review extracted facts</strong>
+        <Tag>
+          {
+            facts.filter((fact) => fact.verification_status === "unverified")
+              .length
+          }{" "}
+          need review
+        </Tag>
+        <select
+          aria-label="Imported fact category"
+          value={category}
+          onChange={(event) => setCategory(event.target.value)}
+        >
+          <option value="">All categories</option>
+          {[...new Set(facts.map((fact) => fact.category))]
+            .sort()
+            .map((value) => (
+              <option key={value} value={value}>
+                {label(value)}
+              </option>
+            ))}
+        </select>
+      </div>
+      <p className="panel-copy">
+        Compare each value with your document. Education, experience, and
+        projects retain their source context. Edit inaccurate extraction or
+        reject unsupported facts before using them.
+      </p>
+      {facts
+        .filter((fact) => !category || fact.category === category)
+        .map((fact) => (
+          <article className="import-fact" key={fact.id}>
+            <div className="row-between">
+              <div>
+                <Tag>{label(fact.category)}</Tag>
+                <h4>{label(fact.key)}</h4>
+              </div>
+              <Status value={fact.verification_status} />
+            </div>
+            <div className="import-fact-value">{pretty(fact.value)}</div>
+            <small>
+              {fact.notes || "Check against the original document."}
+            </small>
+            <div className="actions">
+              <Button
+                secondary
+                onClick={() =>
+                  setEditing({ ...fact, value: pretty(fact.value) })
+                }
+              >
+                <Pencil size={13} />
+                Edit fact
+              </Button>
+              {fact.verification_status !== "verified" && (
+                <Button
+                  secondary
+                  disabled={!!ctx.busy}
+                  onClick={() =>
+                    ctx.act(
+                      `verify:${fact.id}`,
+                      () =>
+                        updateFact(fact, { verification_status: "verified" }),
+                      "Fact verified after your review.",
+                    )
+                  }
+                >
+                  <Check size={14} />
+                  Verify fact
+                </Button>
+              )}
+              {fact.verification_status !== "rejected" && (
+                <Button
+                  secondary
+                  disabled={!!ctx.busy}
+                  onClick={() =>
+                    ctx.act(
+                      `reject:${fact.id}`,
+                      () =>
+                        updateFact(fact, {
+                          verification_status: "rejected",
+                          locked: false,
+                        }),
+                      "Fact rejected and excluded from automatic use.",
+                    )
+                  }
+                >
+                  Reject fact
+                </Button>
+              )}
+            </div>
+          </article>
+        ))}
+      {editing && (
+        <Editor
+          title="Review imported fact"
+          description="Keep only information supported by your document. Verification is your explicit decision."
+          fields={factFields}
+          initial={editing}
+          onClose={() => setEditing(null)}
+          onSave={async (values) => {
+            await updateFact(editing, values);
+            await ctx.act(
+              "refresh",
+              () => Promise.resolve({}),
+              "Fact review saved.",
+            );
+          }}
+        />
+      )}
+    </div>
   );
 }
 export function Email({ ctx }: { ctx: AppContext }) {
@@ -2063,7 +2215,15 @@ export function Email({ ctx }: { ctx: AppContext }) {
                   <span className="list-icon">
                     <Mail size={20} />
                   </span>
-                  <Status value={i?.status || "not connected"} />
+                  <Status
+                    value={
+                      i?.last_error
+                        ? "error"
+                        : i?.status === "connected" && !i?.last_sync
+                          ? "awaiting first sync"
+                          : i?.status || "not connected"
+                    }
+                  />
                 </div>
                 <h3>
                   {p === "gmail"
@@ -2073,6 +2233,9 @@ export function Email({ ctx }: { ctx: AppContext }) {
                       : "IMAP over TLS"}
                 </h3>
                 <p>{i?.last_error || `Last sync: ${time(i?.last_sync)}`}</p>
+                {i?.config?.account_email && (
+                  <p>Verified account: {i.config.account_email}</p>
+                )}
                 <Button
                   secondary
                   onClick={() => setEdit({ provider: p, ...i })}
@@ -2194,7 +2357,7 @@ export function IntegrationEditor({
       title={`Configure ${p === "imap" ? "IMAP" : label(p)}`}
       description={
         imap
-          ? "Use an application password where your provider requires one. It is stored in macOS Keychain."
+          ? "Use an application password where your provider requires one. It is stored in macOS Keychain. Save & connect authenticates and reads recent messages; it never sends email."
           : "Register your OAuth application and set its loopback redirect URI. Connecting opens your provider’s authorization page."
       }
       fields={
@@ -2217,6 +2380,16 @@ export function IntegrationEditor({
               },
             ]
           : [
+              ...(p === "gmail"
+                ? [
+                    {
+                      key: "expected_email",
+                      label: "Expected Gmail account",
+                      type: "text" as const,
+                      hint: "Optional. Authorization must return this Google account; no password is entered here.",
+                    },
+                  ]
+                : []),
               { key: "client_id", label: "OAuth client ID", required: true },
               {
                 key: "secret",
@@ -2238,27 +2411,27 @@ export function IntegrationEditor({
         ...integration.config,
         secret: "",
       }}
-      submit={imap ? "Save connection" : "Save & authorize"}
+      submit={imap ? "Save & connect" : "Save & authorize"}
       onClose={onClose}
       onSave={async (values) => {
         const { secret, ...config } = values;
-        await api(`/integrations/${p}`, "PUT", {
-          config,
-          ...(secret ? { secret } : {}),
-        });
-        if (!imap) {
-          const r = await api(`/integrations/${p}/connect`, "POST");
-          if (r.url) {
-            await openExternal(r.url);
-          }
+        try {
+          await api(`/integrations/${p}`, "PUT", {
+            config,
+            ...(secret ? { secret } : {}),
+          });
+          const connection = await api(`/integrations/${p}/connect`, "POST");
+          if (connection.url) await openExternal(connection.url);
+          ctx.toast(
+            imap
+              ? "IMAP connected and initial read-only sync completed."
+              : "Authorization opened in your browser.",
+          );
+        } finally {
+          // Saving a changed account invalidates its previous connection even
+          // when the subsequent authorization fails.
+          await ctx.act("refresh", () => Promise.resolve({}));
         }
-        await ctx.act(
-          "refresh",
-          () => Promise.resolve({}),
-          imap
-            ? "Email connection saved."
-            : "Authorization opened in your browser.",
-        );
       }}
     />
   );

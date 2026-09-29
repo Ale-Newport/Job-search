@@ -23,7 +23,16 @@ import {
   Zap,
 } from "lucide-react";
 import type { AppContext, Data } from "./types";
-import { api, download, items, label, time, useResource } from "./api";
+import {
+  api,
+  download,
+  items,
+  label,
+  openExternal,
+  time,
+  useResource,
+} from "./api";
+import { BoundaryConfirmation, BrowserAccountConfirmation } from "./onboarding";
 import {
   Button,
   Confirm,
@@ -284,6 +293,7 @@ export function Automation({ ctx }: { ctx: AppContext }) {
             {d.browser && (
               <JsonDetails title="Current browser state" data={d.browser} />
             )}
+            <BrowserAccountConfirmation ctx={ctx} />
           </Panel>
           <Panel
             title="Active boundaries"
@@ -300,7 +310,10 @@ export function Automation({ ctx }: { ctx: AppContext }) {
               }}
             />
             <div className="panel-actions">
-              <Button secondary onClick={() => ctx.navigate("settings")}>
+              <Button
+                secondary
+                onClick={() => ctx.navigate("settings", "automation")}
+              >
                 Edit boundaries
                 <ArrowRight size={14} />
               </Button>
@@ -403,10 +416,12 @@ export function Settings({
   const r = useResource("/settings", ctx.refresh),
     integrations = useResource("/integrations", ctx.refresh),
     health = useResource("/health"),
-    [tab, setTab] = useState("general"),
+    [tab, setTab] = useState(ctx.target || "general"),
     [edit, setEdit] = useState<"automation" | "ai" | null>(null),
     [credential, setCredential] = useState<string | null>(null),
     [result, setResult] = useState<Data | null>(null),
+    [textResult, setTextResult] = useState<Data | null>(null),
+    [deepSeek, setDeepSeek] = useState(false),
     s = r.data || {};
   const tabs = [
     ["general", "General", Settings2],
@@ -463,12 +478,10 @@ export function Settings({
                 <Button
                   secondary
                   onClick={async () => {
-                    await ctx.act("onboarding", () =>
-                      api("/settings", "PATCH", {
-                        onboarding_completed: false,
-                      }),
+                    const shown = await ctx.act("onboarding", () =>
+                      api("/onboarding", "PATCH", { hidden: false }),
                     );
-                    ctx.navigate("dashboard");
+                    if (shown) ctx.navigate("dashboard");
                   }}
                 >
                   Show guide
@@ -544,6 +557,7 @@ export function Settings({
                   automationFields.map((f) => [f.key, s[f.key]]),
                 )}
               />
+              <BoundaryConfirmation ctx={ctx} />
             </Panel>
             <div className="info-card">
               <ShieldCheck size={22} />
@@ -623,6 +637,11 @@ export function Settings({
             <Panel
               title="Text generation"
               description="Drafts grounded in the verified facts you select"
+              action={
+                <Button secondary onClick={() => setDeepSeek(true)}>
+                  Set up DeepSeek
+                </Button>
+              }
             >
               <KeyValues
                 data={{
@@ -642,6 +661,45 @@ export function Settings({
                       : "Your selected remote provider receives the question, role context, and the verified facts you choose. Review every generated answer."}
                 </p>
               </div>
+              <div className="panel-actions">
+                <Button
+                  secondary
+                  loading={ctx.busy === "text-test"}
+                  onClick={async () => {
+                    const value = await ctx.act("text-test", () =>
+                      api("/ai/text/test", "POST", {}),
+                    );
+                    if (value) setTextResult(value);
+                  }}
+                >
+                  <Zap size={15} />
+                  Test text provider
+                </Button>
+                <span className="muted">
+                  Uses a synthetic prompt with no CV or profile facts. Remote
+                  tests use your configured budget.
+                </span>
+                <Button
+                  secondary
+                  onClick={() =>
+                    ctx.act("deepseek-pricing", () =>
+                      openExternal(
+                        "https://api-docs.deepseek.com/quick_start/pricing/",
+                      ),
+                    )
+                  }
+                >
+                  DeepSeek official pricing
+                  <ExternalLink size={13} />
+                </Button>
+              </div>
+              {textResult && (
+                <JsonDetails
+                  title="Text provider test result"
+                  data={textResult}
+                  open
+                />
+              )}
             </Panel>
             <Panel
               title="Provider credentials & cost control"
@@ -762,6 +820,75 @@ export function Settings({
               "refresh",
               () => Promise.resolve({}),
               "Provider configuration saved.",
+            );
+          }}
+        />
+      )}
+      {deepSeek && (
+        <Editor
+          title="Set up DeepSeek"
+          description="Uses the OpenAI-compatible provider slot. Verified 29 September 2026: deepseek-flash, https://api.deepseek.com/v1. Prices below use peak, uncached rates as a conservative budget bound. Enter your own key; no profile is sent by saving."
+          fields={[
+            {
+              key: "secret",
+              label: "DeepSeek API key",
+              type: "password",
+              hint: "Stored only in macOS Keychain. Blank retains the current OpenAI-compatible key; replace it if it belongs to a different provider.",
+            },
+            {
+              key: "monthly_budget",
+              label: "Monthly remote AI budget (USD)",
+              type: "number",
+              min: 0,
+              step: 0.01,
+              required: true,
+              hint: "Set your own limit. Zero blocks paid remote inference.",
+            },
+            {
+              key: "input_cost_per_million",
+              label: "Input price per million tokens (USD)",
+              type: "number",
+              min: 0,
+              step: 0.01,
+              required: true,
+            },
+            {
+              key: "output_cost_per_million",
+              label: "Output price per million tokens (USD)",
+              type: "number",
+              min: 0,
+              step: 0.01,
+              required: true,
+            },
+          ]}
+          initial={{
+            secret: "",
+            monthly_budget: s.monthly_budget ?? 0,
+            input_cost_per_million: 0.3,
+            output_cost_per_million: 1.2,
+          }}
+          submit="Save DeepSeek configuration"
+          onClose={() => setDeepSeek(false)}
+          onSave={async (values) => {
+            const { secret, monthly_budget, ...prices } = values;
+            const previous =
+              items(integrations.data).find(
+                (entry) => entry.provider === "openai-compatible",
+              )?.config || {};
+            await api("/integrations/openai-compatible", "PUT", {
+              config: { ...previous, ...prices },
+              ...(secret ? { secret } : {}),
+            });
+            await api("/settings", "PATCH", {
+              text_provider: "openai-compatible",
+              text_base_url: "https://api.deepseek.com/v1",
+              text_model: "deepseek-flash",
+              monthly_budget,
+            });
+            await ctx.act(
+              "refresh",
+              () => Promise.resolve({}),
+              "DeepSeek configuration saved. Use Test text provider to verify the connection.",
             );
           }}
         />

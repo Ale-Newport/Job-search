@@ -33,6 +33,7 @@ import {
   label,
   openExternal,
   pretty,
+  showReviewWindow,
   time,
   useResource,
 } from "./api";
@@ -628,6 +629,22 @@ export function ApplicationDetail({
     [reconcile, setReconcile] = useState(false),
     a = r.data;
   const refreshApplication = r.reload;
+  const previousRunStatus = useRef<string | undefined>(undefined);
+  const runStatus = a?.runs?.at(-1)?.status;
+  useEffect(() => {
+    const wasRunning = ["running", "submitting"].includes(
+      previousRunStatus.current || "",
+    );
+    previousRunStatus.current = runStatus;
+    if (
+      wasRunning &&
+      ["section_review", "human_required", "needs_review", "error"].includes(
+        runStatus || "",
+      )
+    ) {
+      void showReviewWindow().catch(() => undefined);
+    }
+  }, [runStatus]);
   const active =
     ctx.busy === "apply" ||
     ctx.busy === "approve" ||
@@ -652,9 +669,11 @@ export function ApplicationDetail({
               <div className="tags">
                 <Status value={a.status} />
                 <Tag>
-                  {a.section_consent
-                    ? "Approval per section"
-                    : `${label(a.mode || "review")} mode`}
+                  {a.assisted_autofill
+                    ? "Autofill · final approval"
+                    : a.section_consent
+                      ? "Approval per section"
+                      : `${label(a.mode || "review")} mode`}
                 </Tag>
                 <Tag>Created {date(a.created_at)}</Tag>
               </div>

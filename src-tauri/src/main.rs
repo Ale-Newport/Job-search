@@ -32,6 +32,15 @@ struct Backend {
 }
 
 #[tauri::command]
+fn show_review_window(app: tauri::AppHandle) -> Result<(), String> {
+    let window = app
+        .get_webview_window("main")
+        .ok_or("Main window unavailable")?;
+    window.show().map_err(|error| error.to_string())?;
+    window.set_focus().map_err(|error| error.to_string())
+}
+
+#[tauri::command]
 fn connection_info(backend: tauri::State<'_, Backend>) -> Result<ConnectionInfo, String> {
     if let Some(status) = backend
         .child
@@ -281,7 +290,11 @@ fn main() {
             tray.build(app)?;
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![connection_info, export_file])
+        .invoke_handler(tauri::generate_handler![
+            connection_info,
+            export_file,
+            show_review_window
+        ])
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::CloseRequested { api, .. } = event {
                 api.prevent_close();

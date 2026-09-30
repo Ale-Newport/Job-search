@@ -8,7 +8,7 @@ from pathlib import Path
 import re
 
 from .adapters import get_adapter
-from .answers import normalize, option_for, resolve_answer
+from .answers import normalize, option_for, resolve_answer, selected_choice_matches
 from .browser import BrowserSession, confirmation_evidence
 from .browser import PROGRESS, is_submit
 from .engines import make_engine
@@ -71,6 +71,7 @@ class BrowserManager(BrowserSession):
         self._review.clear()
         self._section_review.clear()
         section_consent = bool(settings.get("section_consent"))
+        skip_optional = bool(settings.get("skip_optional_unknown"))
         section_grant = {tuple(key) for key in settings.get("_section_grant", [])}
         if mode.upper() == "MANUAL":
             return self._result("needs_review", None, adapter=adapter.name,
@@ -84,7 +85,7 @@ class BrowserManager(BrowserSession):
         try:
             self._check_pause()
             if same_application and self.page and not self.page.is_closed():
-                snapshot = await self.observe()
+                snapshot = await self.wait_until_ready()
             else:
                 snapshot = await self.open(url)
             if adapter.manual_only:
@@ -94,6 +95,7 @@ class BrowserManager(BrowserSession):
             max_steps = min(100, max(1, int(settings.get("browser_max_steps", 45))))
             handled: set[tuple] = set()
             page_advances = 0
+            stale_retries = 0
             pending_dropdown = None
             while len(steps) < max_steps:
                 self._check_pause()
@@ -115,8 +117,14 @@ class BrowserManager(BrowserSession):
                 upload_mime = None
                 if pending_dropdown:
                     resolution = pending_dropdown["resolution"]
-                    choices = [e for e in snapshot["elements"] if e["role"] == "option" and
-                               "CLICK" in e["operations"] and normalize(e["label"]) == normalize(resolution["answer"])]
+                    for _ in range(20):
+                        options = [e for e in snapshot["elements"] if e["role"] == "option" and "CLICK" in e["operations"]]
+                        choice = option_for(resolution["answer"], options, question=resolution["question"])
+                        choices = [choice] if choice else []
+                        if choices or snapshot["blocked"]:
+                            break
+                        await asyncio.sleep(.2)
+                        snapshot = await self.observe()
                     if len(choices) != 1:
                         return self._result("human_required", snapshot, answers=answers, steps=steps, adapter=adapter.name,
                                             questions=[{"question": resolution["question"], "kind": "option",
@@ -125,7 +133,7 @@ class BrowserManager(BrowserSession):
                     snapshot = await self.observe()
                     selected = next((e for e in snapshot["elements"] if e["node_id"] == pending_dropdown["node_id"] and
                                      e["document_id"] == pending_dropdown["document_id"]), None)
-                    if selected is None or normalize(selected.get("selected_text") or selected.get("value", "")) != normalize(resolution["answer"]):
+                    if selected is None or selected.get("expanded") or normalize(selected.get("selected_text") or selected.get("value", "")) != normalize(choices[0]["label"]):
                         return self._result("human_required", snapshot, answers=answers, steps=steps, adapter=adapter.name,
                                             questions=[{"question": resolution["question"], "kind": "option",
                                                         "reason": "The selected dropdown value could not be independently verified."}])
@@ -134,17 +142,20 @@ class BrowserManager(BrowserSession):
                     continue
                 for element in snapshot["elements"]:
                     operations = element["operations"]
-                    if element["role"] == "combobox" and operations == ["CLICK"]:
+                    if element["role"] == "combobox" and "CLICK" in operations and "SELECT" not in operations:
                         resolution = resolve_answer(adapter.question(element), facts, policies=policies)
-                        if resolution["answer"] is None:
-                            questions.append({"question": adapter.question(element), "kind": resolution["kind"]})
+                        if resolution["leave_blank"] and not element.get("required"):
                             continue
-                        if normalize(element.get("selected_text", "")) == normalize(resolution["answer"]):
+                        if resolution["answer"] is None:
+                            if element.get("required") or not skip_optional:
+                                questions.append({"question": adapter.question(element), "kind": resolution["kind"], "required": element.get("required", False)})
+                            continue
+                        if not element.get("expanded") and selected_choice_matches(resolution["question"], resolution["answer"], element.get("selected_text") or element.get("value", "")):
                             self._add_answer(answers, {k: resolution[k] for k in ("question", "answer", "fact_ids", "verified", "confidence", "kind")})
                             continue
                         pending_dropdown = {"resolution": resolution, "node_id": element["node_id"],
                                             "document_id": element["document_id"]}
-                        action = Decision(Operation.CLICK, element["index"])
+                        action = Decision(Operation.TYPE_TEXT if "TYPE_TEXT" in operations else Operation.CLICK, element["index"])
                         value = resolution["answer"]
                         break
                     if not any(op in operations for op in ("TYPE_TEXT", "SELECT", "CHECK", "UNCHECK", "UPLOAD")):
@@ -156,7 +167,7 @@ class BrowserManager(BrowserSession):
                     if "UPLOAD" in operations:
                         candidates = self._documents_for(field, documents)
                         if len(candidates) != 1:
-                            if element.get("required") or not element.get("value"):
+                            if element.get("required") or (not skip_optional and not element.get("value")):
                                 questions.append({"question": field or "Select a document to upload", "kind": "document", "target": element["index"]})
                             continue
                         document = candidates[0]
@@ -179,8 +190,9 @@ class BrowserManager(BrowserSession):
                             handled.add(signature)
                         continue
                     if resolution["answer"] is None:
-                        questions.append({"question": field, "kind": resolution["kind"], "target": element["index"],
-                                          "current_value": element["value"], "required": element.get("required", False)})
+                        if element.get("required") or not skip_optional:
+                            questions.append({"question": field, "kind": resolution["kind"], "target": element["index"],
+                                              "current_value": element["value"], "required": element.get("required", False)})
                         # Do not mark unknown fields handled: questions must survive the next observation.
                         continue
                     answer = resolution["answer"]
@@ -230,9 +242,21 @@ class BrowserManager(BrowserSession):
                                 raise HumanRequired("This field needs manual review before it can be filled.")
                             return self.section_checkpoint(snapshot, target, keys, fields, answers, steps, adapter.name)
                         section_grant.remove(key)
-                    result = await self.execute(action, snapshot, value=value, file_path=file_path,
-                                                upload_name=upload_name, upload_mime=upload_mime,
-                                                minimum_confidence=float(settings.get("browser_confidence_threshold", settings.get("min_confidence", .85))))
+                    try:
+                        result = await self.execute(action, snapshot, value=value, file_path=file_path,
+                                                    upload_name=upload_name, upload_mime=upload_mime,
+                                                    minimum_confidence=float(settings.get("browser_confidence_threshold", settings.get("min_confidence", .85))))
+                    except StaleState:
+                        # ATSs hydrate and validate asynchronously while fields are filled.
+                        # The rejected operation made no write. Re-observe and resolve from
+                        # verified facts again; never reuse an old target or section approval.
+                        if section_consent or not settings.get("assisted_autofill") or stale_retries >= 5:
+                            raise
+                        stale_retries += 1
+                        handled.clear()
+                        pending_dropdown = None
+                        snapshot = await self.wait_until_ready()
+                        continue
                     await self._record_step(result, steps, snapshot)
                     snapshot = await self.observe()
                     continue
@@ -249,7 +273,7 @@ class BrowserManager(BrowserSession):
                 if snapshot["errors"]:
                     return self._result("human_required", snapshot, answers=answers, steps=steps, adapter=adapter.name,
                                         questions=[{"question": e, "kind": "validation"} for e in snapshot["errors"]])
-                entry_only = section_consent and not settings.get("has_filled_sections") and not steps and not any(
+                entry_only = (section_consent or settings.get("assisted_autofill")) and not steps and not any(
                     any(op in e["operations"] for op in ("TYPE_TEXT", "SELECT", "CHECK", "UPLOAD")) for e in snapshot["elements"])
                 submit = None if entry_only else adapter.submit_button(snapshot)
                 if submit:
@@ -278,6 +302,7 @@ class BrowserManager(BrowserSession):
                     await self._record_step(await self.execute(decision, snapshot), steps, snapshot)
                     page_advances += 1
                     snapshot = await self._wait_for_change(previous)
+                    snapshot = await self.wait_until_ready()
                     if snapshot["fingerprint"] == previous:
                         return self._result("human_required", snapshot, answers=answers, steps=steps, adapter=adapter.name,
                                             questions=[{"question": "The next step did not open. Check form validation in the browser.", "kind": "validation"}])

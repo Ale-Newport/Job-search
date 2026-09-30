@@ -2,7 +2,7 @@
 
 from pathlib import Path
 
-from .answers import normalize, option_for, resolve_answer
+from .answers import normalize, option_for, resolve_answer, selected_choice_matches
 
 
 def action_key(element, operation, value=None, file_path=None, upload_name=None):
@@ -44,9 +44,9 @@ def section_plan(snapshot, target, adapter, facts, documents, policies, document
             if answer is None or resolved["leave_blank"]:
                 continue
             evidence = {"fact_ids": resolved["fact_ids"], "kind": resolved["kind"]}
-            if element["role"] == "combobox" and ops == ["CLICK"]:
-                if normalize(element.get("selected_text", "")) != normalize(answer):
-                    operation, value = "CLICK", answer
+            if element["role"] == "combobox" and "CLICK" in ops and "SELECT" not in ops:
+                if element.get("expanded") or not selected_choice_matches(question, answer, element.get("selected_text") or element.get("value", "")):
+                    operation, value = "TYPE_TEXT" if "TYPE_TEXT" in ops else "CLICK", answer
             elif "TYPE_TEXT" in ops and element["value"] != answer:
                 operation, value = "TYPE_TEXT", answer
             elif "SELECT" in ops:

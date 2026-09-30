@@ -203,15 +203,22 @@ function AssistedApply({
 }) {
   const documents = useResource("/documents", ctx.refresh);
   const [documentId, setDocumentId] = useState("");
+  const [autofill, setAutofill] = useState(true);
+  useEffect(() => {
+    const approved = (documents.data?.items || []).filter(
+      (d: Data) => d.latest_version?.approved,
+    );
+    if (approved.length === 1) setDocumentId(approved[0].latest_version.id);
+  }, [documents.data]);
   return (
     <Modal title="Apply with review" onClose={close}>
       <p className="panel-copy">
         {job.title} · {job.company}
       </p>
       <p className="panel-copy">
-        Meridian opens a visible browser and proposes answers from your verified
-        profile. You approve the data before each section is filled, each
-        Continue step, and the final submission separately.
+        Meridian opens a visible browser, fills answers from your verified
+        profile and uploads the CV you select. You review the completed form
+        before sending.
       </p>
       <label className="field">
         CV to use
@@ -229,9 +236,23 @@ function AssistedApply({
             ))}
         </select>
       </label>
+      <label className="field">
+        Filling permission
+        <select
+          value={autofill ? "final" : "sections"}
+          onChange={(e) => setAutofill(e.target.value === "final")}
+        >
+          <option value="final">
+            Fill automatically · approve before sending
+          </option>
+          <option value="sections">Approve each section before filling</option>
+        </select>
+      </label>
       <p className="panel-copy">
-        Missing answers, sign-in and unsupported controls pause for your input.
-        Opening the browser does not authorize filling or sending.
+        Required answers that are missing from your profile pause for your
+        input. Optional unanswered questions stay blank. Sign-in and human
+        verification may need your help. Meridian always asks before the final
+        submission.
       </p>
       <div className="modal-actions">
         <Button secondary onClick={close}>
@@ -245,8 +266,11 @@ function AssistedApply({
               () =>
                 api(`/jobs/${job.id}/assisted-apply`, "POST", {
                   document_version_id: documentId || null,
+                  autofill_approved: autofill,
                 }),
-              "Browser opened. Review the proposed section in Meridian.",
+              autofill
+                ? "Filling your application. Meridian will ask before sending."
+                : "Browser opened. Review the proposed section in Meridian.",
             );
             if (result) {
               close();
@@ -254,7 +278,7 @@ function AssistedApply({
             }
           }}
         >
-          Open browser & inspect
+          {autofill ? "Allow filling & open browser" : "Open browser & inspect"}
         </Button>
       </div>
     </Modal>
@@ -281,7 +305,7 @@ export function Daily({ ctx }: { ctx: AppContext }) {
       <SectionTitle
         eyebrow="YOUR DAILY JOB SEARCH"
         title="A new day. Your next opportunity."
-        description="Find roles, apply with section-by-section review, and keep every application in one place."
+        description="Find roles, fill applications with your verified profile, and review before sending."
         actions={
           <Button
             loading={!!d?.refreshing || ctx.busy === "daily-refresh"}

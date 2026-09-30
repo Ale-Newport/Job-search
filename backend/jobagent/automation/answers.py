@@ -20,7 +20,7 @@ ALIASES = {
     "phone": ["phone", "phone number", "mobile", "telephone", "mobile phone"],
     "country": ["country", "country of residence", "current country"],
     "city": ["city", "current city", "town"],
-    "location": ["location", "current location", "where are you based"],
+    "location": ["location", "current location", "where are you based", "where are you currently located"],
     "address": ["address", "street address", "address line 1"],
     "postcode": ["postcode", "postal code", "zip code", "zip postal code"],
     "linkedin": ["linkedin", "linkedin url", "linkedin profile", "linkedin profile url"],
@@ -32,16 +32,17 @@ ALIASES = {
     "graduation_year": ["graduation year", "year of graduation"],
     "current_company": ["current company", "current employer"],
     "current_title": ["current title", "current job title", "job title"],
-    "expected_salary": ["expected salary", "salary expectation", "salary expectations", "desired salary"],
+    "expected_salary": ["expected salary", "salary expectation", "salary expectations", "desired salary", "what are your salary expectations"],
     "availability": ["availability", "available from", "earliest start date", "start date"],
-    "notice_period": ["notice period", "what is your notice period"],
+    "notice_period": ["notice period", "what is your notice period", "what is your current notice period"],
     "work_authorization": ["work authorization", "are you legally authorized to work", "right to work"],
-    "sponsorship_required": ["sponsorship required", "do you require sponsorship", "will you require visa sponsorship"],
+    "sponsorship_required": ["sponsorship required", "do you require sponsorship", "will you require visa sponsorship",
+                             "do you require sponsorship now or in the future to work in the job s location"],
     "relocation": ["relocation", "willing to relocate", "are you willing to relocate"],
 }
 
 SENSITIVE = {
-    "disability": r"disabilit|medical|health condition",
+    "disability": r"disabilit|medical|health condition|neurodivergen|reasonable adjustments",
     "ethnicity": r"ethnic|racial|race\b",
     "gender": r"gender|\bsex\b|sexual orientation|pronoun",
     "criminal_record": r"criminal|convict|arrest",
@@ -86,7 +87,7 @@ def approved_facts(facts: list[dict]) -> list[dict]:
 
 
 def canonical_key(label: str) -> str | None:
-    norm = normalize(re.sub(r"\s*\(?(?:required|optional)\)?\s*$", "", label, flags=re.I))
+    norm = normalize(re.sub(r"(?:\s+\(?(?:required|optional)\)?|\((?:required|optional)\))\s*$", "", label, flags=re.I))
     for key, aliases in ALIASES.items():
         if norm == normalize(key) or norm in aliases:
             return key
@@ -138,15 +139,29 @@ def resolve_answer(question: str, facts: list[dict], *, hints: list[str] | None 
     return result
 
 
-def option_for(answer: str, options: list[dict]) -> dict | None:
+def option_for(answer: str, options: list[dict], *, question: str = "") -> dict | None:
     norm = normalize(answer)
     matches = [o for o in options if not o.get("disabled") and
                norm in {normalize(o.get("label", "")), normalize(o.get("value", ""))}]
     if len(matches) == 1:
         return matches[0]
+    if canonical_key(question) in {"location", "city"}:
+        # Geocoders expand a verified city/country into city/county/region/country.
+        # Require every supplied component, including country, and a unique result.
+        aliases = {"uk": "united kingdom", "gb": "united kingdom", "u k": "united kingdom"}
+        parts = [aliases.get(normalize(p), normalize(p)) for p in answer.split(',') if normalize(p)]
+        if len(parts) >= 2:
+            matches = [o for o in options if not o.get("disabled") and set(parts).issubset({
+                aliases.get(normalize(p), normalize(p)) for p in o.get("label", "").split(',')})]
+            if len(matches) == 1:
+                return matches[0]
     if norm == "prefer not to say":
         matches = [o for o in options if not o.get("disabled") and
                    normalize(o.get("label", "")) in {"decline to self identify", "i do not wish to answer", "decline to answer"}]
         if len(matches) == 1:
             return matches[0]
     return None
+
+
+def selected_choice_matches(question: str, answer: str, value: str) -> bool:
+    return option_for(answer, [{"label": value, "value": value}], question=question) is not None

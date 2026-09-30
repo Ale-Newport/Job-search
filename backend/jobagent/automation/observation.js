@@ -25,11 +25,18 @@
       .map(id => node.getRootNode().getElementById?.(id)?.textContent || '').join(' ').trim();
     return (refs || node.getAttribute('aria-label') ||
       [...(node.labels || [])].map(n => n.innerText).join(' ') ||
+      (node.getAttribute('role') === 'option' ? node.innerText : '') ||
       (['submit', 'button'].includes(node.type) ? node.value : '') ||
       (['BUTTON', 'A', 'SUMMARY', 'OPTION'].includes(node.tagName) ? node.innerText : '') ||
       node.getAttribute('placeholder') || node.getAttribute('title') ||
       node.getAttribute('name') || node.id || node.innerText || '').trim().slice(0, 500);
   };
+  const fieldFor = node => node.closest('[data-field-path],.ashby-application-form-field-entry');
+  const questionFor = node => fieldFor(node)?.querySelector('.ashby-application-form-question-title');
+  const required = node => !!node.required || node.getAttribute('aria-required') === 'true' ||
+    /(?:^|\s)_required_/.test(questionFor(node)?.className || '');
+  const uploadProxy = node => node.type === 'file' && fieldFor(node)?.querySelector(
+    '.ashby-application-form-input-file-dropzone-upload');
   const selector = 'input,textarea,select,button,a[href],summary,[contenteditable="true"],' +
     '[role="button"],[role="checkbox"],[role="radio"],[role="combobox"],' +
     '[role="textbox"],[role="option"],[role="switch"]';
@@ -48,13 +55,19 @@
       section_label: (heading?.innerText || container?.getAttribute('aria-label') || 'Application details').slice(0, 160)};
   };
   for (const node of all) {
-    if (['hidden', 'password'].includes(node.type) || !visible(node)) continue;
+    // Ashby's optional resume parser is separate from the actual resume field.
+    if (node.closest('.ashby-application-form-autofill-input-root')) continue;
+    const proxy = uploadProxy(node);
+    if (['hidden', 'password'].includes(node.type) || !(proxy ? visible(proxy) : visible(node))) continue;
+    if (node.type === 'checkbox' && node.closest('.ashby-application-form-input-yesno')) continue;
     const tag = node.tagName.toLowerCase();
     const type = node.type || '';
     let role = node.getAttribute('role') || ({button:'button', a:'link', textarea:'textbox',
       select:'combobox', summary:'button'}[tag]) ||
       (['checkbox','radio'].includes(type) ? type : type === 'file' ? 'upload' :
         ['submit','button'].includes(type) ? 'button' : 'textbox');
+    const yesno = node.matches('button[data-option][aria-pressed]') && node.closest('.ashby-application-form-input-yesno');
+    if (yesno) role = 'radio';
     const enabled = !node.matches(':disabled') && !node.closest('[aria-disabled="true"]');
     const readonly = !!node.readOnly || node.getAttribute('aria-readonly') === 'true';
     let operations;
@@ -68,34 +81,41 @@
     if (tag === 'a') operations.push('OPEN_TAB');
     if (role === 'combobox' && !operations.includes('CLICK')) operations.push('CLICK');
     const rect = node.getBoundingClientRect();
-    elements.push({node_id: identity(node), role, tag, type, label: label(node), ...sectionFor(node),
+    const question = questionFor(node)?.innerText?.trim();
+    elements.push({node_id: identity(node), role, tag, type, explicit_type: node.getAttribute('type'),
+      label: role === 'combobox' || role === 'upload' ? question || label(node) : label(node), ...sectionFor(node),
+      upload_proxy_id: proxy && visible(proxy) ? identity(proxy) : null,
+      field_path: fieldFor(node)?.getAttribute('data-field-path') || '',
+      expanded: node.getAttribute('aria-expanded') === 'true',
       value: type === 'file' ? [...node.files || []].map(f => f.name).join(', ') :
-        String(node.value ?? (node.isContentEditable ? node.innerText : '')),
-      checked: typeof node.checked === 'boolean' ? node.checked : node.getAttribute('aria-checked') === 'true',
-      required: !!node.required || node.getAttribute('aria-required') === 'true',
+        String(yesno ? node.getAttribute('data-option') : node.value ?? (node.isContentEditable ? node.innerText : '')),
+      checked: yesno ? node.getAttribute('aria-pressed') === 'true' :
+        typeof node.checked === 'boolean' ? node.checked : node.getAttribute('aria-checked') === 'true',
+      required: required(node),
       enabled, readonly, operations: enabled ? operations : [],
       name: node.name || '', id: node.id || '', autocomplete: node.autocomplete || '',
       href: tag === 'a' ? node.href : null,
       options: tag === 'select' ? [...node.options].map(o => ({label:o.label, value:o.value,
         disabled:o.disabled || !!o.closest('optgroup[disabled]')})) : [],
-      group: role === 'radio' ? node.name || node.closest('[role="radiogroup"],fieldset')?.textContent?.slice(0,500) || '' : '',
+      group: role === 'radio' ? fieldFor(node)?.getAttribute('data-field-path') || node.name || node.closest('[role="radiogroup"],fieldset')?.textContent?.slice(0,500) || '' : '',
       selected_text: role === 'combobox' ? node.getAttribute('aria-valuetext') ||
         (tag !== 'input' && tag !== 'select' ? node.innerText : '') : '',
-      context: node.closest('fieldset')?.querySelector('legend')?.innerText ||
+      context: question || node.closest('fieldset')?.querySelector('legend')?.innerText ||
         node.closest('[role="group"],[role="radiogroup"]')?.getAttribute('aria-label') || '',
       in_viewport: rect.bottom > 0 && rect.top < innerHeight && rect.right > 0 && rect.left < innerWidth
     });
   }
   const text = (document.body?.innerText || '').slice(0, 16000);
   const challenge = /verify (?:that )?you(?:'re| are) human|human verification|complete the captcha|security check|unusual traffic/i.test(text)
-    || [...document.querySelectorAll('iframe')].some(f => visible(f) && /recaptcha|hcaptcha|challenges.cloudflare/.test(f.src));
+    || [...document.querySelectorAll('iframe')].some(f => visible(f) && /recaptcha|hcaptcha|challenges.cloudflare/.test(f.src)
+      && !(f.closest('.grecaptcha-badge') && /[?&]size=invisible(?:&|$)/.test(f.src)));
   const mfa = /enter (?:the |your )?(?:verification|authentication|security|one.time) code|two.factor authentication|approve (?:the |this )?sign.in/i.test(text);
   const login = [...document.querySelectorAll('input[type="password"]')].some(visible);
   const errors = [...document.querySelectorAll('[role="alert"],.field-error,.error-message,[aria-invalid="true"]')]
     .filter(visible).map(n => n.innerText || label(n)).filter(Boolean).slice(0, 30);
   const unresolved_required = all.filter(node => (node.required || node.getAttribute('aria-required') === 'true') &&
     !node.matches(':disabled') && node.type !== 'hidden' && node.type !== 'password' &&
-    !visible(node) && (node.validity ? !node.validity.valid : !node.value))
+    !visible(node) && !uploadProxy(node) && (node.validity ? !node.validity.valid : !node.value))
     .map(node => ({label:label(node),type:node.type || node.getAttribute('role')}));
   return {document_id:cache.documentId,url:location.href,title:document.title,text,elements,
     challenge,mfa,login,errors,unresolved_required,scroll:{y:scrollY,height:document.documentElement.scrollHeight,viewport:innerHeight}};

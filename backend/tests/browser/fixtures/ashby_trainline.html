@@ -1,0 +1,40 @@
+<!doctype html><meta charset="utf-8"><title>Trainline application fixture</title>
+<style>body{font:16px sans-serif;padding:24px}fieldset{margin:12px 0;border:0}label{display:block}input{padding:8px}button{padding:10px}.clipped{border:0;clip:rect(0,0,0,0);clip-path:inset(50%);height:1px;width:1px;position:absolute}[role=listbox]{position:fixed;top:10px;left:10px;background:white;padding:20px;z-index:99}[role=option]{padding:10px;cursor:pointer}</style>
+<h1>Junior Machine Learning Engineer</h1><div id="loading"></div>
+<template id="form-template">
+<form onsubmit="event.preventDefault(); window.submissions++">
+ <div class="ashby-application-form-autofill-input-root"><input type="file"><h3>Autofill from resume</h3><button>Upload file</button></div>
+ <label>Name*<input name="name" required></label><label>Email*<input name="email" required type="email"></label>
+ <label>LinkedIn Profile<input name="linkedin"></label>
+ <div data-field-path="resume"><fieldset><label class="ashby-application-form-question-title _required_test" for="resume">Resume</label>
+  <div class="ashby-application-form-input-file"><input id="resume" type="file" class="clipped"><button class="ashby-application-form-input-file-dropzone-upload" type="button">Upload File</button></div>
+ </fieldset></div>
+ <div data-field-path="notice"><fieldset><label class="ashby-application-form-question-title _required_test">What is your current notice period?</label><input role="combobox" aria-expanded="false" placeholder="Start typing..." data-options="Immediately available|1 week|2 weeks|1 month|6 weeks|2 months|3 months|6 months|Other"><button type="button">⌄</button></fieldset></div>
+ <div data-field-path="salary"><fieldset><label class="ashby-application-form-question-title _required_test" for="salary">What are your salary expectations?</label><input id="salary" type="number"></fieldset></div>
+ <div data-field-path="sponsor"><fieldset><label class="ashby-application-form-question-title _required_test">Do you require sponsorship now or in the future to work in the job's location?</label><div class="ashby-application-form-input-yesno"><button data-option="yes" aria-pressed="false">Yes</button><button data-option="no" aria-pressed="false">No</button><input type="checkbox" tabindex="-1" hidden></div></fieldset></div>
+ <div data-field-path="location"><fieldset><label class="ashby-application-form-question-title _required_test">Where are you currently located?</label><input role="combobox" aria-expanded="false" placeholder="Start typing..." data-options="London, Greater London, England, United Kingdom|London, Ontario, Canada|Madrid, Spain"><button type="button">⌄</button></fieldset></div>
+ <div data-field-path="hybrid"><fieldset><label class="ashby-application-form-question-title _required_test">Are you able to commit to our hybrid working policy?</label><div class="ashby-application-form-input-yesno"><button data-option="yes" aria-pressed="false">Yes</button><button data-option="no" aria-pressed="false">No</button><input type="checkbox" tabindex="-1" hidden></div></fieldset></div>
+ <div data-field-path="diversity"><fieldset><label class="ashby-application-form-question-title">Describe your gender</label><input role="combobox" aria-expanded="false" placeholder="Start typing..." data-options="Man|Woman|Prefer not to say"></fieldset></div>
+ <label>How are you currently using AI?<textarea></textarea></label>
+ <label><input type="checkbox">I agree to future job communications</label>
+ <button>Submit Application</button>
+</form></template>
+<script>
+window.submissions=0; window.selections={};
+setTimeout(()=>document.getElementById('loading').textContent='Fetching application form',150);
+setTimeout(()=>{
+ document.getElementById('loading').remove();document.body.append(document.getElementById('form-template').content.cloneNode(true));
+ document.querySelectorAll('[data-option]').forEach(b=>b.onclick=e=>{e.preventDefault();b.parentNode.querySelectorAll('button').forEach(s=>s.setAttribute('aria-pressed',String(s===b)));});
+ document.querySelectorAll('[role=combobox]').forEach(input=>input.oninput=()=>{
+  document.querySelector('[role=listbox]')?.remove();input.setAttribute('aria-expanded','true');
+  const search=input.value;
+  setTimeout(()=>{
+   const box=document.createElement('div');box.setAttribute('role','listbox');
+   input.dataset.options.split('|').filter(v=>search.startsWith('London') ? v.startsWith('London') : v.toLowerCase().includes(search.toLowerCase())).forEach(v=>{
+    const option=document.createElement('div');option.id=':r'+Math.random().toString(36).slice(2)+':';option.setAttribute('role','option');option.textContent=v;
+    option.onclick=()=>{input.value=v;input.setAttribute('aria-expanded','false');window.selections[input.closest('[data-field-path]').dataset.fieldPath]=v;box.remove();};box.append(option);
+   });document.body.append(box);
+  },450);
+ });
+},700);
+</script>

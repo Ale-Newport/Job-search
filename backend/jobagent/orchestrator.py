@@ -241,7 +241,9 @@ class Orchestrator:
                         raise ValueError("Selected document is missing or outside the document vault")
                 config = settings_for(self.db)
                 config["resume_existing"] = resume
-                config["section_consent"] = bool(application.get("section_consent"))
+                config["assisted_autofill"] = bool(application.get("section_consent") and application.get("assisted_autofill"))
+                config["section_consent"] = bool(application.get("section_consent") and not config["assisted_autofill"])
+                config["skip_optional_unknown"] = bool(application.get("section_consent"))
                 config["_section_grant"] = section_grant or []
                 config["has_filled_sections"] = bool(self.db.one(
                     "SELECT s.id FROM automation_steps s JOIN automation_runs r ON r.id=s.run_id WHERE r.application_id=? AND s.operation IN ('TYPE_TEXT','SELECT','UPLOAD','CHECK') LIMIT 1",

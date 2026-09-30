@@ -70,6 +70,29 @@ def wait_for_review(client, run_id):
     pytest.fail(f"Application preparation did not finish: {run}")
 
 
+def test_assisted_autofill_permission_persists_but_never_enables_auto_submit(tmp_path, acceptance_server, monkeypatch):
+    monkeypatch.setenv("MERIDIAN_TEST", "1")
+    app = create_app(tmp_path, token="autofill", secret_store=AcceptanceSecrets(), start_scheduler=False)
+    with TestClient(app, headers={"Authorization": "Bearer autofill"}) as client:
+        browser = app.state.automation.browser
+        client.portal.call(browser.start, True)
+        for key, value in [("full_name", "Alex Example"), ("email", "alex@example.test"), ("city", "London")]:
+            require_ok(client.post("/api/facts", json={"category": "contact", "key": key, "value": value,
+                "verification_status": "verified"}), 201)
+        job = require_ok(client.post("/api/jobs", json={"title": "Junior Engineer", "company": "Fixture",
+            "location": "London", "url": acceptance_server + "/sections.html"}), 201)
+        start = require_ok(client.post(f"/api/jobs/{job['id']}/assisted-apply", json={"autofill_approved": True}))
+        wait_for_review(client, start['run_id'])
+        application = app.state.automation.application(start['application_id'])
+        assert application['assisted_autofill'] == 1 and application['mode'] == 'review'
+        assert client.portal.call(browser.page.locator('[name="city"]').input_value) == 'London'
+        assert client.portal.call(browser.page.evaluate, 'window.submissions') == 0
+        assert client.portal.call(browser.page.evaluate, 'window.advances') == 1
+        assert client.patch(f"/api/applications/{application['id']}", json={"mode": "auto"}).status_code == 422
+        assert client.post(f"/api/applications/{application['id']}/approve", json={"approved": False}).status_code == 400
+        assert client.portal.call(browser.page.evaluate, 'window.submissions') == 0
+
+
 def test_api_to_browser_approval_email_deadline_and_timeline(tmp_path, acceptance_server, monkeypatch):
     monkeypatch.setenv("MERIDIAN_TEST", "1")
     app = create_app(tmp_path, token="acceptance-only-token", secret_store=AcceptanceSecrets(), start_scheduler=False)

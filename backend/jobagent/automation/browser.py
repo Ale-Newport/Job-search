@@ -44,7 +44,10 @@ def is_submit(element: dict) -> bool:
     if element.get("role") != "button":
         return False
     label = element.get("label", "").strip()
-    return not PROGRESS.match(label) and (element.get("type") == "submit" or bool(SUBMIT.search(label)))
+    # Buttons inside custom widgets often inherit HTML's default type=submit.
+    # That default alone is not evidence of the employer's final submit control.
+    explicit = element.get("explicit_type", element.get("type"))
+    return not PROGRESS.match(label) and (explicit == "submit" or bool(SUBMIT.search(label)))
 
 
 def confirmation_evidence(snapshot: dict) -> list[dict]:
@@ -92,7 +95,7 @@ class BrowserSession:
             self._playwright = await async_playwright().start()
             self.context = await self._playwright.chromium.launch_persistent_context(
                 user_data_dir=str(self.profile_path), headless=headless, channel=self._channel,
-                viewport={"width": 1280, "height": 900}, accept_downloads=False,
+                viewport={"width": 1280, "height": 900}, accept_downloads=False, chromium_sandbox=True,
             )
         except Exception as error:
             if self._playwright:
@@ -141,7 +144,23 @@ class BrowserSession:
         await self.start()
         await self.page.goto(url, wait_until="domcontentloaded", timeout=45000)
         self._snapshots.clear()
-        return await self.observe()
+        return await self.wait_until_ready()
+
+    async def wait_until_ready(self) -> dict:
+        """Allow an ATS's asynchronous application form to finish loading."""
+        deadline = time.monotonic() + 20
+        earliest = time.monotonic() + 1
+        while True:
+            self._check_pause()
+            snapshot = await self.observe()
+            loading = re.search(r"(?:fetching|loading) (?:the |your )?(?:application|form)", snapshot["text"], re.I)
+            ready = bool(snapshot['elements'] and snapshot['text'].strip())
+            if urlparse(snapshot['url']).path.rstrip('/').endswith('/application'):
+                ready = any(any(op in e['operations'] for op in ('TYPE_TEXT', 'SELECT', 'CHECK', 'UPLOAD'))
+                            for e in snapshot['elements']) or bool(confirmation_evidence(snapshot))
+            if snapshot["blocked"] or time.monotonic() >= deadline or (not loading and ready and time.monotonic() >= earliest):
+                return snapshot
+            await asyncio.sleep(.25)
 
     async def observe(self) -> dict:
         if not self.page or self.page.is_closed():
@@ -150,6 +169,10 @@ class BrowserSession:
         refs = {}
         elements = []
         for position, frame in enumerate(self.page.frames):
+            # An invisible reCAPTCHA badge is not an interactive challenge or an application frame.
+            # A visible challenge uses a separate bframe, which is still inspected and blocked.
+            if re.search(r"/recaptcha/(?:api2|enterprise)/anchor\?", frame.url) and re.search(r"[?&]size=invisible(?:&|$)", frame.url):
+                continue
             try:
                 data = await frame.evaluate(OBSERVATION_SCRIPT)
             except Exception:
@@ -229,9 +252,20 @@ class BrowserSession:
                 node = handle.as_element()
                 if node is None:
                     raise StaleState("The original DOM node no longer exists in the observed document.")
+                proxy_handle = None
                 try:
-                    await node.scroll_into_view_if_needed()
-                    valid = await node.evaluate("""node => {
+                    visible_node = node
+                    if op == Operation.UPLOAD and element.get("upload_proxy_id"):
+                        proxy_handle = await node.evaluate_handle("""(node, id) => {
+                            const proxy = window.__meridianObservedControlsV1.nodes.get(id);
+                            const field = node.closest('[data-field-path],.ashby-application-form-field-entry');
+                            return node.isConnected && !node.disabled && field?.contains(proxy) ? proxy : null;
+                        }""", element["upload_proxy_id"])
+                        visible_node = proxy_handle.as_element()
+                        if visible_node is None:
+                            raise StaleState("The observed upload control changed.")
+                    await visible_node.scroll_into_view_if_needed()
+                    valid = await visible_node.evaluate("""node => {
                         if (!node.isConnected || node.ownerDocument !== document) return 'document';
                         if (node.matches(':disabled') || node.closest('[aria-disabled="true"],[inert]')) return 'disabled';
                         const r = node.getBoundingClientRect(), s = getComputedStyle(node);
@@ -298,6 +332,8 @@ class BrowserSession:
                             self.page = new_pages[-1]
                             await self.page.wait_for_load_state("domcontentloaded")
                 finally:
+                    if proxy_handle:
+                        await proxy_handle.dispose()
                     await handle.dispose()
             elif op in {Operation.SCROLL_DOWN, Operation.SCROLL_UP}:
                 await self.page.mouse.wheel(0, 650 if op == Operation.SCROLL_DOWN else -650)

@@ -387,8 +387,11 @@ def create_app(data_dir: Path | None = None, token: str | None = None, secret_st
 
         if app.state.automation.running or app.state.automation.lock.locked():
             raise ValueError("Finish or pause the current browser operation first")
+        if payload.get("autofill_approved", False) not in (True, False):
+            raise ValueError("Autofill approval must be a boolean")
         application = prepare_application(app.state.db, job_id, "review", payload.get("document_version_id"),
-                                          app.state.data_dir, section_consent=True)
+                                          app.state.data_dir, section_consent=True,
+                                          assisted_autofill=payload.get("autofill_approved") is True)
         run = app.state.automation.launch(application["id"], resume=False)
         return {"application_id": application["id"], **run}
 

@@ -2,6 +2,10 @@ import { useCallback, useEffect, useState } from "react";
 import type { Data, List } from "./types";
 let connection: Promise<{ base_url: string; token: string }> | undefined;
 export const desktop = () => "__TAURI_INTERNALS__" in window;
+export async function showReviewWindow() {
+  if (desktop())
+    await (await import("@tauri-apps/api/core")).invoke("show_review_window");
+}
 async function getConnection() {
   if (!connection)
     connection = desktop()

@@ -79,6 +79,67 @@ async def test_lever_derives_only_verified_full_name(browser, fixture_server, ca
     assert (await browser.submit(result["snapshot_id"]))["status"] == "confirmed"
 
 
+async def test_trainline_delayed_ashby_form_fills_and_stops_before_submit(browser, fixture_server, candidate, resume):
+    candidate += [fact("notice_period", "Immediately available"), fact("expected_salary", "45000"),
+                  fact("sponsorship_required", "No"), fact("location", "London, UK"),
+                  fact("Are you able to commit to our hybrid working policy?", "Yes")]
+    result = await browser.fill_application({"id": "trainline", "url": fixture_server + "/ashby_trainline.html",
+                                             "ats": "ashby"}, candidate, [resume],
+                                            settings={"assisted_autofill": True, "skip_optional_unknown": True})
+    assert result["status"] == "needs_review", result
+    assert await browser.page.evaluate("window.submissions") == 0
+    assert await browser.page.evaluate("window.selections") == {"notice": "Immediately available", "location": "London, Greater London, England, United Kingdom"}
+    assert await browser.page.locator('[data-field-path="sponsor"] [data-option="no"]').get_attribute('aria-pressed') == 'true'
+    assert await browser.page.locator('[data-field-path="hybrid"] [data-option="yes"]').get_attribute('aria-pressed') == 'true'
+    assert await browser.page.locator('#salary').input_value() == '45000'
+    assert await browser.page.locator('#resume').evaluate('n=>n.files[0].name') == 'resume.txt'
+    assert await browser.page.locator('.ashby-application-form-autofill-input-root input').evaluate('n=>n.files.length') == 0
+    assert await browser.page.locator('[data-field-path="diversity"] input').input_value() == ''
+    assert not await browser.page.get_by_label('I agree to future job communications').is_checked()
+
+
+async def test_trainline_missing_required_facts_fill_known_fields_then_ask(browser, fixture_server, candidate, resume):
+    result = await browser.fill_application({"id": "trainline-missing", "url": fixture_server + "/ashby_overview.html"},
+                                            candidate, [resume], settings={"skip_optional_unknown": True,
+                                                "assisted_autofill": True, "has_filled_sections": True})
+    assert result["status"] == "human_required", result
+    assert len(result['questions']) == 5, result['questions']
+    assert all(q.get('required') for q in result['questions'])
+    assert await browser.page.locator('[name="name"]').input_value() == 'Alex Example'
+    assert await browser.page.locator('#resume').evaluate('n=>n.files.length') == 1
+    assert await browser.page.evaluate('window.submissions') == 0
+
+
+async def test_hidden_upload_proxy_still_rejects_covered_control(browser, fixture_server, resume):
+    snapshot = await browser.open(fixture_server + "/ashby_trainline.html")
+    target = next(e for e in snapshot['elements'] if e['type'] == 'file')
+    await browser.page.evaluate("""() => {const overlay=document.createElement('div');
+        overlay.style.cssText='position:fixed;inset:0;z-index:999;background:white';document.body.append(overlay)}""")
+    browser.allowed_uploads = {Path(resume['path'])}
+    with pytest.raises(StaleState):
+        await browser.execute(Decision(Operation.UPLOAD, target['index']), snapshot, file_path=resume['path'])
+    assert await browser.page.locator('#resume').evaluate('n=>n.files.length') == 0
+
+
+async def test_assisted_autofill_reobserves_async_dom_change_before_writing(browser, fixture_server, candidate, resume, monkeypatch):
+    original = browser.execute
+    changed = False
+
+    async def changing_page(decision, snapshot, **kwargs):
+        nonlocal changed
+        if not changed:
+            changed = True
+            await browser.page.evaluate("() => document.body.insertAdjacentHTML('beforeend', '<p>Loaded application instructions</p>')")
+        return await original(decision, snapshot, **kwargs)
+
+    monkeypatch.setattr(browser, 'execute', changing_page)
+    result = await browser.fill_application({'id': 'async-ats', 'url': fixture_server + '/lever.html', 'ats': 'lever'},
+                                            candidate, [resume], settings={'assisted_autofill': True})
+    assert result['status'] == 'needs_review', result
+    assert await browser.page.locator('[name="name"]').input_value() == 'Alex Example'
+    assert await browser.page.evaluate('window.submissions') == 0
+
+
 async def test_workday_multistep_iframe(browser, fixture_server, candidate):
     result = await browser.fill_application({"id": "wd", "url": fixture_server + "/workday.html", "ats": "workday"}, candidate, [])
     assert result["status"] == "needs_review", result

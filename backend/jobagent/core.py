@@ -596,7 +596,8 @@ def job_prepare(job_id: str, payload: PreparePayload, request: Request):
     )
 
 
-def prepare_application(db, job_id, mode="review", document_version_id=None, data_dir=None, section_consent=False):
+def prepare_application(db, job_id, mode="review", document_version_id=None, data_dir=None, section_consent=False,
+                        assisted_autofill=False):
     if data_dir is None:
         data_dir = db.path.parent.parent
     payload = PreparePayload(mode=mode, document_version_id=document_version_id)
@@ -634,7 +635,8 @@ def prepare_application(db, job_id, mode="review", document_version_id=None, dat
 
             if existing and existing["status"] in SUBMITTED:
                 raise HTTPException(409, "This application has already been submitted or closed")
-            conn.execute("UPDATE applications SET section_consent=1,mode='review' WHERE id=?", (application_id,))
+            conn.execute("UPDATE applications SET section_consent=1,assisted_autofill=?,mode='review' WHERE id=?",
+                         (int(assisted_autofill), application_id))
     application = required(db, "applications", application_id)
     if not existing:
         trusted = db.query("SELECT * FROM facts WHERE verification_status='verified' OR locked=1")

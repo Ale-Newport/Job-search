@@ -5,6 +5,7 @@ import json
 import logging
 import re
 import socket
+import threading
 from datetime import datetime, timezone
 from urllib.parse import urlparse
 
@@ -17,6 +18,10 @@ SERVICE = "com.meridian.jobagent"
 class SecretStore:
     """Only an OS protected credential vault is an acceptable persistent backend."""
 
+    def __init__(self):
+        self._cache: dict[str, str] = {}
+        self._lock = threading.RLock()
+
     def _backend(self):
         backend = keyring.get_keyring()
         name = type(backend).__module__
@@ -25,15 +30,25 @@ class SecretStore:
         return backend
 
     def get(self, name: str) -> str | None:
-        return self._backend().get_password(SERVICE, name)
+        with self._lock:
+            if name in self._cache:
+                return self._cache[name]
+            value = self._backend().get_password(SERVICE, name)
+            if value is not None:
+                self._cache[name] = value
+            return value
 
     def set(self, name: str, value: str):
-        self._backend().set_password(SERVICE, name, value)
+        with self._lock:
+            self._backend().set_password(SERVICE, name, value)
+            self._cache[name] = value
 
     def delete(self, name: str):
-        backend = self._backend()
-        if backend.get_password(SERVICE, name):
-            backend.delete_password(SERVICE, name)
+        with self._lock:
+            backend = self._backend()
+            if backend.get_password(SERVICE, name):
+                backend.delete_password(SERVICE, name)
+            self._cache.pop(name, None)
 
 
 class RedactingFilter(logging.Filter):

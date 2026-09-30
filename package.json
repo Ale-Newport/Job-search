@@ -4,8 +4,8 @@
   "private": true,
   "scripts": {
     "dev": "tauri dev",
-    "build": "tauri build",
-    "build:app": "tauri build --bundles app",
+    "build": ".venv/bin/python scripts/build_signed_app.py",
+    "build:app": ".venv/bin/python scripts/build_signed_app.py --bundles app",
     "typecheck": "npm --prefix frontend run typecheck",
     "lint": "npm --prefix frontend run lint"
   },

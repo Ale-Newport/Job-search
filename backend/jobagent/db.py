@@ -45,7 +45,7 @@ JSON_COLUMNS = {
     "rule",
     "facts_used",
 }
-BOOL_COLUMNS = {"locked", "verified", "enabled", "auto_apply", "remote", "approved", "interested"}
+BOOL_COLUMNS = {"locked", "verified", "enabled", "auto_apply", "remote", "approved", "interested", "section_consent"}
 
 
 def decode_row(row):

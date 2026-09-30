@@ -166,6 +166,7 @@ def tracker(
 def daily_data(db):
     from .core import get_settings
     from .discovery import discovery_busy
+    from .geography import location_evidence, recommendable
 
     settings = get_settings(db)
     today = datetime.now().astimezone().date().isoformat()
@@ -190,6 +191,8 @@ def daily_data(db):
     ]
 
     def suitable(j):
+        if not recommendable(j, settings):
+            return False
         if j.get("posted_at") and j["status"] != "SHORTLISTED" and not j["metadata"].get("application_deadline"):
             try:
                 posted = datetime.fromisoformat(j["posted_at"].replace("Z", "+00:00"))
@@ -210,6 +213,7 @@ def daily_data(db):
     recommended = [j for j in pending if suitable(j)]
     recommended.sort(
         key=lambda j: (
+            settings.get("preferred_city") == "London" and location_evidence(j.get("location"))["london"],
             j["found_today"],
             bool(re.search(r"graduate|new grad|junior|early career|entry.level|associate", j["title"], re.I)),
             j["status"] == "SHORTLISTED",
@@ -226,6 +230,8 @@ def daily_data(db):
     ]
     return {
         "date": today,
+        "region": settings.get("suggested_region", "any"),
+        "preferred_city": settings.get("preferred_city", ""),
         "items": recommended[:50],
         "total": len(recommended),
         "new_today": sum(j["found_today"] for j in recommended),

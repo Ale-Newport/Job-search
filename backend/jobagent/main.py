@@ -381,6 +381,23 @@ def create_app(data_dir: Path | None = None, token: str | None = None, secret_st
     async def application_apply(application_id: str):
         return app.state.automation.launch(application_id)
 
+    @app.post("/api/jobs/{job_id}/assisted-apply")
+    async def assisted_apply(job_id: str, payload: dict = Body(...)):
+        from .core import prepare_application
+
+        if app.state.automation.running or app.state.automation.lock.locked():
+            raise ValueError("Finish or pause the current browser operation first")
+        application = prepare_application(app.state.db, job_id, "review", payload.get("document_version_id"),
+                                          app.state.data_dir, section_consent=True)
+        run = app.state.automation.launch(application["id"], resume=False)
+        return {"application_id": application["id"], **run}
+
+    @app.post("/api/applications/{application_id}/approve-section")
+    async def approve_section(application_id: str, payload: dict = Body(...)):
+        if payload.get("approved") is not True or not isinstance(payload.get("snapshot_id"), str):
+            raise ValueError("Explicit approval of the current section is required")
+        return await app.state.automation.approve_section(application_id, payload["snapshot_id"])
+
     @app.post("/api/applications/{application_id}/approve")
     async def application_approve(application_id: str, payload: dict = Body(...)):
         if payload.get("approved") is not True:

@@ -327,6 +327,11 @@ def match_job(job: dict, facts: list[dict], profile: dict | None = None, feedbac
     components["education"] = education_component
     components["experience"] = experience_component
     exclusions = []
+    if cfg.get("region") == "europe":
+        from .geography import location_evidence
+
+        if not location_evidence(job.get("location"))["europe"]:
+            exclusions.append("A European job location must be explicitly identifiable")
     job_text = " ".join(str(job.get(k, "")) for k in ("title", "description", "company", "location"))
     technologies = cfg.get("technologies", [])
     components["technology_preference"] = {

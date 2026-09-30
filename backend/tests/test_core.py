@@ -75,7 +75,7 @@ def fact(db, value="Python", status="verified", category="skill", key="python"):
 
 def test_database_migrates_reopens_foreign_keys_and_rolls_back(db):
     assert db.one("PRAGMA journal_mode")["journal_mode"] == "wal"
-    assert db.one("SELECT version_num FROM alembic_version")["version_num"] == "0003_notifications"
+    assert db.one("SELECT version_num FROM alembic_version")["version_num"] == "0004_section_consent"
     with pytest.raises(Exception):
         with db.transaction() as conn:
             conn.execute("INSERT INTO settings VALUES('example','true')")

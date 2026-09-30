@@ -1,0 +1,10 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><title>Section consent fixture</title>
+<style>body{font:16px system-ui;padding:24px}label{display:block;margin:16px}fieldset{margin-bottom:20px}</style>
+<h1>Example Europe — Graduate Engineer</h1>
+<form id="application"><div id="step">
+<fieldset><legend>Personal details</legend><label>Full name <input name="full_name" required></label></fieldset>
+<fieldset><legend>Contact details</legend><label>Email <input name="email" type="email" required></label></fieldset>
+<button type="button" id="next">Continue</button></div></form>
+<script>window.submissions=0;window.advances=0;
+document.querySelector('#next').onclick=()=>{window.advances++;document.querySelector('#step').innerHTML='<fieldset><legend>Location</legend><label>City <input name="city" required></label></fieldset><button>Submit application</button>'};
+document.querySelector('form').onsubmit=e=>{e.preventDefault();window.submissions++;document.body.innerHTML='<h1>Application successfully submitted</h1>'};</script></html>

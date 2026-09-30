@@ -8,6 +8,7 @@ import {
   RefreshCw,
   Search,
   X,
+  WandSparkles,
 } from "lucide-react";
 import type { AppContext, Data } from "./types";
 import { api, date, label, openExternal, useResource } from "./api";
@@ -118,12 +119,18 @@ export function OpportunityActions({
   ctx: AppContext;
   compact?: boolean;
 }) {
-  const [record, setRecord] = useState(false);
+  const [record, setRecord] = useState(false),
+    [assist, setAssist] = useState(false);
   return (
     <>
       <div className="opportunity-actions">
+        {!job.submitted && (
+          <Button onClick={() => setAssist(true)}>
+            <WandSparkles size={15} /> Apply with review
+          </Button>
+        )}
         <Button
-          secondary={compact}
+          secondary
           onClick={() =>
             ctx.act("open-job", () =>
               openExternal(job.application_url || job.url),
@@ -178,7 +185,79 @@ export function OpportunityActions({
       {record && (
         <RecordApplied job={job} ctx={ctx} close={() => setRecord(false)} />
       )}
+      {assist && (
+        <AssistedApply job={job} ctx={ctx} close={() => setAssist(false)} />
+      )}
     </>
+  );
+}
+
+function AssistedApply({
+  job,
+  ctx,
+  close,
+}: {
+  job: Data;
+  ctx: AppContext;
+  close: () => void;
+}) {
+  const documents = useResource("/documents", ctx.refresh);
+  const [documentId, setDocumentId] = useState("");
+  return (
+    <Modal title="Apply with review" onClose={close}>
+      <p className="panel-copy">
+        {job.title} · {job.company}
+      </p>
+      <p className="panel-copy">
+        Meridian opens a visible browser and proposes answers from your verified
+        profile. You approve the data before each section is filled, each
+        Continue step, and the final submission separately.
+      </p>
+      <label className="field">
+        CV to use
+        <select
+          value={documentId}
+          onChange={(e) => setDocumentId(e.target.value)}
+        >
+          <option value="">Choose later when the form asks</option>
+          {(documents.data?.items || [])
+            .filter((d: Data) => d.latest_version?.approved)
+            .map((d: Data) => (
+              <option key={d.id} value={d.latest_version.id}>
+                {d.name} · version {d.latest_version.version}
+              </option>
+            ))}
+        </select>
+      </label>
+      <p className="panel-copy">
+        Missing answers, sign-in and unsupported controls pause for your input.
+        Opening the browser does not authorize filling or sending.
+      </p>
+      <div className="modal-actions">
+        <Button secondary onClick={close}>
+          Cancel
+        </Button>
+        <Button
+          loading={ctx.busy === "assisted-apply"}
+          onClick={async () => {
+            const result = await ctx.act(
+              "assisted-apply",
+              () =>
+                api(`/jobs/${job.id}/assisted-apply`, "POST", {
+                  document_version_id: documentId || null,
+                }),
+              "Browser opened. Review the proposed section in Meridian.",
+            );
+            if (result) {
+              close();
+              ctx.select({ kind: "application", id: result.application_id });
+            }
+          }}
+        >
+          Open browser & inspect
+        </Button>
+      </div>
+    </Modal>
   );
 }
 
@@ -202,7 +281,7 @@ export function Daily({ ctx }: { ctx: AppContext }) {
       <SectionTitle
         eyebrow="YOUR DAILY JOB SEARCH"
         title="A new day. Your next opportunity."
-        description="Find roles, apply through the original link, and keep every application in one place."
+        description="Find roles, apply with section-by-section review, and keep every application in one place."
         actions={
           <Button
             loading={!!d?.refreshing || ctx.busy === "daily-refresh"}
@@ -245,6 +324,9 @@ export function Daily({ ctx }: { ctx: AppContext }) {
               </button>
             </div>
             <div className="daily-meta">
+              {d.region === "europe" && (
+                <strong>Europe only · London first</strong>
+              )}
               <span>
                 {d.date} ·{" "}
                 {d.refreshing

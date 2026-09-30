@@ -187,3 +187,70 @@ def test_api_to_browser_approval_email_deadline_and_timeline(tmp_path, acceptanc
         assert db.one("SELECT status FROM applications WHERE id=?", (application_id,))["status"] == "TECHNICAL_TEST"
         assert db.one("SELECT COUNT(*) AS n FROM email_messages WHERE application_id=?", (application_id,))["n"] == 1
         assert db.one("SELECT COUNT(*) AS n FROM automation_steps WHERE run_id=? AND operation='UPLOAD'", (started["run_id"],))["n"] == 1
+
+
+def test_guided_application_requires_each_section_navigation_and_final_consent(tmp_path, acceptance_server, monkeypatch):
+    monkeypatch.setenv("MERIDIAN_TEST", "1")
+    app = create_app(tmp_path, token="guided", secret_store=AcceptanceSecrets(), start_scheduler=False)
+    with TestClient(app, headers={"Authorization": "Bearer guided"}) as client:
+        browser = app.state.automation.browser
+        client.portal.call(browser.start, True)
+        facts = []
+        for key, value in [("full_name", "Alex Example"), ("email", "alex@example.test"), ("city", "London")]:
+            facts.append(require_ok(client.post("/api/facts", json={"category": "contact", "key": key, "value": value,
+                "verification_status": "verified"}), 201))
+        job = require_ok(client.post("/api/jobs", json={"title": "Graduate Engineer", "company": "Example Europe",
+            "location": "London", "url": acceptance_server + "/sections.html"}), 201)
+        start = require_ok(client.post(f"/api/jobs/{job['id']}/assisted-apply", json={}))
+        identifier = start["application_id"]
+
+        def settled(run_id):
+            deadline = time.monotonic() + 20
+            while time.monotonic() < deadline:
+                run = require_ok(client.get(f"/api/automation/runs/{run_id}"))
+                if run["status"] != "running" and not app.state.automation.running:
+                    return run
+                time.sleep(.05)
+            pytest.fail(str(run))
+
+        def approve(run):
+            return client.post(f"/api/applications/{identifier}/approve-section", json={
+                "approved": True, "snapshot_id": run["checkpoint"]["snapshot_id"]})
+
+        run = settled(start["run_id"])
+        assert run["status"] == "section_review", run
+        assert run["checkpoint"]["section"]["title"] == "Personal details"
+        assert client.portal.call(browser.page.locator('[name="full_name"]').input_value) == ""
+        assert client.post(f"/api/applications/{identifier}/approve", json={"approved": True}).status_code == 400
+        assert client.post(f"/api/applications/{identifier}/approve-section", json={"approved": False}).status_code == 400
+        # Changed candidate evidence invalidates permission, before any field is written.
+        require_ok(client.patch(f"/api/facts/{facts[0]['id']}", json={"value": "Alex Updated"}))
+        assert approve(run).status_code == 400
+        assert client.portal.call(browser.page.locator('[name="full_name"]').input_value) == ""
+        run = settled(require_ok(client.post(f"/api/applications/{identifier}/resume"))["run_id"])
+        old = run
+        run = settled(require_ok(approve(run))["run_id"])
+        assert run["status"] == "section_review" and run["checkpoint"]["section"]["title"] == "Contact details", run
+        assert client.portal.call(browser.page.locator('[name="full_name"]').input_value) == "Alex Updated"
+        assert client.portal.call(browser.page.locator('[name="email"]').input_value) == ""
+        assert approve(old).status_code == 400
+        # DOM edits revoke the current consent checkpoint too.
+        client.portal.call(browser.page.locator('legend').nth(1).evaluate, "node => node.textContent = 'Updated contact details'")
+        assert approve(run).status_code == 409
+        run = settled(require_ok(client.post(f"/api/applications/{identifier}/resume"))["run_id"])
+        run = settled(require_ok(approve(run))["run_id"])
+        assert run["status"] == "section_review" and run["checkpoint"]["section"]["kind"] == "continue", run
+        assert client.portal.call(browser.page.evaluate, "window.advances") == 0
+        run = settled(require_ok(approve(run))["run_id"])
+        assert run["status"] == "section_review" and run["checkpoint"]["section"]["title"] == "Location", run
+        assert client.portal.call(browser.page.evaluate, "window.advances") == 1
+        assert client.portal.call(browser.page.locator('[name="city"]').input_value) == ""
+        run = settled(require_ok(approve(run))["run_id"])
+        assert run["status"] == "needs_review", run
+        assert client.portal.call(browser.page.evaluate, "window.submissions") == 0
+        assert require_ok(client.get("/api/settings"))["automation_paused"] is True
+        assert client.patch(f"/api/applications/{identifier}", json={"mode": "auto"}).status_code == 422
+        result = require_ok(client.post(f"/api/applications/{identifier}/approve", json={"approved": True}))
+        assert result["status"] == "confirmed", result
+        assert client.portal.call(browser.page.evaluate, "window.submissions") == 1
+        assert client.post(f"/api/jobs/{job['id']}/assisted-apply", json={}).status_code == 409

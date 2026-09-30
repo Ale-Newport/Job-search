@@ -178,11 +178,11 @@ class Orchestrator:
         if urlparse(result.get("current_url", application["url"])).hostname != hostname:
             raise ValueError("The application navigated to a different domain; review it first")
 
-    def launch(self, application_id, resume=False):
+    def launch(self, application_id, resume=False, section_grant=None):
         application = self.application(application_id)
         if application["mode"].lower() == "manual":
             raise ValueError("Manual mode prepares documents only. Change this application to Review to fill its form.")
-        if self.paused():
+        if self.paused() and not application.get("section_consent"):
             raise ValueError("Automation is paused. Resume it before filling a form.")
         if application["status"] in (
             "APPLIED",
@@ -211,18 +211,18 @@ class Orchestrator:
             "INSERT INTO automation_runs(id,application_id,status,engine,checkpoint,created_at,updated_at) VALUES(?,?,'running',?,'{}',?,?)",
             (run_id, application_id, settings_for(self.db).get("browser_engine", "deterministic"), now(), now()),
         )
-        task = asyncio.create_task(self._fill(run_id, application, resume))
+        task = asyncio.create_task(self._fill(run_id, application, resume, section_grant))
         self.tasks.add(task)
         task.add_done_callback(self.tasks.discard)
         return {"run_id": run_id, "status": "running"}
 
-    async def _fill(self, run_id, application, resume):
+    async def _fill(self, run_id, application, resume, section_grant=None):
         try:
             async with self.lock:
                 self.active_run = run_id
-                if self.paused():
+                if self.paused() and not application.get("section_consent"):
                     raise ValueError("Automation was paused before this run started")
-                if resume:
+                if resume or application.get("section_consent"):
                     await self.browser.resume()
                 self.db.event(application["id"], "PREPARING", "Browser form preparation started", origin="automation")
                 facts = self.db.query("SELECT * FROM facts WHERE verification_status='verified' OR locked=1")
@@ -241,6 +241,11 @@ class Orchestrator:
                         raise ValueError("Selected document is missing or outside the document vault")
                 config = settings_for(self.db)
                 config["resume_existing"] = resume
+                config["section_consent"] = bool(application.get("section_consent"))
+                config["_section_grant"] = section_grant or []
+                config["has_filled_sections"] = bool(self.db.one(
+                    "SELECT s.id FROM automation_steps s JOIN automation_runs r ON r.id=s.run_id WHERE r.application_id=? AND s.operation IN ('TYPE_TEXT','SELECT','UPLOAD','CHECK') LIMIT 1",
+                    (application["id"],)))
                 # An explicit answer authorizes only this question in this application.
                 # Retain the verified manual fact as the browser's evidence source.
                 from .automation.answers import normalize
@@ -289,6 +294,7 @@ class Orchestrator:
                 if (
                     result.get("status") in ("needs_review", "ready_for_review")
                     and application["mode"].lower() == "auto"
+                    and not application.get("section_consent")
                 ):
                     try:
                         self.auto_gate(application, result)
@@ -353,11 +359,29 @@ class Orchestrator:
         quality = 100 if not result.get("questions") else max(0, 100 - 15 * len(result["questions"]))
         self.db.execute("UPDATE applications SET quality_score=? WHERE id=?", (quality, application_id))
 
+    async def approve_section(self, application_id, snapshot_id):
+        if self.running or self.lock.locked():
+            raise ValueError("Browser is busy")
+        async with self.lock:
+            application = self.application(application_id)
+            run = self.db.one("SELECT * FROM automation_runs WHERE application_id=? ORDER BY created_at DESC LIMIT 1", (application_id,))
+            if not application.get("section_consent") or not run or run["status"] != "section_review":
+                raise ValueError("Inspect the current section before approving it")
+            result = json.loads(run["checkpoint"])
+            if result.get("snapshot_id") != snapshot_id or result.get("review_fingerprint") != self.fingerprint(application_id):
+                raise ValueError("The section or candidate evidence changed. Inspect it again.")
+            grant = await self.browser.authorize_section(application_id, snapshot_id)
+            self.db.execute("UPDATE automation_runs SET status='section_approved',updated_at=? WHERE id=?", (now(), run["id"]))
+            self.db.event(application_id, "PREPARING", "Approved section: " + result["section"]["title"], "manual")
+        return self.launch(application_id, resume=True, section_grant=grant)
+
     async def approve(self, application_id):
         if self.running or self.lock.locked():
             raise ValueError("Browser is busy")
         async with self.lock:
             application = self.application(application_id)
+            if application["mode"] == "manual":
+                raise ValueError("Manual mode does not permit browser submission")
             run = self.db.one(
                 "SELECT * FROM automation_runs WHERE application_id=? ORDER BY created_at DESC LIMIT 1",
                 (application_id,),
@@ -372,7 +396,7 @@ class Orchestrator:
             return await self._submit(run["id"], application, result)
 
     async def _submit(self, run_id, application, result):
-        if self.paused():
+        if self.paused() and not application.get("section_consent"):
             raise ValueError("Automation is paused")
         from .documents import document_path
 

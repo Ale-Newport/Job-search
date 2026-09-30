@@ -265,3 +265,29 @@ def test_daily_excludes_passed_deadline_and_prefers_graduate_roles(api):
     assert rows[0]["id"] == j["id"]
     api.app.state.db.execute("UPDATE jobs SET metadata=? WHERE id=?", (dumps({"closed": True}), j["id"]))
     assert [r["id"] for r in api.get("/api/daily").json()["items"]] == [senior["id"]]
+
+
+@pytest.mark.parametrize('location,europe,london', [
+    ('London', True, True), ('London, United Kingdom', True, True), ('Londres, Reino Unido', True, True),
+    ('London, Ontario, Canada', False, False), ('London, ON', False, False),
+    ('New York, NY', False, False), ('Paris, Texas, USA', False, False),
+    ('Berlin, Germany', True, False), ('Remote - Europe', True, False), ('EMEA', False, False),
+    ('Remote worldwide', False, False), ('', False, False), ('Remote US', False, False),
+    ('Madrid; London, UK', True, True), ('San Francisco; Dublin, Ireland', True, False),
+])
+def test_europe_location_evidence(location, europe, london):
+    from jobagent.geography import location_evidence
+    assert location_evidence(location) == {'europe': europe, 'london': london}
+
+
+def test_daily_and_opportunities_europe_only_london_first(api):
+    api.patch('/api/settings', json={'suggested_region': 'europe', 'preferred_city': 'London', 'daily_min_match': 0})
+    rows = []
+    for i, place in enumerate(['Berlin, Germany', 'New York, NY', 'Remote', 'London, UK', 'London, Ontario, Canada']):
+        rows.append(api.post('/api/jobs', json={'title': 'Graduate Software Engineer', 'company': str(i),
+            'url': f'https://example.test/{i}', 'location': place}).json())
+    for endpoint in ['/api/daily', '/api/jobs']:
+        data = api.get(endpoint).json()
+        assert [item['id'] for item in data['items']] == [rows[3]['id'], rows[0]['id']]
+        assert data['total'] == 2
+    assert api.get('/api/tracker').json()['total'] == 5

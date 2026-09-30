@@ -624,12 +624,14 @@ export function ApplicationDetail({
     [edit, setEdit] = useState(false),
     [answer, setAnswer] = useState(false),
     [approve, setApprove] = useState(false),
+    [sectionReview, setSectionReview] = useState(false),
     [reconcile, setReconcile] = useState(false),
     a = r.data;
   const refreshApplication = r.reload;
   const active =
     ctx.busy === "apply" ||
     ctx.busy === "approve" ||
+    ctx.busy === "approve-section" ||
     ["running", "submitting"].includes(a?.runs?.at(-1)?.status);
   useEffect(() => {
     if (!active) return;
@@ -649,7 +651,11 @@ export function ApplicationDetail({
               <p>{a.job?.company || a.company}</p>
               <div className="tags">
                 <Status value={a.status} />
-                <Tag>{label(a.mode || "review")} mode</Tag>
+                <Tag>
+                  {a.section_consent
+                    ? "Approval per section"
+                    : `${label(a.mode || "review")} mode`}
+                </Tag>
                 <Tag>Created {date(a.created_at)}</Tag>
               </div>
             </div>
@@ -661,9 +667,14 @@ export function ApplicationDetail({
           <div className="detail-actions">
             {a.mode !== "manual" && (
               <>
-                {["needs_review", "ready_for_review"].includes(
-                  a.runs?.at(-1)?.status,
-                ) ? (
+                {a.runs?.at(-1)?.status === "section_review" ? (
+                  <Button onClick={() => setSectionReview(true)}>
+                    <ShieldCheck size={15} />
+                    Review section
+                  </Button>
+                ) : ["needs_review", "ready_for_review"].includes(
+                    a.runs?.at(-1)?.status,
+                  ) ? (
                   <Button onClick={() => setApprove(true)}>
                     <ShieldCheck size={15} />
                     Review & approve submission
@@ -679,7 +690,7 @@ export function ApplicationDetail({
                     "FINAL_INTERVIEW",
                   ].includes(a.status) && (
                     <Button
-                      loading={ctx.busy === "apply"}
+                      loading={active}
                       onClick={() =>
                         ctx.act(
                           "apply",
@@ -739,6 +750,19 @@ export function ApplicationDetail({
               <ArrowRight size={15} />
             </Button>
           </div>
+          {a.section_consent && a.runs?.at(-1)?.status === "section_review" && (
+            <div className="tracking-callout">
+              <ShieldCheck size={20} />
+              <p>
+                Waiting for your approval:{" "}
+                {a.runs.at(-1)?.checkpoint?.section?.title}. Review the proposed
+                values before Meridian fills this section.
+              </p>
+              <Button onClick={() => setSectionReview(true)}>
+                Review section
+              </Button>
+            </div>
+          )}
           <div className="tabs">
             {(a.mode === "manual"
               ? ["overview", "documents", "email"]
@@ -1065,6 +1089,13 @@ export function ApplicationDetail({
               onClose={() => setApprove(false)}
             />
           )}
+          {sectionReview && (
+            <SectionApproval
+              application={a}
+              ctx={ctx}
+              close={() => setSectionReview(false)}
+            />
+          )}
         </>
       )}
     </Resource>
@@ -1072,6 +1103,78 @@ export function ApplicationDetail({
 }
 function PlusIcon() {
   return <Pencil size={15} />;
+}
+function SectionApproval({
+  application: a,
+  ctx,
+  close,
+}: {
+  application: Application;
+  ctx: AppContext;
+  close: () => void;
+}) {
+  const checkpoint = a.runs?.at(-1)?.checkpoint,
+    section = checkpoint?.section;
+  return (
+    <Modal
+      wide
+      title={`Review section · ${section?.title || "Application"}`}
+      onClose={close}
+    >
+      <p className="panel-copy">
+        {a.job?.title} · {a.job?.company}
+      </p>
+      <p className="panel-copy">Destination: {section?.destination}</p>
+      <p className="panel-copy">
+        {section?.kind === "continue"
+          ? "Approve moving to the next step with the current form values. The next section will require another review."
+          : "Approve these exact values and attachments for this section. Unknown answers are left for you to resolve."}
+      </p>
+      <div className="answer-list">
+        {(section?.fields || []).map((field: Data, index: number) => (
+          <div className="answer-card" key={index}>
+            <h4>{field.question}</h4>
+            <p>{field.answer}</p>
+            <small>
+              {field.operation === "UPLOAD"
+                ? "Selected document"
+                : field.operation === "CLICK" && section.kind === "continue"
+                  ? "Navigation only"
+                  : "Verified profile answer"}
+            </small>
+          </div>
+        ))}
+      </div>
+      <p className="panel-copy">
+        Final submission always requires a separate approval.
+      </p>
+      <div className="modal-actions">
+        <Button secondary onClick={close}>
+          Keep reviewing
+        </Button>
+        <Button
+          disabled={!section}
+          loading={ctx.busy === "approve-section"}
+          onClick={async () => {
+            const result = await ctx.act(
+              "approve-section",
+              () =>
+                api(`/applications/${a.id}/approve-section`, "POST", {
+                  approved: true,
+                  snapshot_id: checkpoint.snapshot_id,
+                }),
+              "Section approved. Meridian will stop at the next review.",
+            );
+            if (result) close();
+          }}
+        >
+          {section?.kind === "continue"
+            ? "Approve & continue"
+            : "Approve & fill section"}
+        </Button>
+      </div>
+    </Modal>
+  );
 }
 function Approval({
   application: a,

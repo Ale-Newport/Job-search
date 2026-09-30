@@ -78,6 +78,8 @@ DEFAULT_SETTINGS = {
     "scheduler_enabled": False,
     "tracking_first": True,
     "daily_min_match": 50,
+    "suggested_region": "any",
+    "preferred_city": "",
     "rules": [],
     "sensitive_policies": {},
 }
@@ -506,6 +508,17 @@ def jobs_list(
             "EXISTS(SELECT 1 FROM json_each(jobs.match_details,'$.profiles') p WHERE json_extract(p.value,'$.id')=? AND json_extract(p.value,'$.eligible')=1)"
         )
         params.append(profile_id)
+    settings = get_settings(get_db(request))
+    if settings.get("suggested_region") == "europe":
+        from .geography import location_evidence, recommendable
+
+        rows = [decode_row(row) for row in get_db(request).query(
+            "SELECT * FROM jobs WHERE " + " AND ".join(clauses) + " ORDER BY priority_score DESC,created_at DESC", params
+        )]
+        rows = [row for row in rows if recommendable(row, settings)]
+        if settings.get("preferred_city") == "London":
+            rows.sort(key=lambda row: location_evidence(row.get("location"))["london"], reverse=True)
+        return {"items": rows[offset:offset + limit], "total": len(rows)}
     return list_result(
         get_db(request), "jobs", " AND ".join(clauses), params, limit, offset, "priority_score DESC,created_at DESC"
     )
@@ -583,7 +596,7 @@ def job_prepare(job_id: str, payload: PreparePayload, request: Request):
     )
 
 
-def prepare_application(db, job_id, mode="review", document_version_id=None, data_dir=None):
+def prepare_application(db, job_id, mode="review", document_version_id=None, data_dir=None, section_consent=False):
     if data_dir is None:
         data_dir = db.path.parent.parent
     payload = PreparePayload(mode=mode, document_version_id=document_version_id)
@@ -616,17 +629,25 @@ def prepare_application(db, job_id, mode="review", document_version_id=None, dat
                 attach_document(db, conn, application_id, document["id"], "cv")
             except ValueError as exc:
                 raise HTTPException(409, str(exc)) from exc
+        if section_consent:
+            from .tracking import SUBMITTED
+
+            if existing and existing["status"] in SUBMITTED:
+                raise HTTPException(409, "This application has already been submitted or closed")
+            conn.execute("UPDATE applications SET section_consent=1,mode='review' WHERE id=?", (application_id,))
     application = required(db, "applications", application_id)
     if not existing:
         trusted = db.query("SELECT * FROM facts WHERE verification_status='verified' OR locked=1")
-        if trusted and not document:
+        if trusted and not document and not section_consent:
             # Preparation produces a reviewable draft; saving/uploading needs explicit approval.
             draft = generate_document(db, data_dir, job_id, "cv", approved=False)
             application["draft"] = draft
         else:
             application["draft"] = None
         question = (
-            "Review candidate facts and approve a tailored CV before filling this application"
+            "Review each proposed section before filling; approve the final submission separately"
+            if section_consent
+            else "Review candidate facts and approve a tailored CV before filling this application"
             if not document
             else "Review the selected CV and application answers before submitting"
         )
@@ -856,6 +877,8 @@ class SearchConfig(BaseModel):
     keywords: list[str] = Field(default_factory=list)
     negative_keywords: list[str] = Field(default_factory=list)
     locations: list[str] = Field(default_factory=list)
+    region: Literal["europe"] | None = None
+    preferred_locations: list[str] = Field(default_factory=list)
     remote: bool | None = None
     minimum_salary: float | None = Field(default=None, ge=0)
     salary_currency: str | None = Field(default=None, pattern=r"^[A-Z]{3}$")
@@ -1015,7 +1038,9 @@ class ApplicationPatch(Payload):
 @router.patch("/applications/{application_id}")
 def application_update(application_id: str, payload: ApplicationPatch, request: Request):
     db = get_db(request)
-    required(db, "applications", application_id)
+    existing = required(db, "applications", application_id)
+    if existing.get("section_consent") and payload.mode == "auto":
+        raise HTTPException(422, "This application requires approval for each section and final submission")
     values = payload.model_dump(exclude_unset=True, exclude_none=True)
     status = values.pop("status", None)
     if status:
@@ -1287,6 +1312,8 @@ async def settings_patch(payload: dict, request: Request):
             raise HTTPException(422, "Allowed domains must be hostnames without paths or wildcards")
         if key == "default_mode" and value not in {"manual", "review", "auto"}:
             raise HTTPException(422, "Invalid application mode")
+        if key == "suggested_region" and value not in {"any", "europe"}:
+            raise HTTPException(422, "Choose any region or Europe")
         if key == "browser_engine" and value not in {"laya", "jev", "hybrid", "deterministic"}:
             raise HTTPException(422, "Invalid browser engine")
         if key == "text_provider" and value not in {

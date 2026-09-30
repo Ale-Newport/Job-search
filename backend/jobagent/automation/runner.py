@@ -12,6 +12,7 @@ from .answers import normalize, option_for, resolve_answer
 from .browser import BrowserSession, confirmation_evidence
 from .browser import PROGRESS, is_submit
 from .engines import make_engine
+from .consent import action_key, section_plan
 from .types import AutomationError, Decision, HumanRequired, Operation, Paused, StaleState
 
 
@@ -25,6 +26,22 @@ class BrowserManager(BrowserSession):
         self._run_lock = asyncio.Lock()
         self.on_step = None
         self.decision_engine = None  # Optional injected engine, useful for integration tests.
+        self._section_review = {}
+
+    async def authorize_section(self, application_id, snapshot_id):
+        review = self._section_review.get(snapshot_id)
+        if not review or review["application_id"] != application_id or application_id != self._active_application_id:
+            raise ValueError("This section review expired. Inspect the application again.")
+        await self._validate_snapshot(snapshot_id)
+        self._section_review.clear()
+        return review["keys"]
+
+    def section_checkpoint(self, snapshot, element, keys, fields, answers, steps, adapter, kind="fill"):
+        self._section_review = {snapshot["id"]: {"application_id": self._active_application_id, "keys": keys}}
+        result = self._result("section_review", snapshot, answers=answers, steps=steps, adapter=adapter)
+        result["section"] = {"kind": kind, "title": element.get("section_label", "Application details"),
+                             "fields": fields, "destination": element.get("href") or element.get("frame_url") or snapshot["url"]}
+        return result
 
     def _result(self, status: str, snapshot: dict | None, *, answers: list | None = None,
                 questions: list | None = None, steps: list | None = None,
@@ -52,6 +69,9 @@ class BrowserManager(BrowserSession):
         same_application = self._active_application_id == application.get("id")
         self._active_application_id = application.get("id")
         self._review.clear()
+        self._section_review.clear()
+        section_consent = bool(settings.get("section_consent"))
+        section_grant = {tuple(key) for key in settings.get("_section_grant", [])}
         if mode.upper() == "MANUAL":
             return self._result("needs_review", None, adapter=adapter.name,
                                 questions=[{"question": "Manual mode: open and complete the prepared application yourself.", "kind": "manual"}])
@@ -63,7 +83,7 @@ class BrowserManager(BrowserSession):
         self.allowed_uploads = {Path(d["path"]).resolve() for d in documents if d.get("path") and Path(d["path"]).is_file()}
         try:
             self._check_pause()
-            if (same_application or settings.get("resume_existing")) and self.page and not self.page.is_closed():
+            if same_application and self.page and not self.page.is_closed():
                 snapshot = await self.observe()
             else:
                 snapshot = await self.open(url)
@@ -125,6 +145,7 @@ class BrowserManager(BrowserSession):
                         pending_dropdown = {"resolution": resolution, "node_id": element["node_id"],
                                             "document_id": element["document_id"]}
                         action = Decision(Operation.CLICK, element["index"])
+                        value = resolution["answer"]
                         break
                     if not any(op in operations for op in ("TYPE_TEXT", "SELECT", "CHECK", "UNCHECK", "UPLOAD")):
                         continue
@@ -200,6 +221,15 @@ class BrowserManager(BrowserSession):
                         action = Decision(operation, element["index"])
                         break
                 if action:
+                    if section_consent:
+                        target = next(e for e in snapshot["elements"] if e["index"] == action.target)
+                        key = action_key(target, action.operation, value, file_path, upload_name)
+                        if key not in section_grant:
+                            fields, keys = section_plan(snapshot, target, adapter, facts, documents, policies, self._documents_for)
+                            if key not in keys:
+                                raise HumanRequired("This field needs manual review before it can be filled.")
+                            return self.section_checkpoint(snapshot, target, keys, fields, answers, steps, adapter.name)
+                        section_grant.remove(key)
                     result = await self.execute(action, snapshot, value=value, file_path=file_path,
                                                 upload_name=upload_name, upload_mime=upload_mime,
                                                 minimum_confidence=float(settings.get("browser_confidence_threshold", settings.get("min_confidence", .85))))
@@ -219,7 +249,9 @@ class BrowserManager(BrowserSession):
                 if snapshot["errors"]:
                     return self._result("human_required", snapshot, answers=answers, steps=steps, adapter=adapter.name,
                                         questions=[{"question": e, "kind": "validation"} for e in snapshot["errors"]])
-                submit = adapter.submit_button(snapshot)
+                entry_only = section_consent and not settings.get("has_filled_sections") and not steps and not any(
+                    any(op in e["operations"] for op in ("TYPE_TEXT", "SELECT", "CHECK", "UPLOAD")) for e in snapshot["elements"])
+                submit = None if entry_only else adapter.submit_button(snapshot)
                 if submit:
                     self._review[snapshot["id"]] = {"application_id": self._active_application_id, "adapter": adapter.name,
                                                     "mode": mode.upper(), "answers": answers, "steps": steps,
@@ -228,9 +260,21 @@ class BrowserManager(BrowserSession):
                 next_button = adapter.next_button(snapshot)
                 if next_button is None:
                     next_button = await self._decide_safe_progress(snapshot, settings)
+                if next_button is None and entry_only:
+                    links = [e for e in snapshot["elements"] if e["role"] == "link" and "CLICK" in e["operations"]
+                             and re.fullmatch(r"apply(?: now| for (?:this |the )?(?:job|role|position))?", e["label"].strip(), re.I)
+                             and (e.get("href") or "").startswith(("http://", "https://"))]
+                    next_button = links[0] if len(links) == 1 else None
                 if next_button and page_advances < 8:
                     previous = snapshot["fingerprint"]
                     decision = next_button.pop("_decision", None) or Decision(Operation.CLICK, next_button["index"])
+                    if section_consent:
+                        key = action_key(next_button, decision.operation)
+                        if key not in section_grant:
+                            return self.section_checkpoint(snapshot, next_button, [key],
+                                [{"question": "Continue in the employer's form", "answer": next_button["label"], "operation": "CLICK"}],
+                                answers, steps, adapter.name, "continue")
+                        section_grant.remove(key)
                     await self._record_step(await self.execute(decision, snapshot), steps, snapshot)
                     page_advances += 1
                     snapshot = await self._wait_for_change(previous)

@@ -2,6 +2,8 @@
 
 A private macOS workspace for daily job recommendations, direct application links and a table of every opportunity and application. Public ATS boards, GitHub lists, Trackr and inbox alerts feed the list. You apply externally, record the submission, and matching recruitment emails update the timeline. Verified CV facts and optional document assistance support this workflow.
 
+**Apply with review** on an opportunity starts a visible browser with persisted per-application section consent. Exact field values and selected files require approval before filling; navigation and final submission require separate approvals. Consent is single-use, tied to the observed DOM and evidence, and does not enable background applications. Unknown answers or unsupported controls require human input. `scripts/configure_europe_review.py --data-dir PATH` sets Europe-only recommendations (including the UK), prioritizes London, preserves the full tracker, and rescans matching evidence. Unknown or broadly labeled EMEA/worldwide locations are excluded from suggestions.
+
 [Guía de inicio en español](docs/INICIO_RAPIDO.es.md) · [Verification and observed limitations](docs/VERIFICATION.md)
 
 Meridian runs locally. Tauri 2 hosts the interface and launches a bundled Python service on authenticated loopback. SQLite, documents, browser sessions and logs remain on the Mac. There is no telemetry or project-owned remote server. Cloud AI is optional and requires explicit configuration.

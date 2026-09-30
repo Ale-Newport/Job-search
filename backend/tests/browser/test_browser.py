@@ -261,3 +261,26 @@ async def test_low_confidence_decision_cannot_execute(browser, fixture_server):
     with pytest.raises(HumanRequired, match="confidence"):
         await browser.execute(Decision(Operation.TYPE_TEXT, target["index"], .5), snapshot, value="alex@example.test")
     assert await browser.page.locator('input').input_value() == ""
+
+
+async def test_guided_consent_covers_selected_document_select_radio_and_checkbox(browser, fixture_server, candidate, resume):
+    application = {"id": "guided-gh", "url": fixture_server + "/greenhouse.html", "ats": "greenhouse"}
+    settings = {"section_consent": True,
+                "sensitive_policies": {"legal_certification": {"action": "saved_answer", "fact_id": "privacy"}}}
+    result = await browser.fill_application(application, candidate, [resume], settings=settings)
+    assert result["status"] == "section_review", result
+    assert await browser.page.locator('input[type="file"]').evaluate('n => n.files.length') == 0
+    assert await browser.page.locator('input[name="job_application[first_name]"]').input_value() == ''
+    saw_upload = False
+    for _ in range(10):
+        if result['status'] != 'section_review':
+            break
+        saw_upload |= any(field['operation'] == 'UPLOAD' and field['answer'] == 'resume.txt'
+                          for field in result['section']['fields'])
+        grant = await browser.authorize_section(application['id'], result['snapshot_id'])
+        result = await browser.fill_application(application, candidate, [resume], settings={**settings, '_section_grant': grant})
+    assert saw_upload and result['status'] == 'needs_review', result
+    assert await browser.page.locator('select').input_value() == 'gb'
+    assert await browser.page.locator('input[name="relocation"][value="yes"]').is_checked()
+    assert await browser.page.locator('input[type="file"]').evaluate('n=>n.files[0].name') == 'resume.txt'
+    assert await browser.page.evaluate('window.submissions') == 0

@@ -41,6 +41,12 @@
     for (const node of root.querySelectorAll('*')) if (node.shadowRoot) roots.push(node.shadowRoot);
   }
   const elements = [];
+  const sectionFor = node => {
+    const container = node.closest('fieldset,section,[role="group"],[role="region"]');
+    const heading = container?.querySelector('legend,h1,h2,h3,h4,[role="heading"]');
+    return {section_id: container ? `section-${identity(container)}` : 'page',
+      section_label: (heading?.innerText || container?.getAttribute('aria-label') || 'Application details').slice(0, 160)};
+  };
   for (const node of all) {
     if (['hidden', 'password'].includes(node.type) || !visible(node)) continue;
     const tag = node.tagName.toLowerCase();
@@ -62,7 +68,7 @@
     if (tag === 'a') operations.push('OPEN_TAB');
     if (role === 'combobox' && !operations.includes('CLICK')) operations.push('CLICK');
     const rect = node.getBoundingClientRect();
-    elements.push({node_id: identity(node), role, tag, type, label: label(node),
+    elements.push({node_id: identity(node), role, tag, type, label: label(node), ...sectionFor(node),
       value: type === 'file' ? [...node.files || []].map(f => f.name).join(', ') :
         String(node.value ?? (node.isContentEditable ? node.innerText : '')),
       checked: typeof node.checked === 'boolean' ? node.checked : node.getAttribute('aria-checked') === 'true',

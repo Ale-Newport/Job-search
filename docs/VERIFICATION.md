@@ -1,4 +1,13 @@
-# Verificación de la versión de seguimiento diario — 29 de septiembre de 2026
+# Verificación de la actualización — 30 de septiembre de 2026
+
+- **Apply with review** abre el navegador desde una oferta y exige permiso antes de rellenar cada sección, adjuntar archivos, avanzar y enviar. El consentimiento se conserva como requisito de esa candidatura; no activa reglas de envío para otras ofertas.
+- **202 pruebas Python y 3 Rust correctas**, lint y compilación nativa correctos. Los formularios locales prueban texto, selectores, radio, casillas, CV, navegación, rechazo de permisos repetidos/caducados y ausencia de envíos antes de la aprobación final. La restauración de backups antiguos incluye la migración del requisito de consentimiento.
+- Interfaz comprobada con datos ficticios: botón desde Today, datos exactos antes de aprobar, pausa posterior para Contact details y consentimiento independiente de Continue. En la versión instalada se verificó el botón, el selector del CV aprobado (versión 2) y **Europe only · London first**. No se abrió ni envió una candidatura real.
+- Producción: **229 recomendaciones europeas**, 50 visibles, Londres primero. Today y Opportunities excluyen ubicaciones no europeas o sin evidencia suficiente; Tracker conserva el historial. Se mantienen los 27 roles y los hechos del CV.
+- Instalación y DMG verificados, hashes de los ejecutables instalados iguales a los de la compilación. Backup previo en `.local-data/section-release-backup/`.
+- Gmail conserva la cuenta conectada y una sincronización del 30 de septiembre. El nuevo ejecutable espera la aceptación del permiso protegido del Llavero para su próxima lectura; esto no bloquea el flujo de candidaturas asistidas.
+
+## Verificación de la versión de seguimiento diario — 29 de septiembre de 2026
 
 La pantalla principal es **Today** y **Tracker** reúne oportunidades y candidaturas. Se verificó en una copia aislada el alta manual, la marca de envío sin documentos, la persistencia, la incorporación de un correo de prueba y el cambio a prueba técnica con plazo. La configuración de producción conserva los hechos del CV y las preferencias; pausa los envíos, activa una consulta por día y añade GitHub, Trackr y fuentes de alertas.
 

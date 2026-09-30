@@ -1,31 +1,31 @@
 {
-  "verified_at": "2026-09-29T17:19:44.604369+00:00",
-  "source_commit": "773427e86897beb5f89b2f987b6862795263d286",
+  "verified_at": "2026-09-30T12:46:57.040394+00:00",
+  "source_commit": "90f46c4d54f424bee17a27150cd62308a6847813",
   "version": "0.1.0",
   "platform": "macOS 15+, Apple Silicon arm64",
   "installed_app": "/Users/alejandro/Applications/Meridian.app",
   "dmg": "/Users/alejandro/Projects/Job-search/src-tauri/target/release/bundle/dmg/Meridian_0.1.0_aarch64.dmg",
-  "dmg_sha256": "7cbcd8e69f478e9b59817f394d7b7c32d82a0dfc42fc9b7b02e4632d23a277fb",
-  "dmg_bytes": 88103129,
+  "dmg_sha256": "b726b2654df6058437c80568450deacf75b46e378b431b62acfe28edf843b48c",
+  "dmg_bytes": 88122402,
   "executables": {
     "meridian": {
-      "sha256": "788481d7027d6434110a82f67bd428bbc2cad1f61293edc095310b736587b5c8",
+      "sha256": "8d020537f919f651030a1ff9fbdac7830d89915183b2ea121e900e1e695e97d2",
       "installed_copy_matches_build": true
     },
     "meridian-backend": {
-      "sha256": "0d505d03f313d69f6c2ad2f2de6063b4ec265336e131cc7a899bcb6f75fcded1",
+      "sha256": "0a637f0e623b421a1ad700a16caecf5a2497b6ba6e97581ad8d8afa57ba84b07",
       "installed_copy_matches_build": true
     }
   },
-  "database_revision": "0003_notifications",
+  "database_revision": "0004_section_consent",
   "production_record_counts": {
     "facts": 102,
-    "jobs": 1636,
+    "jobs": 1692,
     "applications": 0,
-    "email_messages": 45
+    "email_messages": 46
   },
   "validation": {
-    "python_tests_passed": 184,
+    "python_tests_passed": 202,
     "rust_tests_passed": 3,
     "ui_e2e_flows_passed": 3,
     "lint": "passed",
@@ -43,7 +43,10 @@
     "daily_tracking_targeted_tests_passed": 19,
     "daily_tracking_ui_manual": "passed",
     "public_source_import": "passed",
-    "native_daily_and_tracker": "passed"
+    "native_daily_and_tracker": "passed",
+    "section_consent_browser_and_api": "passed",
+    "section_consent_ui_manual": "passed",
+    "native_europe_and_assisted_button": "passed"
   },
   "signing": "ad hoc, not notarized",
   "real_applications_sent": 0,
@@ -52,12 +55,14 @@
     "sha256": "256719178a8e8542c13de8728a646e43332f8da62d4c8b9323425a9de9b5338e",
     "installed_copy_matches_build": true
   },
-  "validation_note": "Daily tracking release: 184 Python and 3 Rust tests; final targeted 19 checks; three isolated UI flows and manual daily tracker/email-stage verification. Installed native Today and Tracker verified with 1,636 jobs, 704 matches and the top 50 daily. Public Trackr and GitHub sources and existing Indeed alerts imported into production. Gmail first sync imported 45 messages; the updated binary is waiting for macOS Keychain permission for its next sync. LinkedIn awaits inbox job alerts. No real applications sent.",
+  "validation_note": "Section consent release: 202 Python and 3 Rust tests passed, including real local Chromium forms. Verified no field writes or uploads before section approval, separate navigation consent, stale DOM/evidence rejection, single-use approvals, and separate final submission. Native installed app shows Europe only, London first, 229 matches and the assisted button with the approved CV selectable. No real applications created or sent. Gmail remains connected; the updated executable awaits macOS Keychain permission for its next sync. Earlier UI-flow and runtime validations are retained as historical evidence.",
   "gmail_account_verified": true,
   "real_email_initial_sync_verified": true,
   "daily_recommendations": {
-    "matching_jobs": 704,
-    "visible_daily_limit": 50
+    "matching_jobs": 229,
+    "visible_daily_limit": 50,
+    "region": "europe",
+    "preferred_city": "London"
   },
   "gmail_next_sync_waiting_for_keychain": true
 }

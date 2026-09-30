@@ -1,31 +1,33 @@
 {
-  "verified_at": "2026-09-30T12:46:57.040394+00:00",
-  "source_commit": "90f46c4d54f424bee17a27150cd62308a6847813",
+  "verified_at": "2026-09-30T14:03:04.175340+00:00",
+  "source_commit": "8e4079af39f67e68b447da2e8f055eea982e5fad",
   "version": "0.1.0",
   "platform": "macOS 15+, Apple Silicon arm64",
   "installed_app": "/Users/alejandro/Applications/Meridian.app",
   "dmg": "/Users/alejandro/Projects/Job-search/src-tauri/target/release/bundle/dmg/Meridian_0.1.0_aarch64.dmg",
-  "dmg_sha256": "b726b2654df6058437c80568450deacf75b46e378b431b62acfe28edf843b48c",
-  "dmg_bytes": 88122402,
+  "dmg_sha256": "5d08fd5f0634745ee4661ad2b07045aad7b540437d7cf0bbd7291b9704ef64b7",
+  "dmg_bytes": 88165389,
   "executables": {
     "meridian": {
-      "sha256": "8d020537f919f651030a1ff9fbdac7830d89915183b2ea121e900e1e695e97d2",
-      "installed_copy_matches_build": true
+      "sha256": "1510398839a4099458f2c82520e610982989514d2eedb4999e7504ed1f72f18b",
+      "installed_copy_matches_build": true,
+      "system_copy_matches_build": true
     },
     "meridian-backend": {
-      "sha256": "0a637f0e623b421a1ad700a16caecf5a2497b6ba6e97581ad8d8afa57ba84b07",
-      "installed_copy_matches_build": true
+      "sha256": "a7621698de4fb0cf8929f0a87a6c48a26282eebf6c17cda339830ae005bb8818",
+      "installed_copy_matches_build": true,
+      "system_copy_matches_build": true
     }
   },
-  "database_revision": "0004_section_consent",
+  "database_revision": "0005_assisted_autofill",
   "production_record_counts": {
     "facts": 102,
     "jobs": 1692,
-    "applications": 0,
+    "applications": 1,
     "email_messages": 46
   },
   "validation": {
-    "python_tests_passed": 202,
+    "python_tests_passed": 208,
     "rust_tests_passed": 3,
     "ui_e2e_flows_passed": 3,
     "lint": "passed",
@@ -46,16 +48,20 @@
     "native_daily_and_tracker": "passed",
     "section_consent_browser_and_api": "passed",
     "section_consent_ui_manual": "passed",
-    "native_europe_and_assisted_button": "passed"
+    "native_europe_and_assisted_button": "passed",
+    "trainline_final_targeted_regressions": 3,
+    "trainline_native_autofill": "passed for all available verified data; four required answers pending",
+    "stable_signing_across_rebuilds": "passed",
+    "gmail_refresh_after_signed_update": "passed"
   },
-  "signing": "ad hoc, not notarized",
+  "signing": "Apple Development, stable designated requirement verified across rebuilds; not notarized",
   "real_applications_sent": 0,
   "real_email_accounts_tested": true,
   "app_icon": {
     "sha256": "256719178a8e8542c13de8728a646e43332f8da62d4c8b9323425a9de9b5338e",
     "installed_copy_matches_build": true
   },
-  "validation_note": "Section consent release: 202 Python and 3 Rust tests passed, including real local Chromium forms. Verified no field writes or uploads before section approval, separate navigation consent, stale DOM/evidence rejection, single-use approvals, and separate final submission. Native installed app shows Europe only, London first, 229 matches and the assisted button with the approved CV selectable. No real applications created or sent. Gmail remains connected; the updated executable awaits macOS Keychain permission for its next sync. Earlier UI-flow and runtime validations are retained as historical evidence.",
+  "validation_note": "208 Python and 3 Rust tests passed; final option-label fix also passed 3 targeted real-Chrome fixture regressions. Installed signed app filled verified name, email, LinkedIn, selected CV and the unique London/UK location on the real Trainline form, without manual field entry. Four required candidate decisions remain unanswered; no application sent. Gmail refreshed its OAuth token and read messages after the signed update. Both installed app copies match this build. Prior UI/runtime entries are historical evidence.",
   "gmail_account_verified": true,
   "real_email_initial_sync_verified": true,
   "daily_recommendations": {
@@ -64,5 +70,24 @@
     "region": "europe",
     "preferred_city": "London"
   },
-  "gmail_next_sync_waiting_for_keychain": true
+  "gmail_next_sync_waiting_for_keychain": false,
+  "real_application_autofill": {
+    "company": "Trainline",
+    "title": "Junior Machine Learning Engineer",
+    "run_id": "8c90722a-3266-4557-add6-991046628dd4",
+    "automatic_fields": [
+      "name",
+      "email",
+      "LinkedIn",
+      "resume",
+      "London, United Kingdom"
+    ],
+    "pending_required_answers": [
+      "notice period",
+      "salary expectations",
+      "sponsorship now or in future",
+      "60% hybrid attendance"
+    ],
+    "submitted": false
+  }
 }

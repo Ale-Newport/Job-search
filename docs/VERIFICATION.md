@@ -92,7 +92,7 @@ Evidencia adicional: [discovery real](discovery-smoke.json), [benchmark Laya](lo
 
 ## Alcance y límites
 
-- Verificado en Apple Silicon con macOS 15+. El build local tiene firma ad hoc; no está notarizado y no se acredita una distribución Intel.
+- Verificado en Apple Silicon con macOS 15+. El build local usa una identidad Apple Development estable; no está notarizado y no se acredita una distribución Intel.
 - Los adaptadores ATS combinan reconocimiento de plataforma y manejo semántico de formularios. No constituyen cobertura garantizada de todos los formularios personalizados. LinkedIn/Indeed utilizan acceso manual.
 - La búsqueda consulta fuentes públicas configuradas y páginas de empleo con datos estructurados. No recorre autónomamente resultados de Google ni portales restringidos. Las listas GitHub admiten archivos Markdown, JSON y CSV.
 - La extracción de documentos es conservadora y requiere texto seleccionable; no incorpora OCR ni un importador específico para cada formato de exportación de LinkedIn. Portfolio/GitHub pueden añadirse como enlaces/hechos y documentos verificables.
@@ -104,3 +104,16 @@ Evidencia adicional: [discovery real](discovery-smoke.json), [benchmark Laya](lo
 - Los avisos de revisión, novedades, buenos matches y plazos próximos se deduplican en SQLite. Su presentación depende de las preferencias de notificaciones de macOS. La información también queda visible dentro de la app.
 
 La aceptación completa con una candidatura real requiere las cuentas del usuario y su aprobación de esa candidatura concreta; no se ha enviado ninguna como parte de esta validación.
+
+
+## Corrección de Apply with review — 30 septiembre 2026
+
+La versión instalada rellena automáticamente con permiso inicial por candidatura y exige confirmación separada para el envío. Sigue disponible el consentimiento por sección. Se ha probado desde el botón real de Today con **Junior Machine Learning Engineer — Trainline**: nombre, email, LinkedIn, CV original aprobado y Londres/Reino Unido quedaron rellenados por Meridian. No se introdujeron campos manualmente en ese navegador ni se pulsó Submit Application.
+
+La candidatura real permanece pendiente de cuatro respuestas que no están verificadas: preaviso, salario esperado, patrocinio actual/futuro y asistencia híbrida mínima del 60 %. Las preguntas opcionales desconocidas, diversidad, ajustes y consentimiento para futuras ofertas quedaron sin responder. No se afirma que la candidatura esté completa ni enviada.
+
+Se corrigieron la espera de hidratación del formulario, los controles Sí/No, el archivo oculto asociado a su botón visible, los desplegables con búsqueda, sus etiquetas frente a IDs internos, la selección inequívoca de Londres y la recuperación acotada de observaciones invalidadas por cambios asíncronos. La prueba local reproduce esos controles, ciudades homónimas y carga tardía, y comprueba cero envíos antes de la aprobación final.
+
+Verificación: **208 pruebas Python y 3 Rust correctas**, más **3 regresiones dirigidas** tras el último ajuste de etiquetas. Ruff, ESLint, TypeScript y Rust correctos. Ambas copias instaladas y el DMG coinciden con la compilación; firma estricta e integridad del DMG verificadas. Código: `8e4079af39f67e68b447da2e8f055eea982e5fad`.
+
+La identidad de firma del backend permanece idéntica entre binarios diferentes. Gmail renovó el token y sincronizó después de actualizar. Se mantienen las credenciales en Keychain y una caché exclusivamente en memoria. Las autorizaciones persistentes de macOS siguen siendo por elemento del llavero; ver [firma y permisos](KEYCHAIN_SIGNING.md). Se cerraron únicamente tres avisos técnicos resueltos de las pruebas anteriores, con la referencia a la ejecución que los resolvió. Los cuatro datos pendientes y la revisión final siguen abiertos.

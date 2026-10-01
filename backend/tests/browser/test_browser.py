@@ -345,3 +345,173 @@ async def test_guided_consent_covers_selected_document_select_radio_and_checkbox
     assert await browser.page.locator('input[name="relocation"][value="yes"]').is_checked()
     assert await browser.page.locator('input[type="file"]').evaluate('n=>n.files[0].name') == 'resume.txt'
     assert await browser.page.evaluate('window.submissions') == 0
+
+
+async def prompt_point(prompt, selector):
+    import json
+
+    result = await prompt.cdp.send(
+        "Runtime.evaluate",
+        {
+            "contextId": prompt.context_id,
+            "returnByValue": True,
+            "expression": "(() => {const r=globalThis.__meridianPrompt.root.querySelector("
+            + json.dumps(selector)
+            + ").getBoundingClientRect();return {x:r.x+r.width/2,y:r.y+r.height/2};})()",
+        },
+    )
+    return result["result"]["value"]
+
+
+async def test_inline_guide_isolated_from_page_and_accepts_only_trusted_events(browser, fixture_server):
+    import asyncio
+    import json
+    from jobagent.automation.browser_prompt import BrowserPrompt
+
+    prompt = BrowserPrompt()
+    await browser.open(fixture_server + "/sections.html")
+    received = []
+
+    async def handle(payload):
+        received.append(payload)
+        return {"message": "Saved"}
+
+    await prompt.show(
+        browser.page,
+        {
+            "question": "Your notice period?",
+            "company": "Fixture",
+            "required": True,
+            "remaining": 1,
+            "answer": "",
+            "can_reuse": True,
+        },
+        handle,
+    )
+    assert await browser.page.evaluate("typeof globalThis.meridianAnswer") == "undefined"
+    assert await browser.page.evaluate("document.querySelector('#meridian-browser-guide').shadowRoot") is None
+    await prompt.cdp.send(
+        "Runtime.evaluate",
+        {
+            "contextId": prompt.context_id,
+            "expression": "globalThis.__meridianPrompt.root.querySelector('input').value='Fake';globalThis.__meridianPrompt.root.querySelector('button').click()",
+        },
+    )
+    assert received == []
+    prompt._message(
+        {
+            "executionContextId": prompt.context_id + 1,
+            "name": "meridianAnswer",
+            "payload": json.dumps({"token": prompt.token, "action": "answer", "answer": "Fake", "reusable": True}),
+        }
+    )
+    assert received == []
+    pt = await prompt_point(prompt, "#answer")
+    await browser.page.mouse.click(**pt)
+    await browser.page.keyboard.press("Meta+A")
+    await browser.page.keyboard.insert_text("2 weeks")
+    pt = await prompt_point(prompt, "button.primary")
+    await browser.page.mouse.click(**pt)
+    for _ in range(100):
+        if received:
+            break
+        await asyncio.sleep(0.02)
+    assert len(received) == 1 and received[0]["answer"] == "2 weeks"
+    assert received[0]["reusable"] is False
+    await prompt.close()
+    assert await browser.page.locator("#meridian-browser-guide").count() == 0
+    assert await browser.page.evaluate("window.submissions") == 0
+
+
+async def test_orchestrator_inline_answers_draft_skip_resume_and_no_submission(tmp_path, fixture_server):
+    import asyncio
+    import json
+    from jobagent.db import Database
+    from jobagent.core import prepare_application
+    from jobagent.discovery import ingest_job
+    from jobagent.orchestrator import Orchestrator
+    from jobagent.application_profile import write_profile
+
+    db = Database(tmp_path / "database" / "meridian.sqlite")
+    write_profile(db, "full_name", "Alex Example", True)
+    job = ingest_job(
+        db,
+        {
+            "title": "Engineer",
+            "company": "Trainline",
+            "location": "London",
+            "url": fixture_server + "/inline_questions.html",
+        },
+    )[0]
+    application = prepare_application(db, job["id"], section_consent=True, assisted_autofill=True)
+    service = Orchestrator(db, tmp_path)
+
+    class Drafts:
+        async def draft(self, *args):
+            return {"answer": "I built a Python automation project.", "facts_used": ["project"]}
+
+    service.text_service = Drafts()
+    await service.browser.start(headless=True)
+
+    async def wait_status(status):
+        for _ in range(500):
+            run = db.one("SELECT * FROM automation_runs ORDER BY created_at DESC LIMIT 1")
+            if run and run["status"] == status and not service.running:
+                return run
+            await asyncio.sleep(0.02)
+        raise AssertionError(run)
+
+    async def click(selector):
+        await service.browser.page.mouse.click(**(await prompt_point(service.prompt, selector)))
+
+    async def state():
+        response = await service.prompt.cdp.send(
+            "Runtime.evaluate",
+            {
+                "contextId": service.prompt.context_id,
+                "returnByValue": True,
+                "expression": "({question:globalThis.__meridianPrompt.root.querySelector('h2').textContent, answer:globalThis.__meridianPrompt.root.querySelector('#answer').value, status:globalThis.__meridianPrompt.root.querySelector('.status').textContent})",
+            },
+        )
+        return response["result"]["value"]
+
+    try:
+        service.launch(application["id"])
+        await wait_status("browser_question")
+        assert (await state())["question"] == "What is your current notice period?"
+        assert await service.browser.page.get_by_label("Name", exact=True).input_value() == "Alex Example"
+        await click("#answer")
+        await service.browser.page.keyboard.press("1")
+        await service.browser.page.keyboard.press("Enter")
+        await click("button.primary")
+        # Wait for the new run, not the previous checkpoint.
+        for _ in range(500):
+            if (
+                not service.running
+                and service.prompt.cdp
+                and (await state())["question"] == "How are you currently using AI?"
+            ):
+                break
+            await asyncio.sleep(0.02)
+        assert await service.browser.page.locator("select").input_value() == "1 month", await state()
+        await click(".row button")  # Generate a draft via the browser UI.
+        for _ in range(300):
+            if (await state())["answer"]:
+                break
+            await asyncio.sleep(0.02)
+        assert (await state())["answer"] == "I built a Python automation project."
+        assert await service.browser.page.locator("textarea").input_value() == ""
+        await click("button.primary")
+        for _ in range(500):
+            if not service.running and service.prompt.cdp and (await state())["question"] == "Describe your gender":
+                break
+            await asyncio.sleep(0.02)
+        assert await service.browser.page.locator("textarea").input_value() == "I built a Python automation project."
+        await click(".row button")  # Leave optional sensitive question blank.
+        run = await wait_status("needs_review")
+        assert not json.loads(run["checkpoint"])["questions"]
+        assert await service.browser.page.evaluate("window.submissions") == 0
+        assert db.one("SELECT count(*) AS n FROM browser_answers")["n"] == 3
+        assert all(row["reusable"] == 0 for row in db.query("SELECT * FROM browser_answers"))
+    finally:
+        await service.close()

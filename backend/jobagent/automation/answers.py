@@ -45,6 +45,7 @@ SENSITIVE = {
     "disability": r"disabilit|medical|health condition|neurodivergen|reasonable adjustments",
     "ethnicity": r"ethnic|racial|race\b",
     "gender": r"gender|\bsex\b|sexual orientation|pronoun",
+    "personal_details": r"\bage\b|date of birth|birth date",
     "criminal_record": r"criminal|convict|arrest",
     "demographic": r"veteran|demographic|religio|marital",
     "legal_certification": r"certif|attest|agree|consent|privacy|terms (?:and|of)|acknowledge",
@@ -60,7 +61,7 @@ def classify_question(question: str) -> str:
         return "work_authorization"
     if re.search(r"salary|compensation|pay expectation", text):
         return "salary"
-    if re.search(r"why |motivat|tell us|describe|cover letter", text):
+    if re.search(r"why |motivat|tell us|describe|cover letter|how are you.*using ai|anything else.*share", text):
         return "free_text"
     if re.search(r"email|phone|address|postcode", text):
         return "contact"
@@ -100,6 +101,18 @@ def resolve_answer(question: str, facts: list[dict], *, hints: list[str] | None 
     result = {"question": question, "kind": category, "answer": None, "fact_ids": [], "verified": False,
               "confidence": 0.0, "leave_blank": False}
     allowed = approved_facts(facts)
+    # These markers are added only by the trusted, application-scoped knowledge
+    # loader, never read from employer DOM or a model response.
+    explicit = [f for f in allowed if f.get("profile_explicit") and
+                (normalize(question) == normalize(f.get("key", "")) or
+                 normalize(question) in f.get("profile_aliases", []) or
+                 (canonical_key(question) and canonical_key(question) == canonical_key(f.get("key", ""))))]
+    if explicit:
+        priority = max(f.get("answer_priority", 0) for f in explicit)
+        explicit = [f for f in explicit if f.get("answer_priority", 0) == priority]
+        if len({fact_value(f) for f in explicit}) == 1:
+            return {**result, "answer": fact_value(explicit[0]), "fact_ids": [f["id"] for f in explicit],
+                    "verified": True, "confidence": 1.0}
     policies = policies or {}
     question_policies = policies.get("questions", {})
     policy = (question_policies.get(normalize(question), policies.get(category, {}))

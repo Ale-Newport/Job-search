@@ -21,10 +21,15 @@
       Number(style.opacity) !== 0 && rect.width > 0 && rect.height > 0;
   };
   const label = node => {
+    const labelText = labelNode => {
+      const copy = labelNode.cloneNode(true);
+      copy.querySelectorAll('input,select,textarea,button').forEach(control => control.remove());
+      return copy.textContent.trim();
+    };
     const refs = (node.getAttribute('aria-labelledby') || '').split(/\s+/)
       .map(id => node.getRootNode().getElementById?.(id)?.textContent || '').join(' ').trim();
     return (refs || node.getAttribute('aria-label') ||
-      [...(node.labels || [])].map(n => n.innerText).join(' ') ||
+      [...(node.labels || [])].map(labelText).join(' ') ||
       (node.getAttribute('role') === 'option' ? node.innerText : '') ||
       (['submit', 'button'].includes(node.type) ? node.value : '') ||
       (['BUTTON', 'A', 'SUMMARY', 'OPTION'].includes(node.tagName) ? node.innerText : '') ||
@@ -100,8 +105,9 @@
       group: role === 'radio' ? fieldFor(node)?.getAttribute('data-field-path') || node.name || node.closest('[role="radiogroup"],fieldset')?.textContent?.slice(0,500) || '' : '',
       selected_text: role === 'combobox' ? node.getAttribute('aria-valuetext') ||
         (tag !== 'input' && tag !== 'select' ? node.innerText : '') : '',
-      context: question || node.closest('fieldset')?.querySelector('legend')?.innerText ||
+      context: question || (role === 'checkbox' && fieldFor(node)?.querySelector('.ashby-application-form-question-description')?.innerText) || node.closest('fieldset')?.querySelector('legend')?.innerText ||
         node.closest('[role="group"],[role="radiogroup"]')?.getAttribute('aria-label') || '',
+      description: (fieldFor(node)?.querySelector('.ashby-application-form-question-description')?.innerText || '').slice(0, 1600),
       in_viewport: rect.bottom > 0 && rect.top < innerHeight && rect.right > 0 && rect.left < innerWidth
     });
   }

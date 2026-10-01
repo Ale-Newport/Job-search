@@ -68,6 +68,7 @@ import {
 } from "./components";
 import type { Field } from "./components";
 import { SetupGuide } from "./onboarding";
+import { ApplicationProfile } from "./application-profile";
 
 const STATUS = [
   "DISCOVERED",
@@ -1595,6 +1596,7 @@ export function Profile({ ctx }: { ctx: AppContext }) {
           Private on this Mac
         </Tag>
       </div>
+      <ApplicationProfile ctx={ctx} />
       <div className="toolbar">
         <SearchInput
           value={q}

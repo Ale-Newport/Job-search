@@ -78,6 +78,7 @@ def create_app(data_dir: Path | None = None, token: str | None = None, secret_st
         from .automation.text_runtime import OllamaRuntime
 
         app.state.automation = Orchestrator(app.state.db, root)
+        app.state.automation.text_service = app.state.text_ai
         app.state.laya_runtime = LayaRuntime(root)
         app.state.ollama_runtime = OllamaRuntime(root)
         scheduler = asyncio.create_task(schedule(app)) if start_scheduler else None

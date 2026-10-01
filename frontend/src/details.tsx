@@ -649,7 +649,7 @@ export function ApplicationDetail({
     ctx.busy === "apply" ||
     ctx.busy === "approve" ||
     ctx.busy === "approve-section" ||
-    ["running", "submitting"].includes(a?.runs?.at(-1)?.status);
+    ["running", "submitting", "browser_question"].includes(a?.runs?.at(-1)?.status);
   useEffect(() => {
     if (!active) return;
     const timer = setInterval(refreshApplication, 2500);

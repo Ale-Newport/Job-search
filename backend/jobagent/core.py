@@ -162,6 +162,42 @@ class FactPayload(Payload):
     notes: str = Field(default="", max_length=10000)
 
 
+class ApplicationProfilePayload(Payload):
+    value: str = Field(default="", max_length=20000)
+    confirmed: bool = False
+
+
+@router.get("/application-profile")
+def application_profile_get(request: Request):
+    from .application_profile import profile
+    return profile(get_db(request))
+
+
+@router.put("/application-profile/{key}")
+def application_profile_put(key: str, payload: ApplicationProfilePayload, request: Request):
+    from .application_profile import write_profile
+    try:
+        identifier = write_profile(get_db(request), key, payload.value, payload.confirmed)
+    except ValueError as exc:
+        raise HTTPException(422, str(exc)) from exc
+    return {"id": identifier}
+
+
+class BrowserAnswerPatch(Payload):
+    answer: str = Field(max_length=20000)
+    reusable: bool = False
+
+
+@router.patch("/browser-answers/{answer_id}")
+def browser_answer_patch(answer_id: str, payload: BrowserAnswerPatch, request: Request):
+    from .application_profile import remember_answer
+    db = get_db(request)
+    row = required(db, 'browser_answers', answer_id)
+    application = db.one('SELECT a.*,j.company,j.location FROM applications a JOIN jobs j ON a.job_id=j.id WHERE a.id=?', (row['application_id'],))
+    identifier = remember_answer(db, application, row['question'], payload.answer, reusable=payload.reusable, skip=not payload.answer.strip())
+    return {'id': identifier}
+
+
 class FactPatch(Payload):
     category: str | None = Field(default=None, min_length=1, max_length=80)
     key: str | None = Field(default=None, min_length=1, max_length=300)

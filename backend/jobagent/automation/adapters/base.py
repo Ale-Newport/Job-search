@@ -19,6 +19,8 @@ class ATSAdapter:
         return any(host == d or host.endswith("." + d) for d in self.domains)
 
     def question(self, element: dict) -> str:
+        if element.get("role") == "checkbox" and element.get("context") and element["context"] != element["label"]:
+            return element["context"] + " — " + element["label"]
         if element.get("role") == "radio":
             return element.get("context") or element.get("group") or element["label"]
         return self.aliases.get(element.get("name", ""), element["label"])

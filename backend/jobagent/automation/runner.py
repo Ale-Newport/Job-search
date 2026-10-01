@@ -141,6 +141,8 @@ class BrowserManager(BrowserSession):
                     pending_dropdown = None
                     continue
                 for element in snapshot["elements"]:
+                    if not element.get("required") and normalize(adapter.question(element)) in settings.get("_skipped_questions", []):
+                        continue
                     operations = element["operations"]
                     if element["role"] == "combobox" and "CLICK" in operations and "SELECT" not in operations:
                         resolution = resolve_answer(adapter.question(element), facts, policies=policies)
@@ -268,6 +270,21 @@ class BrowserManager(BrowserSession):
                                       "kind": "unavailable_frame"})
                 questions = self._dedupe_questions(questions)
                 if questions:
+                    for question in questions:
+                        element = next((e for e in snapshot["elements"] if adapter.question(e) == question["question"]), None)
+                        if element:
+                            question.update(target=element["index"], required=bool(element.get("required")),
+                                            current_value=element.get("value", ""), node_id=element["node_id"],
+                                            document_id=element["document_id"], type=element.get("type"),
+                                            role=element.get("role"), description=element.get("description", ""),
+                                            multiline=element.get("tag") == "textarea", options=element.get("options", []))
+                            if element["role"] == "radio":
+                                question["options"] = [{"label": e["label"], "value": e["value"]} for e in snapshot["elements"]
+                                                       if e.get("group") == element.get("group") and e["role"] == "radio"]
+                                question["current_value"] = next((e["label"] for e in snapshot["elements"] if e.get("group") == element.get("group") and e["role"] == "radio" and e["checked"]), "")
+                            elif element["role"] == "checkbox":
+                                question["options"] = [{"label": "Yes"}, {"label": "No"}]
+                                question["current_value"] = "Yes" if element["checked"] else ""
                     return self._result("human_required", snapshot, answers=answers, questions=questions,
                                         steps=steps, adapter=adapter.name)
                 if snapshot["errors"]:

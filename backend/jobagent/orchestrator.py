@@ -24,6 +24,9 @@ class Orchestrator:
 
         self.db, self.data_dir = db, data_dir
         self.browser = BrowserManager(data_dir)
+        from .automation.browser_prompt import BrowserPrompt
+        self.prompt = BrowserPrompt()
+        self.text_service = None
         self.lock = asyncio.Lock()
         self.tasks: set[asyncio.Task] = set()
         self.running = False
@@ -92,7 +95,7 @@ class Orchestrator:
 
     def application(self, application_id):
         application = self.db.one(
-            "SELECT a.*,j.title,j.company,j.application_url,j.url,j.match_score,j.ats FROM applications a JOIN jobs j ON a.job_id=j.id WHERE a.id=?",
+            "SELECT a.*,j.title,j.company,j.location,j.application_url,j.url,j.match_score,j.ats FROM applications a JOIN jobs j ON a.job_id=j.id WHERE a.id=?",
             (application_id,),
         )
         if not application:
@@ -219,6 +222,7 @@ class Orchestrator:
     async def _fill(self, run_id, application, resume, section_grant=None):
         try:
             async with self.lock:
+                await self.prompt.close()
                 self.active_run = run_id
                 if self.paused() and not application.get("section_consent"):
                     raise ValueError("Automation was paused before this run started")
@@ -226,6 +230,8 @@ class Orchestrator:
                     await self.browser.resume()
                 self.db.event(application["id"], "PREPARING", "Browser form preparation started", origin="automation")
                 facts = self.db.query("SELECT * FROM facts WHERE verification_status='verified' OR locked=1")
+                from .application_profile import application_knowledge
+                facts, skipped = application_knowledge(self.db, application, facts)
                 source_fingerprint = self.fingerprint(application["id"])
                 evidence_at = now()
                 documents = self.db.query(
@@ -244,6 +250,10 @@ class Orchestrator:
                 config["assisted_autofill"] = bool(application.get("section_consent") and application.get("assisted_autofill"))
                 config["section_consent"] = bool(application.get("section_consent") and not config["assisted_autofill"])
                 config["skip_optional_unknown"] = bool(application.get("section_consent"))
+                config["inline_questions"] = bool(config.get("browser_inline_questions", True) and config["assisted_autofill"])
+                if config["inline_questions"]:
+                    config["skip_optional_unknown"] = False
+                config["_skipped_questions"] = skipped
                 config["_section_grant"] = section_grant or []
                 config["has_filled_sections"] = bool(self.db.one(
                     "SELECT s.id FROM automation_steps s JOIN automation_runs r ON r.id=s.run_id WHERE r.application_id=? AND s.operation IN ('TYPE_TEXT','SELECT','UPLOAD','CHECK') LIMIT 1",
@@ -293,6 +303,8 @@ class Orchestrator:
                     for answer in result.get("answers", []):
                         answer["verified"] = False
                 self.persist_result(run_id, application["id"], result)
+                if config["inline_questions"] and result.get("status") == "human_required" and not any(q.get('kind') == 'EVIDENCE_CHANGED' for q in result.get('questions', [])):
+                    await self.show_browser_question(run_id, application, result, facts)
                 if (
                     result.get("status") in ("needs_review", "ready_for_review")
                     and application["mode"].lower() == "auto"
@@ -315,6 +327,87 @@ class Orchestrator:
         finally:
             self.running = False
             self.active_run = None
+
+    async def show_browser_question(self, run_id, application, result, facts):
+        from .application_profile import question_field, profile, draft_fact_ids, remember_answer
+        from .automation.answers import classify_question, SENSITIVE
+        question = next((q for q in result.get('questions', []) if q.get('target') and q.get('kind') != 'document'), None)
+        question = question or next(iter(result.get('questions', [])), None)
+        if not question or not self.browser.page or self.browser.page.is_closed():
+            return
+        spec = question_field(question['question'], application)
+        suggested = next((f for f in profile(self.db)['fields'] if spec and f['key'] == spec['key']), None)
+        options = [o['label'] for o in question.get('options', []) if o.get('label') and not o.get('disabled') and o.get('value') != '']
+        if not options and spec:
+            options = spec['options']
+        kind = classify_question(question['question'])
+        can_draft = (question.get('multiline') or kind == 'free_text') and kind not in {*SENSITIVE, 'work_authorization', 'salary'}
+        safe_reuse = kind != 'legal_certification' and (kind not in {'work_authorization', 'salary'} or bool(spec and spec.get('scope')))
+        answer = question.get('current_value') or (suggested['value'] if suggested else '')
+        manual = not question.get('target') or question.get('kind') == 'document'
+        if manual:
+            can_draft = safe_reuse = False
+        # The original question remains visible alongside the browser-owned guide.
+        snapshot, refs = self.browser._snapshots.get(result['snapshot_id'], ({}, {}))
+        ref = refs.get(question.get('target'))
+        if ref:
+            frame, node_id, document_id = ref
+            await frame.evaluate("([id,doc]) => { const s=window.__meridianObservedControlsV1; if(s?.documentId===doc) s.nodes.get(id)?.scrollIntoView({block:'center'}); }", [node_id, document_id])
+
+        async def handle(payload):
+            latest = self.db.one('SELECT id FROM automation_runs WHERE application_id=? ORDER BY created_at DESC LIMIT 1', (application['id'],))
+            if not latest or latest['id'] != run_id or self.running or self.lock.locked():
+                raise ValueError('This browser question has expired')
+            action = payload['action']
+            if action == 'pause':
+                self.browser.pause()
+                await self.prompt.close()
+                self.db.execute("UPDATE automation_runs SET status='human_required',updated_at=? WHERE id=?", (now(), run_id))
+                return
+            if action == 'rescan':
+                await self.prompt.close()
+                self.launch(application['id'], resume=True)
+                return
+            self.browser._check_pause()
+            if manual:
+                raise ValueError('Complete this step in the form, then choose Recheck form')
+            await self.browser._validate_snapshot(result['snapshot_id'])
+            if action == 'draft':
+                if not can_draft or not self.text_service:
+                    raise ValueError('This question needs your own answer')
+                draft = await self.text_service.draft(settings_for(self.db), question['question'], application, draft_fact_ids(facts, question['question']))
+                return {'answer': draft['answer'], 'message': 'AI draft — review and edit before saving. Based on '+str(len(draft['facts_used']))+' verified facts. Nothing has been filled yet.'}
+            if action == 'skip' and question.get('required'):
+                raise ValueError('This field is required by the employer')
+            value = payload['answer'].strip()
+            if action == 'answer' and not value:
+                raise ValueError('Enter an answer first')
+            if action == 'answer' and options and value not in options:
+                raise ValueError('Choose one of the available answers')
+            if action == 'answer' and question.get('type') == 'number':
+                import math
+                try:
+                    if not math.isfinite(float(value)):
+                        raise ValueError()
+                except ValueError:
+                    raise ValueError('Enter a finite number') from None
+            remember_answer(self.db, application, question['question'], value if action == 'answer' else '',
+                            reusable=payload['reusable'] and safe_reuse, skip=action == 'skip')
+            await self.prompt.close()
+            self.launch(application['id'], resume=True)
+
+        await self.prompt.show(self.browser.page, {
+            'question': question['question'], 'company': application['company'], 'required': question.get('required', False),
+            'remaining': len(result['questions']), 'options': options, 'answer': answer,
+            'multiline': question.get('multiline') or kind == 'free_text' or bool(spec and spec['multiline']),
+            'type': question.get('type'), 'can_draft': bool(can_draft), 'can_reuse': safe_reuse,
+            'description': question.get('description'),
+            'manual': manual,
+            'reuse_label': 'Remember for matching questions' + (' ('+spec['scope']+' only)' if spec and spec.get('scope') else ' in future applications'),
+            'message': 'Suggested answer — confirm or edit it.' if suggested and suggested['state'] == 'suggested' and answer else '',
+        }, handle)
+        result['browser_question'] = True
+        self.db.execute("UPDATE automation_runs SET status='browser_question',checkpoint=?,updated_at=? WHERE id=?", (json.dumps(result), now(), run_id))
 
     def persist_result(self, run_id, application_id, result):
         for answer in result.get("answers", []):
@@ -459,6 +552,11 @@ class Orchestrator:
         }
 
     async def close(self):
+        await self.prompt.close()
+        for task in list(self.prompt.tasks):
+            task.cancel()
+        if self.prompt.tasks:
+            await asyncio.gather(*self.prompt.tasks, return_exceptions=True)
         self.browser.pause()
         for task in self.tasks:
             task.cancel()

@@ -1,4 +1,21 @@
-# Verificación de la actualización — 30 de septiembre de 2026
+# Perfil ampliado y preguntas en el navegador — 1 de octubre de 2026
+
+La versión instalada en ambas carpetas Applications incluye **53 campos editables**, respuestas guardadas por candidatura y el asistente dentro de Chrome. El perfil real conserva los hechos contrastados del CV: muestra 13 campos confirmados, 5 sugerencias revisables y 35 desconocidos. Los datos personales sensibles no se han inferido. Las sugerencias y los borradores no se utilizan como hechos confirmados.
+
+La prueba desde **Resume agent** en la app instalada abrió el formulario real de **Junior Machine Learning Engineer — Trainline**, rellenó nombre, email, LinkedIn, CV seleccionado y ubicación inequívoca en Londres. El asistente quedó visible junto a la pregunta de preaviso, con las nueve opciones correctas y 13 preguntas pendientes entre obligatorias y opcionales. El estado persistido es `browser_question`; no se volvió a abrir la revisión de la app y no se envió ninguna candidatura. Preaviso, salario, patrocinio y compromiso híbrido siguen pendientes de respuestas reales del usuario.
+
+Las preguntas largas pueden recibir un borrador de Ollama/Qwen y revisarse antes de guardarlo. Una inferencia local real se completó usando el hecho confirmado sobre el desarrollo de Meridian, sin convertir experiencias pasadas en empleo actual. Los filtros de redacción y la revisión humana siguen siendo necesarios. Datos demográficos y de inmigración no se pasan al generador.
+
+Validación de esta actualización:
+
+- La ejecución completa inicial obtuvo 212 pruebas correctas y un fallo de migración de una copia antigua; se corrigió la creación idempotente de la tabla de respuestas. Las 12 pruebas posteriores de perfil, redacción y backup pasaron.
+- Las 29 pruebas de navegador/API pasaron. Tras el último ajuste del contexto de casillas, las 5 regresiones de Trainline, preguntas inline y Greenhouse también pasaron. Se comprueban guardado, reutilización explícita, campos opcionales, aislamiento frente a JavaScript de la página, borradores y ausencia de envíos antes de aprobar.
+- 3 pruebas Rust correctas; Ruff, ESLint, TypeScript y comprobación de Rust correctos. Interfaz Profile revisada en copia aislada y app instalada.
+- Backend y frontend recompilados, ambas copias instaladas coinciden con los binarios construidos, firma estricta verificada y DMG con checksum válido. El manifiesto registra hashes y revisión `0006_browser_answers`.
+
+Capturas y logs personales permanecen en `.local-data/profile-release/`, excluido de Git. Los registros siguientes describen versiones anteriores; no sustituyen esta verificación. [Contrato del navegador y límites](BROWSER_AUTOMATION.md).
+
+## Verificación de la actualización — 30 de septiembre de 2026
 
 - **Apply with review** abre el navegador desde una oferta y exige permiso antes de rellenar cada sección, adjuntar archivos, avanzar y enviar. El consentimiento se conserva como requisito de esa candidatura; no activa reglas de envío para otras ofertas.
 - **202 pruebas Python y 3 Rust correctas**, lint y compilación nativa correctos. Los formularios locales prueban texto, selectores, radio, casillas, CV, navegación, rechazo de permisos repetidos/caducados y ausencia de envíos antes de la aprobación final. La restauración de backups antiguos incluye la migración del requisito de consentimiento.

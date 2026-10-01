@@ -343,6 +343,7 @@ export interface Field {
   label: string;
   type?:
     | "text"
+    | "date"
     | "textarea"
     | "number"
     | "select"

@@ -176,6 +176,7 @@ class BrowserManager(BrowserSession):
                     if settings.get('assisted_autofill') and not element.get('required') and classify_question(adapter.question(element)) in {*SENSITIVE, 'work_authorization'}:
                         explicit = profile_resolution(adapter.question(element), facts, element=element, policies=policies)
                         if explicit['answer'] is None:
+                            self._omitted[adapter.question(element)] = {'question': adapter.question(element), 'reason': 'Optional disclosure not provided; left unchanged without inferring personal data.'}
                             continue
                     operations = element["operations"]
                     if element["role"] == "combobox" and "CLICK" in operations and "SELECT" not in operations:

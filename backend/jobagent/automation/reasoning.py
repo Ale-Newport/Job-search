@@ -214,3 +214,25 @@ def profile_resolution(question, facts, *, element=None, policies=None, hints=No
                 0.75,
             )
     return direct
+
+
+def extractive_narrative(question, facts):
+    """A factual fallback for broad narratives, with no generated personal claims."""
+    text = normalize(question)
+    allowed = approved_facts(facts)
+    selected = []
+    if re.search(r"how.*(?:using|use) ai", text):
+        selected = [f for f in allowed if f.get('key') == 'ai_workflow']
+        if not selected:
+            selected = [f for f in allowed if f.get('category') == 'project' and re.search(r"\bi am using ai\b", normalize(f['value']))]
+        if len(selected) != 1:
+            return None
+    elif re.search(r"anything else.*share|tell us about yourself|professional (?:summary|background)", text):
+        for category in ('education', 'experience', 'project'):
+            candidates = [f for f in allowed if f.get('category') == category]
+            if candidates:
+                selected.append(candidates[0])
+    if not selected:
+        return None
+    answer = '\n\n'.join(f['value'] for f in selected)
+    return derived(question, answer, selected, 'Factual draft extracted from the general profile; review its relevance and wording.', .8)

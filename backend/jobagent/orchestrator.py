@@ -336,7 +336,7 @@ class Orchestrator:
     def field_reasoner(self, application, facts, config):
         from .automation.answers import classify_question, SENSITIVE, normalize, option_for
         from .application_profile import draft_fact_ids
-        from .automation.reasoning import derived
+        from .automation.reasoning import derived, extractive_narrative
         import re
 
         async def reason(question, element):
@@ -354,6 +354,11 @@ class Orchestrator:
             if not ids:
                 return None
             choices = [o['label'] for o in element.get('options', []) if o.get('value') and not o.get('disabled')]
+            def fallback():
+                result = extractive_narrative(question, facts) if element.get('tag') == 'textarea' and not choices else None
+                if result and element.get('max_length') and len(result['answer']) > element['max_length']:
+                    return None
+                return result
             try:
                 draft = await self.text_service.infer_field(config, question, application, ids, {
                     'type': element.get('type'), 'multiline': element.get('tag') == 'textarea',
@@ -361,7 +366,7 @@ class Orchestrator:
                     'max_length': element.get('max_length'),
                 })
                 if not draft:
-                    return None
+                    return fallback()
                 value = draft['answer']
                 if choices and not option_for(value, [{'label': c, 'value': c} for c in choices]):
                     return None
@@ -372,10 +377,10 @@ class Orchestrator:
                 evidence = [f for f in facts if f['id'] in draft['facts_used']]
                 return derived(question, value, evidence, 'AI inference from your general professional profile. Review wording and assumptions before submitting.', draft['confidence'])
             except (ValueError, TimeoutError):
-                return None
+                return fallback()
             except Exception:
                 # A provider outage must not prevent deterministic fields being filled.
-                return None
+                return fallback()
         return reason
 
     async def show_browser_question(self, run_id, application, result, facts):

@@ -159,3 +159,28 @@ def test_new_general_availability_supersedes_old_notice_answer_and_skip(tmp_path
     write_profile(db,'notice_period','2 weeks',True)
     knowledge,_ = application_knowledge(db,app,db.query("SELECT * FROM facts WHERE verification_status='verified'"))
     assert profile_resolution('Notice period',knowledge)['answer']=='2 weeks'
+
+
+async def test_inference_excludes_employer_context_and_rejects_contaminated_draft(tmp_path, monkeypatch):
+    import json
+    import httpx
+    from jobagent.text_ai import TextService
+    db=Database(tmp_path/'draft.sqlite')
+    write_profile(db,'general_context','I am using AI coding assistance to develop a local job-search application.',True)
+    identifier=db.one("select id from facts where key='general_context'")['id']
+    def respond(request):
+        content=json.loads(request.content)
+        assert json.loads(content['messages'][1]['content'])['job']=={}
+        return httpx.Response(200,json={'choices':[{'message':{'content':json.dumps({'answer':'At Trainline, I am currently using AI to develop an app.','facts_used':[identifier],'confidence':.99})}}]})
+    original=httpx.AsyncClient
+    monkeypatch.setattr(httpx,'AsyncClient',lambda **kwargs:original(transport=httpx.MockTransport(respond),**kwargs))
+    with pytest.raises(ValueError,match='application destination'):
+        await TextService(db,None).infer_field({'text_provider':'ollama','text_model':'fixture'},'How are you using AI?',{'company':'Trainline'},[identifier],{'multiline':True})
+
+
+def test_extractive_fallback_never_invents_an_answer_to_a_specific_unknown():
+    from jobagent.automation.reasoning import extractive_narrative
+    evidence=[dict(fact('project','I am using AI coding assistance to develop a local job-search application.'), category='project')]
+    result=extractive_narrative('How are you using AI in your work?',evidence)
+    assert result['answer']==evidence[0]['value'] and result['inferred']
+    assert extractive_narrative('How many years have you managed people?',evidence) is None

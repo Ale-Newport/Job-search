@@ -116,7 +116,7 @@ class TextService:
             {
                 "question": writing_question,
                 "today": date.today().isoformat(),
-                "job": {
+                "job": {} if _field is not None else {
                     "title": job.get("title"),
                     "company": job.get("company"),
                 },
@@ -221,6 +221,9 @@ class TextService:
         # Keep common invented motivation out of drafts; review is still required
         # because lexical checks cannot prove every sentence is entailed by a fact.
         source_text = "\n".join(fact["value"] for fact in facts).casefold()
+        company = str(job.get('company') or '').strip()
+        if _field is not None and company and company.casefold() in answer.casefold() and company.casefold() not in source_text:
+            raise ValueError('The draft confused the application destination with candidate evidence and was rejected')
         unsupported = [
             phrase
             for phrase in ("excited", "passionate", "enthusiastic", "eager", "confident", "perfect fit", "strong fit")

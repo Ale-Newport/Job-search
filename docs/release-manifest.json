@@ -1,31 +1,31 @@
 {
-  "verified_at": "2026-10-01T11:46:54.031537+00:00",
-  "source_commit": "f1fd32bbc937508fb946cb927cc8a0781fb0c9d4",
+  "verified_at": "2026-10-02T19:07:17.785488+00:00",
+  "source_commit": "1e37a876040b5f5a86ca5584d41f7f8234d1839f",
   "version": "0.1.0",
   "platform": "macOS 15+, Apple Silicon arm64",
   "installed_app": "/Users/alejandro/Applications/Meridian.app",
   "dmg": "/Users/alejandro/Projects/Job-search/src-tauri/target/release/bundle/dmg/Meridian_0.1.0_aarch64.dmg",
-  "dmg_sha256": "71d000ca5563e697d182fd4c61829c43bf103447af9c5f188e571df0bc7cba4a",
-  "dmg_bytes": 88175341,
+  "dmg_sha256": "a62b3e1fb5992433dbd557f3d7c3deec8d077512f91076844a81904a4b386f91",
+  "dmg_bytes": 88198589,
   "executables": {
     "meridian": {
-      "sha256": "d7c079dd97c745b0b3112f2ded65c537fb6729d8345b5854d58495533829d97d",
+      "sha256": "aa302e035ed3f442b94fcb14d4cf41edca08258a09e6e0a2163a6c11202ac66f",
       "installed_copy_matches_build": true,
       "system_copy_matches_build": true
     },
     "meridian-backend": {
-      "sha256": "22794cb7c4d60284261f7d456d1935708c90e513f2648c1638873f88773da34f",
+      "sha256": "041134bc8991820d79aaf16da3e14bf1bca7e02b22185c3c3a87ba0f72faad34",
       "installed_copy_matches_build": true,
       "system_copy_matches_build": true
     }
   },
   "database_revision": "0006_browser_answers",
   "production_record_counts": {
-    "facts": 111,
-    "jobs": 1747,
-    "applications": 2,
-    "email_messages": 47,
-    "browser_answers": 0
+    "facts": 119,
+    "jobs": 1805,
+    "applications": 3,
+    "email_messages": 48,
+    "browser_answers": 5
   },
   "validation": {
     "rust_tests_passed": 3,
@@ -50,7 +50,7 @@
     "section_consent_ui_manual": "passed",
     "native_europe_and_assisted_button": "passed",
     "trainline_final_targeted_regressions": 3,
-    "trainline_native_autofill": "passed for all available verified data; four required answers pending",
+    "trainline_native_autofill": "needs_review; 11 recorded answers; no browser questions pending; optional unknown disclosures blank",
     "stable_signing_across_rebuilds": "passed",
     "gmail_refresh_after_signed_update": "passed",
     "python_initial_full_run": {
@@ -63,7 +63,12 @@
     "final_trainline_inline_greenhouse_regressions_passed": 5,
     "native_profile_editor": "passed",
     "native_trainline_browser_question": "passed",
-    "ollama_grounded_question_draft": "passed; user review required"
+    "ollama_grounded_question_draft": "passed; user review required",
+    "python_tests_passed": 225,
+    "general_profile_targeted_tests_passed": 16,
+    "general_profile_native_trainline": "passed; availability and two long answers filled and marked for review",
+    "conditional_profile_browser_fixture": "passed; inapplicable saved values cleared, unknown conditions remain unresolved",
+    "ollama_general_profile_inference": "passed; unverified draft"
   },
   "signing": "Apple Development, stable designated requirement verified across rebuilds; not notarized",
   "real_applications_sent": 0,
@@ -72,7 +77,7 @@
     "sha256": "256719178a8e8542c13de8728a646e43332f8da62d4c8b9323425a9de9b5338e",
     "installed_copy_matches_build": true
   },
-  "validation_note": "This release: initial full Python run 212 passed / 1 old-backup migration failure; fix verified by 12 profile and backup tests. Browser/API regressions: 29 passed; final checkbox-context change: 5 browser regressions passed. Three Rust tests, lint, typecheck, packaged native Profile and real Trainline browser guide verified. Both installed app copies match build; strict signatures and DMG checksum verified. Prior validation entries are historical evidence. No real application sent.",
+  "validation_note": "Current release: full suite 225 Python and 3 Rust tests passed; 16 targeted profile, freshness, orchestration and grounding tests passed. Lint and typecheck passed. Real Trainline form verified from installed app: general availability and two long answers filled with inference badges. User supplied additional answers in the browser. Run reached needs_review with 11 answers and no pending browser questions. No application submitted by the assistant. Both installed copies match the build; strict signatures and DMG checksum verified. Other validation entries are historical evidence.",
   "gmail_account_verified": true,
   "real_email_initial_sync_verified": true,
   "daily_recommendations": {
@@ -85,32 +90,33 @@
   "real_application_autofill": {
     "company": "Trainline",
     "title": "Junior Machine Learning Engineer",
-    "run_id": "414c2524-7f1f-4aa8-ab45-e60b6ba2b3e6",
+    "run_id": "59a03556-a83e-4cf1-816b-9195d2681c79",
     "automatic_fields": [
       "name",
       "email",
       "LinkedIn",
       "resume",
-      "London, United Kingdom"
+      "London, United Kingdom",
+      "notice period Other",
+      "conditional earliest-start explanation",
+      "current AI use draft",
+      "additional professional context draft"
     ],
-    "pending_required_answers": [
-      "notice period",
-      "salary expectations",
-      "sponsorship now or in future",
-      "60% hybrid attendance"
-    ],
+    "pending_required_answers": [],
     "submitted": false,
-    "status": "browser_question",
-    "browser_questions_remaining": 13
+    "status": "needs_review",
+    "browser_questions_remaining": 0,
+    "recorded_answers": 11,
+    "pending_action": "Review inferred answers and optional disclosures; final submission requires explicit approval"
   },
   "application_profile": {
-    "editable_fields": 53,
-    "confirmed": 13,
-    "suggested": 5,
-    "unknown": 35,
+    "editable_fields": 57,
     "unknown_sensitive_values_inferred": false,
     "browser_answers_default_scope": "one application",
     "reusable_answers": "explicit opt-in with country/employer scope",
-    "long_answers": "reviewable drafts from verified professional evidence"
-  }
+    "long_answers": "Reviewable professional drafts with factual extract fallback",
+    "general_date_constraints_confirmed": true,
+    "historical_answers": "Newer general availability supersedes incompatible historical question answers"
+  },
+  "real_applications_sent_by_assistant": 0
 }

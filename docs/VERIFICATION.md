@@ -12,6 +12,8 @@ Validación final: **225 pruebas Python y 3 Rust correctas**, después de correg
 
 La prueba real detectó y permitió corregir contaminación del borrador por el nombre de la empresa de destino. La inferencia automática ya omite ese contexto y rechaza atribuciones no respaldadas; una regresión reproduce el fallo. El ensayo posterior con Ollama describió el proyecto actual y la experiencia pasada por separado. Los borradores generales pueden usar texto extraído directamente de hechos si la generación falla.
 
+La comprobación final en la app instalada volvió a abrir Trainline y mostró Other, la explicación de disponibilidad de septiembre de 2027 y dos respuestas largas con avisos ámbar. El usuario aportó respuestas adicionales desde el navegador. La ejecución terminó en `needs_review`, sin errores, con 11 respuestas registradas y ninguna pregunta pendiente del asistente. Los campos opcionales desconocidos permanecen vacíos y requieren la revisión del usuario si desea responderlos. No se pulsó Submit Application durante esta validación. Ambas copias instaladas coinciden con los binarios construidos; firmas estrictas y checksum del DMG correctos. El manifiesto registra el código y los hashes comprobados.
+
 Los apartados siguientes son evidencia histórica de versiones anteriores.
 
 # Perfil ampliado y preguntas en el navegador — 1 de octubre de 2026

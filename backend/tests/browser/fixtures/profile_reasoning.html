@@ -1,0 +1,14 @@
+<!doctype html><meta charset="utf-8"><title>General profile reasoning fixture</title>
+<style>body{font:16px system-ui;max-width:800px;margin:30px}label,fieldset{display:block;margin:22px 0}input,textarea,select{display:block;padding:8px;width:90%}input[type=radio]{display:inline;width:auto}</style>
+<h1>General profile application</h1>
+<form onsubmit="event.preventDefault();window.submissions++">
+<label>Name<input name="name" required></label>
+<label>What is your current notice period?<select name="notice" required><option value="">Choose</option><option>Immediately available</option><option>2 weeks</option><option>Other</option></select></label>
+<label>If you selected other to the above, please specify:<textarea id="notice_other"></textarea></label>
+<fieldset><legend>Do you require sponsorship?</legend><label><input type="radio" name="sponsor" value="Yes" required>Yes</label><label><input type="radio" name="sponsor" value="No" required>No</label></fieldset>
+<label>If you answered yes to the above, confirm your visa status:<input id="visa" value="stale value which must be removed"></label>
+<label>Earliest start date<input id="start" type="date" required></label>
+<label>Tell us about a technically challenging project.<textarea id="project" required></textarea></label>
+<label>Describe your gender<input id="gender"></label>
+<button type="submit">Submit Application</button>
+</form><script>window.submissions=0;</script>

@@ -8,7 +8,8 @@ from pathlib import Path
 import re
 
 from .adapters import get_adapter
-from .answers import normalize, option_for, resolve_answer, selected_choice_matches
+from .answers import normalize, option_for, selected_choice_matches, classify_question, SENSITIVE
+from .reasoning import conditional_state, profile_resolution
 from .browser import BrowserSession, confirmation_evidence
 from .browser import PROGRESS, is_submit
 from .engines import make_engine
@@ -27,6 +28,7 @@ class BrowserManager(BrowserSession):
         self.on_step = None
         self.decision_engine = None  # Optional injected engine, useful for integration tests.
         self._section_review = {}
+        self._omitted = {}
 
     async def authorize_section(self, application_id, snapshot_id):
         review = self._section_review.get(snapshot_id)
@@ -47,7 +49,7 @@ class BrowserManager(BrowserSession):
                 questions: list | None = None, steps: list | None = None,
                 evidence: list | None = None, adapter: str = "generic", error: str | None = None) -> dict:
         result = {"status": status, "answers": answers or [], "questions": questions or [], "steps": steps or [],
-                  "evidence": evidence or [], "snapshot_id": snapshot["id"] if snapshot else None,
+                  "evidence": evidence or [], "omitted": list(self._omitted.values()), "snapshot_id": snapshot["id"] if snapshot else None,
                   "current_url": snapshot["url"] if snapshot else self.status()["current_url"],
                   "adapter": adapter, "error": error, "application_id": self._active_application_id,
                   "validation_errors": snapshot.get("errors", []) if snapshot else [],
@@ -70,6 +72,7 @@ class BrowserManager(BrowserSession):
         self._active_application_id = application.get("id")
         self._review.clear()
         self._section_review.clear()
+        self._omitted.clear()
         section_consent = bool(settings.get("section_consent"))
         skip_optional = bool(settings.get("skip_optional_unknown"))
         section_grant = {tuple(key) for key in settings.get("_section_grant", [])}
@@ -81,6 +84,20 @@ class BrowserManager(BrowserSession):
         steps: list[dict] = []
         snapshot = None
         policies = settings.get("sensitive_policies", {})
+        reasoning_cache = {}
+
+        async def resolve(element):
+            field = adapter.question(element)
+            result = profile_resolution(field, facts, element=element, policies=policies,
+                                       hints=[element.get("name", ""), element.get("autocomplete", "")])
+            callback = settings.get("_reason_answer")
+            if result['answer'] is None and not result['leave_blank'] and callback and settings.get('assisted_autofill'):
+                key = (field, element.get('type'), tuple(o.get('label', '') for o in element.get('options', [])))
+                if key not in reasoning_cache:
+                    reasoning_cache[key] = await callback(field, element)
+                result = reasoning_cache[key] or result
+            return result
+
         self.allowed_uploads = {Path(d["path"]).resolve() for d in documents if d.get("path") and Path(d["path"]).is_file()}
         try:
             self._check_pause()
@@ -137,15 +154,32 @@ class BrowserManager(BrowserSession):
                         return self._result("human_required", snapshot, answers=answers, steps=steps, adapter=adapter.name,
                                             questions=[{"question": resolution["question"], "kind": "option",
                                                         "reason": "The selected dropdown value could not be independently verified."}])
-                    self._add_answer(answers, {k: resolution[k] for k in ("question", "answer", "fact_ids", "verified", "confidence", "kind")})
+                    self._add_answer(answers, dict(resolution))
                     pending_dropdown = None
                     continue
                 for element in snapshot["elements"]:
+                    condition = conditional_state(element, snapshot['elements'], adapter)
+                    element['_condition'] = condition or {}
+                    self._omitted.pop(adapter.question(element), None)
+                    if condition and condition['applies'] is False:
+                        self._omitted[adapter.question(element)] = {'question': adapter.question(element), 'reason': condition['reason']}
+                    if condition and condition['applies'] is not True:
+                        if condition['applies'] is None and element.get('required'):
+                            questions.append({'question': adapter.question(element), 'kind': 'conditional', 'reason': condition['reason']})
+                        # Inapplicable fields must remain blank even when an exact saved answer exists.
+                        elif condition['applies'] is False and element.get('value') and 'TYPE_TEXT' in element['operations']:
+                            action, value = Decision(Operation.TYPE_TEXT, element['index']), ''
+                            break
+                        continue
                     if not element.get("required") and normalize(adapter.question(element)) in settings.get("_skipped_questions", []):
                         continue
+                    if settings.get('assisted_autofill') and not element.get('required') and classify_question(adapter.question(element)) in {*SENSITIVE, 'work_authorization'}:
+                        explicit = profile_resolution(adapter.question(element), facts, element=element, policies=policies)
+                        if explicit['answer'] is None:
+                            continue
                     operations = element["operations"]
                     if element["role"] == "combobox" and "CLICK" in operations and "SELECT" not in operations:
-                        resolution = resolve_answer(adapter.question(element), facts, policies=policies)
+                        resolution = await resolve(element)
                         if resolution["leave_blank"] and not element.get("required"):
                             continue
                         if resolution["answer"] is None:
@@ -153,7 +187,7 @@ class BrowserManager(BrowserSession):
                                 questions.append({"question": adapter.question(element), "kind": resolution["kind"], "required": element.get("required", False)})
                             continue
                         if not element.get("expanded") and selected_choice_matches(resolution["question"], resolution["answer"], element.get("selected_text") or element.get("value", "")):
-                            self._add_answer(answers, {k: resolution[k] for k in ("question", "answer", "fact_ids", "verified", "confidence", "kind")})
+                            self._add_answer(answers, dict(resolution))
                             continue
                         pending_dropdown = {"resolution": resolution, "node_id": element["node_id"],
                                             "document_id": element["document_id"]}
@@ -184,7 +218,7 @@ class BrowserManager(BrowserSession):
                         self._add_answer(answers, {"question": field, "answer": filename, "fact_ids": [],
                                                   "document_version_id": document.get("id"), "verified": True})
                         break
-                    resolution = resolve_answer(field, facts, hints=[element.get("name", ""), element.get("autocomplete", "")], policies=policies)
+                    resolution = await resolve(element)
                     if resolution["leave_blank"]:
                         if element.get("required"):
                             questions.append({"question": field, "kind": resolution["kind"], "reason": "This field is required but your policy is to leave it blank."})
@@ -229,7 +263,7 @@ class BrowserManager(BrowserSession):
                         desired = truth in {"yes", "true", "1"}
                         if desired != element["checked"]:
                             operation = Operation.CHECK if desired else Operation.UNCHECK
-                    self._add_answer(answers, {k: resolution[k] for k in ("question", "answer", "fact_ids", "verified", "confidence", "kind")})
+                    self._add_answer(answers, dict(resolution))
                     handled.add(signature)
                     if operation:
                         action = Decision(operation, element["index"])
@@ -334,6 +368,26 @@ class BrowserManager(BrowserSession):
         except Exception as error:
             self._last_error = str(error)[:500]
             return self._result("error", snapshot, answers=answers, steps=steps, adapter=adapter.name, error=self._last_error)
+
+    async def mark_inferred_answers(self, result):
+        """Visible, non-interactive review badges; never modify field values/labels."""
+        from importlib.resources import files
+        source = files('jobagent').joinpath('automation/inference_badges.js').read_text()
+        snapshot, refs = self._snapshots.get(result.get('snapshot_id'), ({}, {}))
+        adapter = get_adapter(result.get('current_url', ''), result.get('adapter'))
+        notes = {a['question']: a for a in result.get('answers', []) if a.get('inferred')}
+        for frame in self.page.frames if self.page and not self.page.is_closed() else []:
+            entries = []
+            for element in snapshot.get('elements', []):
+                answer = notes.get(adapter.question(element))
+                ref = refs.get(element['index'])
+                if answer and ref and ref[0] == frame:
+                    entries.append({'node_id': ref[1], 'document_id': ref[2], 'reason': answer['reason']})
+            try:
+                await frame.evaluate(source, entries)
+            except Exception:
+                # Cosmetic annotations must not turn an unavailable frame into a failed run.
+                pass
 
     async def submit(self, snapshot_id: str | None, settings: dict | None = None) -> dict:
         """Call only after root policy/approval checks; one-use approval is bound to a fresh form."""

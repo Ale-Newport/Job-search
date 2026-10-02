@@ -19,7 +19,7 @@ export function ApplicationProfile({ ctx }: { ctx: AppContext }) {
   return (
     <Panel
       title="Application profile"
-      description="Contact details, preferences and answers beyond your CV. Confirmed answers can fill forms; suggestions remain drafts until you accept them."
+      description="Your general profile: education, availability, experience and preferences. Meridian derives form answers from these facts and marks inferred answers for review."
     >
       <Resource {...r} retry={r.reload}>
         <div className="application-profile-body">
@@ -106,9 +106,7 @@ export function ApplicationProfile({ ctx }: { ctx: AppContext }) {
             ))}
           </div>
           <p className="panel-copy">
-            New questions appear beside the employer’s form. AI can draft longer
-            answers from verified experience; you can edit and confirm them
-            there. Optional disclosures can stay blank.
+            Meridian uses your general profile to fill new questions, including written answers. Inferred answers are marked for review and never become verified facts automatically. Conditional questions stay blank when they do not apply. Missing personal disclosures are handled in the browser.
           </p>
           {!!r.data?.answers?.length && (
             <details>
@@ -168,8 +166,8 @@ export function ApplicationProfile({ ctx }: { ctx: AppContext }) {
                   ? "textarea"
                   : edit.type === "number"
                     ? "number"
-                    : edit.type === "date"
-                      ? "date"
+                    : edit.type === "date" || edit.type === "month"
+                      ? edit.type
                       : "text",
               options: edit.options?.length
                 ? [{ value: "", label: "Not provided" }, ...edit.options]

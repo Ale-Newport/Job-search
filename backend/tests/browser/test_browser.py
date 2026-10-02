@@ -502,16 +502,43 @@ async def test_orchestrator_inline_answers_draft_skip_resume_and_no_submission(t
         assert (await state())["answer"] == "I built a Python automation project."
         assert await service.browser.page.locator("textarea").input_value() == ""
         await click("button.primary")
-        for _ in range(500):
-            if not service.running and service.prompt.cdp and (await state())["question"] == "Describe your gender":
-                break
-            await asyncio.sleep(0.02)
-        assert await service.browser.page.locator("textarea").input_value() == "I built a Python automation project."
-        await click(".row button")  # Leave optional sensitive question blank.
         run = await wait_status("needs_review")
+        assert await service.browser.page.locator("textarea").input_value() == "I built a Python automation project."
+        # Unknown optional disclosures now stay blank without interrupting filling.
+        assert await service.browser.page.get_by_label("Describe your gender").input_value() == ""
         assert not json.loads(run["checkpoint"])["questions"]
         assert await service.browser.page.evaluate("window.submissions") == 0
-        assert db.one("SELECT count(*) AS n FROM browser_answers")["n"] == 3
+        assert db.one("SELECT count(*) AS n FROM browser_answers")["n"] == 2
         assert all(row["reusable"] == 0 for row in db.query("SELECT * FROM browser_answers"))
     finally:
         await service.close()
+
+
+async def test_general_profile_fills_infers_skips_conditions_and_marks_review(browser, fixture_server):
+    candidate = [fact('full_name','Alex Example'), fact('earliest_start_month','2027-09'),
+                 fact('masters_completion_month','2027-09'),fact('sponsorship_required','No'),
+                 fact('If you answered yes to the above, confirm your visa status:', 'must never be filled'),
+                 fact('project','Developed retrieval system',category='project')]
+    calls=[]
+    async def reason(question, element):
+        from jobagent.automation.reasoning import derived
+        calls.append(question)
+        if question=='Tell us about a technically challenging project.':
+            return derived(question,'I developed a retrieval system.',[candidate[-1]],'AI draft from professional profile.',.6)
+    result = await browser.fill_application({'id':'reasoning','url':fixture_server+'/profile_reasoning.html'}, candidate, [], settings={'assisted_autofill':True,'_reason_answer':reason})
+    assert result['status']=='needs_review', result
+    assert await browser.page.locator('[name=notice]').input_value()=='Other'
+    assert 'September 2027' in await browser.page.locator('#notice_other').input_value()
+    assert await browser.page.locator('#visa').input_value()==''
+    assert await browser.page.locator('#gender').input_value()==''
+    assert await browser.page.locator('#start').input_value()=='2027-09-01'
+    assert await browser.page.locator('#project').input_value()=='I developed a retrieval system.'
+    assert len(calls)==1, calls
+    assert len([a for a in result['answers'] if a.get('inferred')])==4
+    assert all(not a['verified'] for a in result['answers'] if a.get('inferred'))
+    assert await browser.page.evaluate('window.submissions')==0
+    await browser.mark_inferred_answers(result)
+    assert await browser.page.locator('[data-meridian-inference-badge]').count()==4
+    # Visible badges must not invalidate the approval snapshot.
+    await browser._validate_snapshot(result['snapshot_id'])
+    assert await browser.page.evaluate('window.submissions')==0

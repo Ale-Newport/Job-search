@@ -875,16 +875,18 @@ export function ApplicationDetail({
                       <div className="row-between">
                         <h4>{v.question}</h4>
                         <Status
-                          value={v.verified ? "verified" : "unverified"}
+                          value={v.inferred ? "Inferred · review" : v.verified ? "verified" : "unverified"}
                         />
                       </div>
                       <p className="prose-text">{v.answer}</p>
+                      {v.reason && <p className="muted">{v.reason}</p>}
                       <JsonDetails
                         title="Why this answer? View evidence"
                         data={{
                           fact_ids: v.fact_ids || v.facts_used,
                           evidence: v.evidence,
                           confidence: v.confidence,
+                          reason: v.reason,
                           source: v.source,
                         }}
                       />
@@ -1259,9 +1261,10 @@ function Approval({
                 <div className="answer-card" key={v.id || i}>
                   <div className="row-between">
                     <h4>{v.question}</h4>
-                    <Status value={v.verified ? "verified" : "unverified"} />
+                    <Status value={v.inferred ? "Inferred · review" : v.verified ? "verified" : "unverified"} />
                   </div>
                   <p>{v.answer}</p>
+                  {v.reason && <p className="muted">{v.reason}</p>}
                   <small>
                     Supporting facts:{" "}
                     {(v.fact_ids || v.facts_used || []).join(", ") ||

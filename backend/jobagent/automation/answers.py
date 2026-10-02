@@ -29,7 +29,7 @@ ALIASES = {
     "university": ["university", "school", "school name", "institution"],
     "degree": ["degree", "degree type", "qualification"],
     "field_of_study": ["field of study", "major", "subject"],
-    "graduation_year": ["graduation year", "year of graduation"],
+    "graduation_year": ["graduation year", "year of graduation", "what is your graduation year", "expected graduation year"],
     "current_company": ["current company", "current employer"],
     "current_title": ["current title", "current job title", "job title"],
     "expected_salary": ["expected salary", "salary expectation", "salary expectations", "desired salary", "what are your salary expectations"],

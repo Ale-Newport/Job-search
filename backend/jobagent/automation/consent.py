@@ -2,7 +2,9 @@
 
 from pathlib import Path
 
-from .answers import normalize, option_for, resolve_answer, selected_choice_matches
+from .reasoning import conditional_state, profile_resolution
+
+from .answers import normalize, option_for, selected_choice_matches
 
 
 def action_key(element, operation, value=None, file_path=None, upload_name=None):
@@ -22,6 +24,13 @@ def section_plan(snapshot, target, adapter, facts, documents, policies, document
     for element in snapshot["elements"]:
         if element["document_id"] != target["document_id"] or element.get("section_id", "page") != section:
             continue
+        condition = conditional_state(element, snapshot['elements'], adapter)
+        element['_condition'] = condition or {}
+        if condition and condition['applies'] is not True:
+            if condition['applies'] is False and element.get('value') and 'TYPE_TEXT' in element['operations']:
+                keys.append(action_key(element, 'TYPE_TEXT', ''))
+                fields.append({'question': adapter.question(element), 'answer': '', 'operation': 'TYPE_TEXT', 'reason': condition['reason']})
+            continue
         ops = element["operations"]
         question = adapter.question(element)
         operation, value, file_path, filename = None, None, None, None
@@ -37,8 +46,8 @@ def section_plan(snapshot, target, adapter, facts, documents, policies, document
             answer = filename
             evidence = {"document_version_id": document.get("id"), "fact_ids": []}
         else:
-            resolved = resolve_answer(
-                question, facts, hints=[element.get("name", ""), element.get("autocomplete", "")], policies=policies
+            resolved = profile_resolution(
+                question, facts, element=element, hints=[element.get("name", ""), element.get("autocomplete", "")], policies=policies
             )
             answer = resolved["answer"]
             if answer is None or resolved["leave_blank"]:

@@ -286,9 +286,14 @@ class Orchestrator:
                 from .usage import decision_settings
 
                 config = decision_settings(self.db, config, SecretStore())
+                if config['assisted_autofill'] and self.text_service:
+                    config['_reason_answer'] = self.field_reasoner(application, facts, config)
                 result = await self.browser.fill_application(
                     application, facts, documents, application["mode"].upper(), config
                 )
+                annotate = getattr(self.browser, 'mark_inferred_answers', None)
+                if annotate:
+                    await annotate(result)
                 used = {identifier for answer in result.get("answers", []) for identifier in answer.get("fact_ids", [])}
                 result["facts_snapshot"] = [fact for fact in facts if fact["id"] in used]
                 result["evidence_at"] = evidence_at
@@ -327,6 +332,51 @@ class Orchestrator:
         finally:
             self.running = False
             self.active_run = None
+
+    def field_reasoner(self, application, facts, config):
+        from .automation.answers import classify_question, SENSITIVE, normalize, option_for
+        from .application_profile import draft_fact_ids
+        from .automation.reasoning import derived
+        import re
+
+        async def reason(question, element):
+            kind = classify_question(question)
+            # Missing sensitive facts and commitments cannot be made true by an LLM.
+            if kind in {*SENSITIVE, 'work_authorization', 'salary', 'contact', 'identity'} or re.search(
+                r'passport|national insurance|social security|password|bank|\bpin\b|\botp\b|signatur|'
+                r'commit|willing|relocat|travel|hybrid|office attend|notice period|start date|available|'
+                r'current (?:employer|company|job)|\baddress\b|\bphone\b|\bemail\b', normalize(question)
+            ):
+                return None
+            if element.get('type') in {'date', 'month', 'email', 'tel', 'url', 'file', 'password'}:
+                return None
+            ids = draft_fact_ids(facts, question)
+            if not ids:
+                return None
+            choices = [o['label'] for o in element.get('options', []) if o.get('value') and not o.get('disabled')]
+            try:
+                draft = await self.text_service.infer_field(config, question, application, ids, {
+                    'type': element.get('type'), 'multiline': element.get('tag') == 'textarea',
+                    'options': choices, 'description': element.get('description', ''),
+                    'max_length': element.get('max_length'),
+                })
+                if not draft:
+                    return None
+                value = draft['answer']
+                if choices and not option_for(value, [{'label': c, 'value': c} for c in choices]):
+                    return None
+                if element.get('type') == 'number' and not re.fullmatch(r'\d+(?:\.\d+)?', value):
+                    return None
+                if element.get('max_length') and len(value) > element['max_length']:
+                    return None
+                evidence = [f for f in facts if f['id'] in draft['facts_used']]
+                return derived(question, value, evidence, 'AI inference from your general professional profile. Review wording and assumptions before submitting.', draft['confidence'])
+            except (ValueError, TimeoutError):
+                return None
+            except Exception:
+                # A provider outage must not prevent deterministic fields being filled.
+                return None
+        return reason
 
     async def show_browser_question(self, run_id, application, result, facts):
         from .application_profile import question_field, profile, draft_fact_ids, remember_answer
@@ -410,6 +460,10 @@ class Orchestrator:
         self.db.execute("UPDATE automation_runs SET status='browser_question',checkpoint=?,updated_at=? WHERE id=?", (json.dumps(result), now(), run_id))
 
     def persist_result(self, run_id, application_id, result):
+        for omitted in result.get('omitted', []):
+            self.db.execute('DELETE FROM application_answers WHERE application_id=? AND question=?', (application_id, omitted['question']))
+            self.db.execute("UPDATE human_tasks SET status='resolved',answer=?,updated_at=? WHERE application_id=? AND question=?",
+                            ('Not applicable: '+omitted['reason'], now(), application_id, omitted['question']))
         for answer in result.get("answers", []):
             question = answer.get("question", answer.get("label", "Field"))
             self.db.execute(

@@ -90,6 +90,8 @@
     elements.push({node_id: identity(node), role, tag, type, explicit_type: node.getAttribute('type'),
       label: role === 'combobox' || role === 'upload' ? question || label(node) : label(node), ...sectionFor(node),
       upload_proxy_id: proxy && visible(proxy) ? identity(proxy) : null,
+      form_id: node.closest('form') ? identity(node.closest('form')) : 'page',
+      max_length: node.maxLength > 0 ? node.maxLength : null,
       field_path: fieldFor(node)?.getAttribute('data-field-path') || '',
       expanded: node.getAttribute('aria-expanded') === 'true',
       value: type === 'file' ? [...node.files || []].map(f => f.name).join(', ') :
@@ -107,7 +109,7 @@
         (tag !== 'input' && tag !== 'select' ? node.innerText : '') : '',
       context: question || (role === 'checkbox' && fieldFor(node)?.querySelector('.ashby-application-form-question-description')?.innerText) || node.closest('fieldset')?.querySelector('legend')?.innerText ||
         node.closest('[role="group"],[role="radiogroup"]')?.getAttribute('aria-label') || '',
-      description: (fieldFor(node)?.querySelector('.ashby-application-form-question-description')?.innerText || '').slice(0, 1600),
+      description: (fieldFor(node)?.querySelector('.ashby-application-form-question-description')?.innerText || (node.getAttribute('aria-describedby') || '').split(/\s+/).map(id => document.getElementById(id)?.textContent || '').join(' ')).slice(0, 1600),
       in_viewport: rect.bottom > 0 && rect.top < innerHeight && rect.right > 0 && rect.left < innerWidth
     });
   }

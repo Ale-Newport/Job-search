@@ -1,3 +1,17 @@
+# Razonamiento desde el perfil general — 2 de octubre de 2026
+
+El perfil incorpora campos generales de fin del máster, mes más temprano para empezar, situación laboral/estudios y contexto profesional. Las fechas proporcionadas por el usuario se guardan confirmadas en producción, con backup previo; no se incluyen datos personales en Git.
+
+El motor deriva disponibilidad, año de graduación y comparaciones con meses de incorporación. Distingue disponibilidad de preaviso contractual: puede elegir Other y explicar la disponibilidad en el campo condicional. Un día exacto propuesto se marca explícitamente como inferencia revisable. Las respuestas existentes confirmadas tienen prioridad.
+
+Las preguntas profesionales nuevas se pueden completar usando Ollama y hechos del perfil, aunque nunca se haya guardado esa pregunta. Las inferencias permanecen sin verificar, con aviso ámbar junto al campo y explicación en Answers. Los datos sensibles, compromisos y cantidades desconocidos no se fabrican. Una pregunta requerida sin respuesta respaldada continúa dentro del navegador. No se garantiza cobertura universal de todos los ATS.
+
+Se evalúan los campos condicionales antes de resolver respuestas: las opciones Other/Yes/No y opciones entre comillas se contrastan con la selección observada en el mismo formulario. Las referencias explícitas tienen prioridad sobre la proximidad. Si no corresponde, el campo se deja vacío; se limpian textos antiguos y registros de respuestas que ya no aplican.
+
+Validación: **222 pruebas Python y 3 Rust correctas**, después de corregir las regresiones iniciales de revisión y alias de fecha. Ruff, ESLint, TypeScript y Rust correctos. La nueva prueba real de Chrome sobre un ATS aislado comprueba derivación sin respuestas guardadas, borrador nuevo, exclusión condicional incluso con un valor guardado, avisos de inferencia, validez del snapshot y cero envíos. Inferencia adicional con Ollama local completada y conservada como respuesta sin verificar. Los logs y resultados personales están en `.local-data/reasoning-release/`.
+
+Los apartados siguientes son evidencia histórica de versiones anteriores.
+
 # Perfil ampliado y preguntas en el navegador — 1 de octubre de 2026
 
 La versión instalada en ambas carpetas Applications incluye **53 campos editables**, respuestas guardadas por candidatura y el asistente dentro de Chrome. El perfil real conserva los hechos contrastados del CV: muestra 13 campos confirmados, 5 sugerencias revisables y 35 desconocidos. Los datos personales sensibles no se han inferido. Las sugerencias y los borradores no se utilizan como hechos confirmados.

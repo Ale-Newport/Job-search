@@ -88,7 +88,11 @@ FIELDS = [
         "Availability & compensation",
         aliases=["if you selected other please specify", "if you selected other to the above please specify"],
     ),
-    field("availability", "Earliest start date", "Availability & compensation", kind="date"),
+    field("availability", "Exact earliest start date (if agreed)", "Availability & compensation", kind="date"),
+    field("earliest_start_month", "Earliest start month (YYYY-MM)", "Availability & compensation", kind="month"),
+    field("masters_completion_month", "Master’s completion month (YYYY-MM)", "Education & experience", kind="month"),
+    field("employment_status", "Current employment / study situation", "Education & experience", multiline=True),
+    field("general_context", "General professional context and preferences", "Written answers", multiline=True),
     field(
         "expected_salary_uk",
         "Expected annual salary (GBP, UK roles)",
@@ -285,6 +289,8 @@ def write_profile(db, key, value, confirmed, note="Entered in application profil
     f = BY_KEY[key]
     if f["type"] == "number" and value and (not re.fullmatch(r"\d+(?:\.\d+)?", value) or float(value) > 1e9):
         raise ValueError("Enter a nonnegative number without a currency symbol")
+    if f["type"] == "month" and value and not re.fullmatch(r"\d{4}-(?:0[1-9]|1[0-2])", value):
+        raise ValueError("Enter a month as YYYY-MM")
     if f["type"] == "date" and value:
         from datetime import date
 
@@ -448,7 +454,7 @@ def draft_fact_ids(facts, question):
         f
         for f in facts
         if f["category"] in {"experience", "project", "education", "skill", "language"}
-        or f["key"] in {"ai_workflow", "professional_summary", "motivation", "achievement"}
+        or f["key"] in {"ai_workflow", "professional_summary", "motivation", "achievement", "general_context", "employment_status", "earliest_start_month", "masters_completion_month", "preferred_roles", "preferred_locations", "employment_type", "workplace_preference", "current_company", "current_title"}
     ]
     tokens = set(normalize(question).split()) - {"what", "your", "you", "are", "the", "and", "how", "work"}
     return [

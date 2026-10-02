@@ -1049,7 +1049,15 @@ def application_detail(application_id: str, request: Request):
             decode_row(row)
             for row in db.query(f"SELECT * FROM {table} WHERE application_id=? ORDER BY created_at", (application_id,))
         ]
+    latest_answers = {
+        a['question']: a for a in (result['runs'][-1].get('checkpoint', {}).get('answers', []) if result['runs'] else [])
+    }
     for answer in result["answers"]:
+        latest = latest_answers.get(answer['question'], {})
+        if not answer['verified'] and latest.get('answer') == answer['answer']:
+            for key in ('inferred', 'requires_review', 'reason', 'confidence'):
+                if key in latest:
+                    answer[key] = latest[key]
         answer["evidence"] = historical_facts(db, answer["fact_ids"], answer["created_at"])
     result["documents"] = [
         decode_row(row)

@@ -120,7 +120,7 @@ export function ApplicationProfile({ ctx }: { ctx: AppContext }) {
                       <strong>{a.question}</strong>
                       <p>{a.action === "skip" ? "Left blank" : a.answer}</p>
                       <small>
-                        {a.reusable
+                        {a.superseded ? "Superseded by newer general profile details · not used" : a.reusable
                           ? `Reusable${a.scope ? ` · ${a.scope}` : ""}`
                           : "This application only"}
                       </small>

@@ -135,3 +135,27 @@ async def test_semantic_drafts_use_professional_facts_and_remain_unverified(tmp_
         "What is your current employer?",
     ]:
         assert await reason(q, {"tag": "textarea"}) is None
+
+
+def test_new_general_availability_supersedes_old_notice_answer_and_skip(tmp_path):
+    from jobagent.application_profile import remember_answer, application_knowledge, profile
+    from jobagent.discovery import ingest_job
+    from jobagent.core import prepare_application
+    db = Database(tmp_path / 'freshness.sqlite')
+    job = ingest_job(db, {'title':'Engineer','company':'Trainline','location':'London','url':'https://example.test/job'})[0]
+    app = {**prepare_application(db,job['id']), 'company':'Trainline','location':'London'}
+    remember_answer(db,app,'What is your current notice period?','6 months')
+    remember_answer(db,app,'If you selected other to the above, please specify:','',skip=True)
+    # Explicit timestamps make recency deterministic, even on coarse clocks.
+    db.execute("UPDATE browser_answers SET updated_at='2026-10-01T00:00:00+00:00'")
+    write_profile(db,'earliest_start_month','2027-09',True)
+    knowledge,skipped = application_knowledge(db,app,db.query("SELECT * FROM facts WHERE verification_status='verified'"))
+    resolved = profile_resolution('What is your current notice period?',knowledge,element={'role':'combobox'})
+    assert resolved['answer']=='Other' and resolved['inferred']
+    assert not skipped
+    assert all(row['superseded'] for row in profile(db)['answers'])
+    assert db.one('SELECT count(*) AS n FROM browser_answers')['n']==2
+    # A deliberately supplied contractual notice in the general profile is still used.
+    write_profile(db,'notice_period','2 weeks',True)
+    knowledge,_ = application_knowledge(db,app,db.query("SELECT * FROM facts WHERE verification_status='verified'"))
+    assert profile_resolution('Notice period',knowledge)['answer']=='2 weeks'

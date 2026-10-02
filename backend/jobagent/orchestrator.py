@@ -481,6 +481,11 @@ class Orchestrator:
                     result.get("evidence_at", now()),
                 ),
             )
+            self.db.execute(
+                "UPDATE human_tasks SET status='resolved',answer=?,updated_at=? WHERE application_id=? AND question=? AND status='open'",
+                ('Filled from profile; review inferred wording before submission' if answer.get('inferred') else str(answer.get('answer', '')),
+                 now(), application_id, question),
+            )
         # Steps are persisted immediately by on_step, including before a crash.
         for question in result.get("questions", []):
             self.human_task(

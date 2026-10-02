@@ -237,6 +237,29 @@ for key, alias in {
     BY_KEY[key]["aliases"].append(alias)
 
 
+def memory_superseded(db, question, updated_at):
+    """Concrete newer profile constraints supersede old form-specific guesses/skips.
+
+    A saved general contractual notice remains authoritative. We do not delete
+    history or turn an old question response into a global employment fact.
+    """
+    key = canonical_key(question)
+    norm = normalize(question)
+    if norm in BY_KEY['notice_other']['aliases']:
+        key = 'notice_other'
+    dependencies = {
+        'notice_period': ['earliest_start_month', 'notice_period'],
+        'notice_other': ['earliest_start_month', 'notice_period', 'notice_other'],
+        'availability': ['earliest_start_month', 'availability'],
+        'graduation_year': ['masters_completion_month'],
+    }.get(key, [])
+    for dependency in dependencies:
+        row = db.one('SELECT updated_at FROM facts WHERE source=?', ('application_profile:'+dependency,))
+        if row and row['updated_at'] > updated_at:
+            return True
+    return False
+
+
 def profile(db):
     facts = db.query("SELECT * FROM facts ORDER BY updated_at")
     rows = []
@@ -277,6 +300,8 @@ def profile(db):
     memory = db.query(
         "SELECT m.*,f.value AS answer,f.verification_status FROM browser_answers m JOIN facts f ON m.fact_id=f.id ORDER BY m.updated_at DESC"
     )
+    for row in memory:
+        row['superseded'] = memory_superseded(db, row['question'], row['updated_at'])
     return {"fields": rows, "answers": memory}
 
 
@@ -367,6 +392,8 @@ def application_knowledge(db, application, facts):
         "SELECT m.*,f.* FROM browser_answers m JOIN facts f ON f.id=m.fact_id WHERE m.application_id=? OR m.reusable=1",
         (application["id"],),
     ):
+        if memory_superseded(db, row['question'], row['updated_at']):
+            continue
         if row["verification_status"] != "verified" or not scope_matches(row["scope"], application):
             continue
         if row["action"] == "skip":

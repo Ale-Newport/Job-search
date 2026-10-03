@@ -1,122 +1,101 @@
 {
-  "verified_at": "2026-10-02T19:07:17.785488+00:00",
-  "source_commit": "1e37a876040b5f5a86ca5584d41f7f8234d1839f",
+  "verified_at": "2026-10-03T11:11:11.150665+00:00",
+  "source_commit": "05e70dd4de581f6a9f841505a423c10c3f857e4e",
   "version": "0.1.0",
   "platform": "macOS 15+, Apple Silicon arm64",
-  "installed_app": "/Users/alejandro/Applications/Meridian.app",
+  "installed_apps": [
+    "/Applications/Meridian.app",
+    "/Users/alejandro/Applications/Meridian.app"
+  ],
   "dmg": "/Users/alejandro/Projects/Job-search/src-tauri/target/release/bundle/dmg/Meridian_0.1.0_aarch64.dmg",
-  "dmg_sha256": "a62b3e1fb5992433dbd557f3d7c3deec8d077512f91076844a81904a4b386f91",
-  "dmg_bytes": 88198589,
+  "dmg_sha256": "cb048ceb2e254c8f90bc6c1f2d563c9b3e47578051f10371c6438bca150746fd",
+  "dmg_bytes": 88219580,
   "executables": {
     "meridian": {
-      "sha256": "aa302e035ed3f442b94fcb14d4cf41edca08258a09e6e0a2163a6c11202ac66f",
-      "installed_copy_matches_build": true,
-      "system_copy_matches_build": true
+      "sha256": "d16d56ebf299eb86b0f442d509bb2bbf8b6acb68dab5128a48e2a6446e21e15f",
+      "system_copy_matches_build": true,
+      "installed_copy_matches_build": true
     },
     "meridian-backend": {
-      "sha256": "041134bc8991820d79aaf16da3e14bf1bca7e02b22185c3c3a87ba0f72faad34",
-      "installed_copy_matches_build": true,
-      "system_copy_matches_build": true
+      "sha256": "db5c3200389a297c1bb8700d66503e1cbceacb34bbd2141b6f9a39ec130cc892",
+      "system_copy_matches_build": true,
+      "installed_copy_matches_build": true
     }
   },
-  "database_revision": "0006_browser_answers",
+  "database_revision": "0007_candidate_intelligence",
   "production_record_counts": {
-    "facts": 119,
-    "jobs": 1805,
-    "applications": 3,
-    "email_messages": 48,
-    "browser_answers": 5
+    "facts": 247,
+    "jobs": 1870,
+    "applications": 4,
+    "email_messages": 49,
+    "browser_answers": 5,
+    "knowledge_entities": 55,
+    "knowledge_facts": 128,
+    "knowledge_relationships": 53,
+    "candidate_policies": 2
   },
   "validation": {
+    "python_tests_passed": 795,
     "rust_tests_passed": 3,
-    "ui_e2e_flows_passed": 3,
+    "candidate_intelligence_tests_passed": 564,
+    "generated_semantic_questions": 500,
     "lint": "passed",
     "typecheck": "passed",
-    "native_launch": "passed",
-    "chrome_from_packaged_app": "passed",
-    "laya_from_packaged_app": "passed",
-    "codesign_deep_strict": "passed",
+    "production_build": "passed",
+    "codesign_deep_strict": "passed for both installed copies",
     "dmg_checksum": "passed",
-    "python_followup_targeted_tests_passed": 25,
-    "brand_vectors_and_native_ui": "passed",
-    "email_oauth_targeted_tests_passed": 43,
-    "email_connection_ui_flow": "passed",
-    "native_email_keychain_progress": "passed",
-    "daily_tracking_targeted_tests_passed": 19,
-    "daily_tracking_ui_manual": "passed",
-    "public_source_import": "passed",
-    "native_daily_and_tracker": "passed",
-    "section_consent_browser_and_api": "passed",
-    "section_consent_ui_manual": "passed",
-    "native_europe_and_assisted_button": "passed",
-    "trainline_final_targeted_regressions": 3,
-    "trainline_native_autofill": "needs_review; 11 recorded answers; no browser questions pending; optional unknown disclosures blank",
-    "stable_signing_across_rebuilds": "passed",
-    "gmail_refresh_after_signed_update": "passed",
-    "python_initial_full_run": {
-      "passed": 212,
-      "failed": 1,
-      "failure": "Old-backup migration table already exists; fixed and retested"
+    "native_profile": "passed; typed identity, contact, education and derived availability visible",
+    "native_reasoning_probe": "passed; recent STEM graduate resolved Yes with DERIVED_MEDIUM and an explicit recency assumption",
+    "ollama": "real local classifier exercised; a bad live classification led to a grounded-answer guard and four additional regressions"
+  },
+  "signing": "Stable Apple Development identity; not notarized",
+  "real_applications_sent_by_assistant": 0,
+  "calibration": {
+    "jobs_attempted": 10,
+    "accessible_application_forms": 7,
+    "application_fields_observed": 93,
+    "unique_questions": 56,
+    "unique_intents": 26,
+    "answerable_fields": 66,
+    "answers_verified_in_final_dom": 66,
+    "answerable_required_fields": 39,
+    "required_answers_verified_in_final_dom": 39,
+    "derived_answers": 12,
+    "narrative_answers": 5,
+    "inapplicable_conditionals_left_blank": 2,
+    "submitted": 0,
+    "remaining_roots": {
+      "MISSING_FACT": 17,
+      "BAD_ENUM_MAPPING": 1,
+      "MISSING_CURRENT_IMMIGRATION_EVIDENCE": 5,
+      "EXPLICIT_CONFIRMATION_REQUIRED": 2
     },
-    "profile_and_backup_targeted_tests_passed": 12,
-    "browser_and_api_regressions_passed": 29,
-    "final_trainline_inline_greenhouse_regressions_passed": 5,
-    "native_profile_editor": "passed",
-    "native_trainline_browser_question": "passed",
-    "ollama_grounded_question_draft": "passed; user review required",
-    "python_tests_passed": 225,
-    "general_profile_targeted_tests_passed": 16,
-    "general_profile_native_trainline": "passed; availability and two long answers filled and marked for review",
-    "conditional_profile_browser_fixture": "passed; inapplicable saved values cleared, unknown conditions remain unresolved",
-    "ollama_general_profile_inference": "passed; unverified draft"
+    "unverified_answerable_fields": []
   },
-  "signing": "Apple Development, stable designated requirement verified across rebuilds; not notarized",
-  "real_applications_sent": 0,
-  "real_email_accounts_tested": true,
-  "app_icon": {
-    "sha256": "256719178a8e8542c13de8728a646e43332f8da62d4c8b9323425a9de9b5338e",
-    "installed_copy_matches_build": true
-  },
-  "validation_note": "Current release: full suite 225 Python and 3 Rust tests passed; 16 targeted profile, freshness, orchestration and grounding tests passed. Lint and typecheck passed. Real Trainline form verified from installed app: general availability and two long answers filled with inference badges. User supplied additional answers in the browser. Run reached needs_review with 11 answers and no pending browser questions. No application submitted by the assistant. Both installed copies match the build; strict signatures and DMG checksum verified. Other validation entries are historical evidence.",
-  "gmail_account_verified": true,
-  "real_email_initial_sync_verified": true,
-  "daily_recommendations": {
-    "matching_jobs": 229,
-    "visible_daily_limit": 50,
-    "region": "europe",
-    "preferred_city": "London"
-  },
-  "gmail_next_sync_waiting_for_keychain": false,
-  "real_application_autofill": {
-    "company": "Trainline",
-    "title": "Junior Machine Learning Engineer",
-    "run_id": "59a03556-a83e-4cf1-816b-9195d2681c79",
-    "automatic_fields": [
-      "name",
-      "email",
-      "LinkedIn",
-      "resume",
-      "London, United Kingdom",
-      "notice period Other",
-      "conditional earliest-start explanation",
-      "current AI use draft",
-      "additional professional context draft"
+  "calibration_limits": {
+    "accessible_forms": [
+      "Trainline",
+      "Mytos",
+      "Shift Technology",
+      "Blenheim Chalcot (two roles)",
+      "Fifty One Degrees",
+      "Elwood"
     ],
-    "pending_required_answers": [],
-    "submitted": false,
-    "status": "needs_review",
-    "browser_questions_remaining": 0,
-    "recorded_answers": 11,
-    "pending_action": "Review inferred answers and optional disclosures; final submission requires explicit approval"
+    "external_or_platform_blocks": [
+      "Haleon: Indeed manual handoff and external verification",
+      "British Council: Indeed manual handoff/sign-in",
+      "BlackRock: Workday application page exposed no usable form"
+    ],
+    "remaining_information": [
+      "contractual notice",
+      "current employer verification",
+      "current immigration working conditions",
+      "employer-specific salary and office preferences",
+      "separate legal consent"
+    ],
+    "ambiguous_enum": "Mytos combines visa route, sponsorship and work authorization; no unsupported choice selected",
+    "required_denominator": "Controls observed as required and answerable from existing evidence; inaccessible steps excluded"
   },
-  "application_profile": {
-    "editable_fields": 57,
-    "unknown_sensitive_values_inferred": false,
-    "browser_answers_default_scope": "one application",
-    "reusable_answers": "explicit opt-in with country/employer scope",
-    "long_answers": "Reviewable professional drafts with factual extract fallback",
-    "general_date_constraints_confirmed": true,
-    "historical_answers": "Newer general availability supersedes incompatible historical question answers"
-  },
-  "real_applications_sent_by_assistant": 0
+  "private_audit": ".local-data/intelligence-release/final-audit.json",
+  "validation_note": "Ten authorized fill-only attempts; seven accessible forms, 66 grounded answers/uploads independently verified, including 39 answerable required controls. No application submitted. This is bounded calibration evidence, not universal ATS coverage. Prior release evidence remains in docs/VERIFICATION.md."
 }

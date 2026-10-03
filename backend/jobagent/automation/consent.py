@@ -2,9 +2,10 @@
 
 from pathlib import Path
 
+from ..intelligence.formatting import choice as option_for
 from .reasoning import conditional_state, profile_resolution
 
-from .answers import normalize, option_for, selected_choice_matches
+from .answers import normalize, selected_choice_matches, dropdown_search_value
 
 
 def action_key(element, operation, value=None, file_path=None, upload_name=None):
@@ -49,13 +50,19 @@ def section_plan(snapshot, target, adapter, facts, documents, policies, document
             resolved = profile_resolution(
                 question, facts, element=element, hints=[element.get("name", ""), element.get("autocomplete", "")], policies=policies
             )
+            intelligence = policies.get('_candidate_engine')
+            if intelligence:
+                candidate = intelligence.answer_question(question, element, policies.get('_job_context', {}))
+                candidate = intelligence.confirmed_fallback(question, candidate, facts, policies)
+                if candidate['canonical_intent'] != 'OTHER':
+                    resolved = candidate
             answer = resolved["answer"]
             if answer is None or resolved["leave_blank"]:
                 continue
             evidence = {"fact_ids": resolved["fact_ids"], "kind": resolved["kind"]}
             if element["role"] == "combobox" and "CLICK" in ops and "SELECT" not in ops:
                 if element.get("expanded") or not selected_choice_matches(question, answer, element.get("selected_text") or element.get("value", "")):
-                    operation, value = "TYPE_TEXT" if "TYPE_TEXT" in ops else "CLICK", answer
+                    operation, value = "TYPE_TEXT" if "TYPE_TEXT" in ops else "CLICK", dropdown_search_value(resolved)
             elif "TYPE_TEXT" in ops and element["value"] != answer:
                 operation, value = "TYPE_TEXT", answer
             elif "SELECT" in ops:

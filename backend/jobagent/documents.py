@@ -337,7 +337,7 @@ def select_facts(db, fact_ids=None):
             raise ValueError("Only verified or locked facts can support a generated document")
     else:
         facts = db.query(
-            "SELECT * FROM facts WHERE verification_status='verified' OR locked=1 ORDER BY category,created_at"
+            "SELECT * FROM facts WHERE category!='knowledge' AND (verification_status='verified' OR locked=1) ORDER BY category,created_at"
         )
     if not facts:
         raise ValueError("Verify candidate facts before generating a document")

@@ -8,7 +8,8 @@ from pathlib import Path
 import re
 
 from .adapters import get_adapter
-from .answers import normalize, option_for, selected_choice_matches, classify_question, SENSITIVE
+from .answers import normalize, selected_choice_matches, classify_question, SENSITIVE, dropdown_search_value
+from ..intelligence.formatting import choice as option_for
 from .reasoning import conditional_state, profile_resolution
 from .browser import BrowserSession, confirmation_evidence
 from .browser import PROGRESS, is_submit
@@ -83,15 +84,28 @@ class BrowserManager(BrowserSession):
         questions: list[dict] = []
         steps: list[dict] = []
         snapshot = None
-        policies = settings.get("sensitive_policies", {})
+        policies = dict(settings.get("sensitive_policies", {}))
+        policies["_candidate_engine"] = settings.get("_candidate_engine")
+        policies["_job_context"] = settings.get("_job_context", application)
         reasoning_cache = {}
 
         async def resolve(element):
             field = adapter.question(element)
+            if re.search(r'\babove (?:university|institution|school)\b', field, re.I):
+                preceding = [e for e in snapshot['elements'] if e['index'] < element['index'] and e.get('form_id') == element.get('form_id') and e.get('document_id') == element.get('document_id') and re.search(r'university|institution|school', adapter.question(e), re.I)]
+                if preceding:
+                    parent = preceding[-1]
+                    element['_education_reference'] = parent.get('selected_text') or parent.get('value')
+            intelligence = settings.get('_candidate_engine')
+            if intelligence:
+                result = await intelligence.answer(field, element, settings.get('_job_context', application))
+                result = intelligence.confirmed_fallback(field, result, facts, policies)
+                if result['canonical_intent'] != 'OTHER' or result['answer'] is not None:
+                    return result
             result = profile_resolution(field, facts, element=element, policies=policies,
                                        hints=[element.get("name", ""), element.get("autocomplete", "")])
             callback = settings.get("_reason_answer")
-            if result['answer'] is None and not result['leave_blank'] and callback and settings.get('assisted_autofill'):
+            if result['answer'] is None and not result['leave_blank'] and callback and settings.get('assisted_autofill') and not intelligence:
                 key = (field, element.get('type'), tuple(o.get('label', '') for o in element.get('options', [])))
                 if key not in reasoning_cache:
                     reasoning_cache[key] = await callback(field, element)
@@ -133,10 +147,11 @@ class BrowserManager(BrowserSession):
                 upload_name = None
                 upload_mime = None
                 if pending_dropdown:
+                    from ..intelligence.formatting import choice as enum_choice
                     resolution = pending_dropdown["resolution"]
                     for _ in range(20):
                         options = [e for e in snapshot["elements"] if e["role"] == "option" and "CLICK" in e["operations"]]
-                        choice = option_for(resolution["answer"], options, question=resolution["question"])
+                        choice = enum_choice(resolution["answer"], options, question=resolution["question"])
                         choices = [choice] if choice else []
                         if choices or snapshot["blocked"]:
                             break
@@ -146,7 +161,14 @@ class BrowserManager(BrowserSession):
                         return self._result("human_required", snapshot, answers=answers, steps=steps, adapter=adapter.name,
                                             questions=[{"question": resolution["question"], "kind": "option",
                                                         "reason": "No unique visible dropdown option matches the verified answer."}])
-                    await self._record_step(await self.execute(Decision(Operation.CLICK, choices[0]["index"]), snapshot), steps, snapshot)
+                    try:
+                        await self._record_step(await self.execute(Decision(Operation.CLICK, choices[0]["index"]), snapshot), steps, snapshot)
+                    except StaleState:
+                        if section_consent or not settings.get('assisted_autofill') or stale_retries >= 5:
+                            raise
+                        stale_retries += 1
+                        snapshot = await self.observe()
+                        continue
                     snapshot = await self.observe()
                     selected = next((e for e in snapshot["elements"] if e["node_id"] == pending_dropdown["node_id"] and
                                      e["document_id"] == pending_dropdown["document_id"]), None)
@@ -174,7 +196,7 @@ class BrowserManager(BrowserSession):
                     if not element.get("required") and normalize(adapter.question(element)) in settings.get("_skipped_questions", []):
                         continue
                     if settings.get('assisted_autofill') and not element.get('required') and classify_question(adapter.question(element)) in {*SENSITIVE, 'work_authorization'}:
-                        explicit = profile_resolution(adapter.question(element), facts, element=element, policies=policies)
+                        explicit = await resolve(element) if settings.get('_candidate_engine') else profile_resolution(adapter.question(element), facts, element=element, policies=policies)
                         if explicit['answer'] is None:
                             self._omitted[adapter.question(element)] = {'question': adapter.question(element), 'reason': 'Optional disclosure not provided; left unchanged without inferring personal data.'}
                             continue
@@ -184,7 +206,7 @@ class BrowserManager(BrowserSession):
                         if resolution["leave_blank"] and not element.get("required"):
                             continue
                         if resolution["answer"] is None:
-                            if element.get("required") or not skip_optional:
+                            if element.get("required") or not skip_optional or element.get('selected_text') or element.get('value'):
                                 questions.append({"question": adapter.question(element), "kind": resolution["kind"], "required": element.get("required", False)})
                             continue
                         if not element.get("expanded") and selected_choice_matches(resolution["question"], resolution["answer"], element.get("selected_text") or element.get("value", "")):
@@ -193,7 +215,7 @@ class BrowserManager(BrowserSession):
                         pending_dropdown = {"resolution": resolution, "node_id": element["node_id"],
                                             "document_id": element["document_id"]}
                         action = Decision(Operation.TYPE_TEXT if "TYPE_TEXT" in operations else Operation.CLICK, element["index"])
-                        value = resolution["answer"]
+                        value = dropdown_search_value(resolution)
                         break
                     if not any(op in operations for op in ("TYPE_TEXT", "SELECT", "CHECK", "UNCHECK", "UPLOAD")):
                         continue
@@ -227,9 +249,10 @@ class BrowserManager(BrowserSession):
                             handled.add(signature)
                         continue
                     if resolution["answer"] is None:
-                        if element.get("required") or not skip_optional:
+                        if element.get("required") or not skip_optional or element.get('value'):
                             questions.append({"question": field, "kind": resolution["kind"], "target": element["index"],
-                                              "current_value": element["value"], "required": element.get("required", False)})
+                                              "current_value": element["value"], "required": element.get("required", False),
+                                              "reason": "The current value needs verification against candidate evidence." if element.get('value') else resolution.get('root_cause')})
                         # Do not mark unknown fields handled: questions must survive the next observation.
                         continue
                     answer = resolution["answer"]
@@ -265,10 +288,10 @@ class BrowserManager(BrowserSession):
                         if desired != element["checked"]:
                             operation = Operation.CHECK if desired else Operation.UNCHECK
                     self._add_answer(answers, dict(resolution))
-                    handled.add(signature)
                     if operation:
                         action = Decision(operation, element["index"])
                         break
+                    handled.add(signature)
                 if action:
                     if section_consent:
                         target = next(e for e in snapshot["elements"] if e["index"] == action.target)
@@ -325,7 +348,7 @@ class BrowserManager(BrowserSession):
                 if snapshot["errors"]:
                     return self._result("human_required", snapshot, answers=answers, steps=steps, adapter=adapter.name,
                                         questions=[{"question": e, "kind": "validation"} for e in snapshot["errors"]])
-                entry_only = (section_consent or settings.get("assisted_autofill")) and not steps and not any(
+                entry_only = (section_consent or settings.get("assisted_autofill")) and not any(
                     any(op in e["operations"] for op in ("TYPE_TEXT", "SELECT", "CHECK", "UPLOAD")) for e in snapshot["elements"])
                 submit = None if entry_only else adapter.submit_button(snapshot)
                 if submit:
@@ -337,10 +360,11 @@ class BrowserManager(BrowserSession):
                 if next_button is None:
                     next_button = await self._decide_safe_progress(snapshot, settings)
                 if next_button is None and entry_only:
-                    links = [e for e in snapshot["elements"] if e["role"] == "link" and "CLICK" in e["operations"]
-                             and re.fullmatch(r"apply(?: now| for (?:this |the )?(?:job|role|position))?", e["label"].strip(), re.I)
-                             and (e.get("href") or "").startswith(("http://", "https://"))]
+                    from .browser import is_application_entry
+                    links = [e for e in snapshot['elements'] if is_application_entry(e, snapshot)]
                     next_button = links[0] if len(links) == 1 else None
+                    if next_button:
+                        next_button['_decision'] = Decision(Operation.OPEN_TAB, next_button['index'])
                 if next_button and page_advances < 8:
                     previous = snapshot["fingerprint"]
                     decision = next_button.pop("_decision", None) or Decision(Operation.CLICK, next_button["index"])
@@ -501,4 +525,4 @@ class BrowserManager(BrowserSession):
             return [d for d in valid if d.get("kind") == "cover_letter"]
         if "transcript" in label:
             return [d for d in valid if d.get("kind") == "transcript"]
-        return valid if len(valid) == 1 else []
+        return []  # An arbitrary attachment is not necessarily a CV.

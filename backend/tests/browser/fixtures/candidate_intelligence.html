@@ -1,0 +1,11 @@
+<!doctype html><html><head><title>Candidate reasoning test</title></head><body>
+<form onsubmit="event.preventDefault();window.submissions++">
+<div class="application-question"><div>Which university are you enrolled at?</div><div class="application-field"><input name="card[0]" required></div></div>
+<div class="application-question"><div>Highest completed degree level</div><div class="application-field"><select name="card[1]" required><option value="">Select</option><option value="ba">Undergraduate, Bachelor's, or equivalent</option><option value="ma">Postgraduate, Master's, or equivalent</option></select></div></div>
+<div class="application-question"><div>Degree classification</div><div class="application-field"><select name="card[2]" required><option value="">Select</option><option value="first">First-Class Honours (First or 1st) (70% and above)</option><option value="second">Upper Second-Class Honours (2:1)</option></select></div></div>
+<label>Earliest start date<input type="date" name="start" required></label>
+<label>Degree average<input type="number" step="1" name="grade" required></label>
+<label>Describe ownership of a product<textarea name="story" required></textarea></label>
+<label>GDPR Notice<input type="checkbox" name="consent" required></label>
+<button type="submit">Finish application</button>
+</form><script>window.submissions=0</script></body></html>

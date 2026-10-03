@@ -20,7 +20,7 @@ from .types import Decision, HumanRequired, InvalidDecision, Operation, Paused, 
 
 OBSERVATION_SCRIPT = Path(__file__).with_name("observation.js").read_text()
 PROGRESS = re.compile(r"^(?:next|continue|save and continue|review|proceed)(?:\s|$)", re.I)
-SUBMIT = re.compile(r"\b(?:submit|send application|apply now|complete application|confirm application)\b", re.I)
+SUBMIT = re.compile(r"\b(?:submit|send application|apply(?: now)?|finish application|complete application|confirm application)\b", re.I)
 CONFIRMATION = re.compile(
     r"(?:thank you for (?:applying|your application)|application (?:has been |was )?"
     r"(?:received|submitted|successfully submitted)|(?:we have|we've) received your application|"
@@ -48,6 +48,19 @@ def is_submit(element: dict) -> bool:
     # That default alone is not evidence of the employer's final submit control.
     explicit = element.get("explicit_type", element.get("type"))
     return not PROGRESS.match(label) and (explicit == "submit" or bool(SUBMIT.search(label)))
+
+
+def is_application_entry(element: dict, snapshot: dict) -> bool:
+    """An observed application URL on a listing may be opened with a GET.
+
+    Never click a button that could execute submission code, even if it looks
+    like a navigation link. A page with candidate inputs is never an entry page.
+    """
+    return bool(element.get('tag') == 'a' and 'OPEN_TAB' in element.get('operations', [])
+                and re.fullmatch(r'apply(?: now| for (?:this |the )?(?:job|role|position))?', element.get('label', '').strip(), re.I)
+                and urlparse(element.get('href') or '').scheme in {'http', 'https'}
+                and not any(any(op in e['operations'] for op in ('TYPE_TEXT', 'SELECT', 'CHECK', 'UPLOAD'))
+                            for e in snapshot['elements']))
 
 
 def confirmation_evidence(snapshot: dict) -> list[dict]:
@@ -154,8 +167,10 @@ class BrowserSession:
             self._check_pause()
             snapshot = await self.observe()
             loading = re.search(r"(?:fetching|loading) (?:the |your )?(?:application|form)", snapshot["text"], re.I)
+            if not any(any(op in e['operations'] for op in ('TYPE_TEXT', 'SELECT', 'CHECK', 'UPLOAD')) for e in snapshot['elements']):
+                loading = loading or re.search(r'^\s*Loading[.\s]*$', snapshot['text'], re.I | re.M)
             ready = bool(snapshot['elements'] and snapshot['text'].strip())
-            if urlparse(snapshot['url']).path.rstrip('/').endswith('/application'):
+            if urlparse(snapshot['url']).path.rstrip('/').endswith(('/application', '/apply')):
                 ready = any(any(op in e['operations'] for op in ('TYPE_TEXT', 'SELECT', 'CHECK', 'UPLOAD'))
                             for e in snapshot['elements']) or bool(confirmation_evidence(snapshot))
             if snapshot["blocked"] or time.monotonic() >= deadline or (not loading and ready and time.monotonic() >= earliest):
@@ -236,7 +251,8 @@ class BrowserSession:
             element = next((e for e in observed["elements"] if e["index"] == decision.target), None)
             if decision.target is not None and (not element or op not in element["operations"]):
                 raise InvalidDecision("The target was not observed supporting this operation.")
-            if element and is_submit(element) and not allow_submit:
+            entry_navigation = element and op == Operation.OPEN_TAB and is_application_entry(element, observed)
+            if element and is_submit(element) and not allow_submit and not entry_navigation:
                 raise HumanRequired("Final submission requires a separate policy check and approval.")
             self._check_pause()
             if op in {Operation.BLOCKED, Operation.HUMAN_REQUIRED}:
@@ -255,11 +271,23 @@ class BrowserSession:
                 proxy_handle = None
                 try:
                     visible_node = node
+                    if element.get('interaction_proxy_id'):
+                        proxy_handle = await node.evaluate_handle("""(node, id) => {
+                            const proxy = window.__meridianObservedControlsV1.nodes.get(id);
+                            return node.isConnected && proxy?.isConnected && node.getAttribute('role') === 'combobox'
+                                && node.closest('.select__control') === proxy ? proxy : null;
+                        }""", element['interaction_proxy_id'])
+                        visible_node = proxy_handle.as_element()
+                        if visible_node is None:
+                            raise StaleState('The observed dropdown control changed.')
                     if op == Operation.UPLOAD and element.get("upload_proxy_id"):
                         proxy_handle = await node.evaluate_handle("""(node, id) => {
                             const proxy = window.__meridianObservedControlsV1.nodes.get(id);
                             const field = node.closest('[data-field-path],.ashby-application-form-field-entry');
-                            return node.isConnected && !node.disabled && field?.contains(proxy) ? proxy : null;
+                            const inline = node.closest('a,button,label');
+                            const attachment = node.matches('.visually-hidden') && node.parentElement?.querySelector(':scope > button[type="button"]');
+                            const associated = field?.contains(proxy) || inline === proxy || attachment === proxy;
+                            return node.isConnected && proxy?.isConnected && !node.disabled && associated ? proxy : null;
                         }""", element["upload_proxy_id"])
                         visible_node = proxy_handle.as_element()
                         if visible_node is None:
@@ -291,6 +319,9 @@ class BrowserSession:
                     if op == Operation.TYPE_TEXT:
                         if value is None or not isinstance(value, str) or len(value) > 20000:
                             raise InvalidDecision("A verified text value is required.")
+                        # React Select opens on pointer interaction, not focus alone.
+                        if element['role'] == 'combobox' and not element.get('expanded'):
+                            await visible_node.click()
                         await node.fill(value)
                     elif op == Operation.SELECT:
                         option = next((o for o in element["options"] if o["value"] == value and not o["disabled"]), None)

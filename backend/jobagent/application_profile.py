@@ -261,11 +261,22 @@ def memory_superseded(db, question, updated_at):
 
 
 def profile(db):
-    facts = db.query("SELECT * FROM facts ORDER BY updated_at")
+    from .intelligence.store import Knowledge
+
+    facts = db.query("SELECT * FROM facts WHERE category!='knowledge' ORDER BY updated_at")
+    knowledge = Knowledge(db)
+    people = knowledge.records('person')
     rows = []
     for f in FIELDS:
         explicit = next((x for x in facts if x["source"] == "application_profile:" + f["key"]), None)
-        if explicit:
+        structured = [x for x in knowledge.rows if len(people) == 1 and x['entity_id'] == people[0]['id'] and x['concept'] == f['key']]
+        if structured:
+            selected = knowledge.fact(people[0]['id'], f['key'])
+            value = str(selected['value']) if selected else ''
+            state = 'confirmed' if selected else 'unknown'
+            source = 'Candidate Knowledge · ' + selected['source'] if selected else 'Review conflicting or unconfirmed evidence in Knowledge'
+            ids = [selected['id']] if selected else []
+        elif explicit:
             value = explicit["value"]
             state = (
                 "confirmed"
@@ -323,7 +334,7 @@ def write_profile(db, key, value, confirmed, note="Entered in application profil
     status = "verified" if confirmed and value else "unverified"
     source = "application_profile:" + key
     with db.transaction() as conn:
-        old = conn.execute("SELECT * FROM facts WHERE source=?", (source,)).fetchone()
+        old = conn.execute("SELECT * FROM facts WHERE source=? AND category!='knowledge'", (source,)).fetchone()
         identifier = old["id"] if old else uid()
         if old:
             invalidate_fact_evidence(db, conn, dict(old))
@@ -337,6 +348,8 @@ def write_profile(db, key, value, confirmed, note="Entered in application profil
                 "INSERT INTO facts VALUES(?,?,?,?,?,?,?,?,?,?,?)",
                 (identifier, candidate, "application_profile", key, value, source, status, 0, note, now(), now()),
             )
+    from .intelligence.store import sync_profile_fact
+    sync_profile_fact(db,key,value,confirmed)
     return identifier
 
 
@@ -367,6 +380,7 @@ def question_field(question, application):
 
 def application_knowledge(db, application, facts):
     """Scoped memories never leak into another application's candidate answers."""
+    facts = [f for f in facts if f['category'] != 'knowledge']
     base = [f for f in facts if not f["source"].startswith(("browser_answer:", "application_profile:"))]
     # An explicit edit/clear in Profile overrides a CV value, including when
     # the replacement is still a draft. Do not silently resurrect the old value.

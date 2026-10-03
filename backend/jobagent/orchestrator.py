@@ -113,7 +113,9 @@ class Orchestrator:
             "SELECT d.id,d.content_hash,d.approved FROM document_versions d JOIN application_documents a ON d.id=a.document_version_id WHERE a.application_id=? ORDER BY d.id",
             (application_id,),
         )
-        return hashlib.sha256(json.dumps([facts, answers, documents], sort_keys=True).encode()).hexdigest()
+        from .intelligence.store import Knowledge
+        knowledge_version = Knowledge(self.db).version
+        return hashlib.sha256(json.dumps([facts, answers, documents, knowledge_version], sort_keys=True).encode()).hexdigest()
 
     def rate_gate(self, application):
         settings = settings_for(self.db)
@@ -288,6 +290,11 @@ class Orchestrator:
                 config = decision_settings(self.db, config, SecretStore())
                 if config['assisted_autofill'] and self.text_service:
                     config['_reason_answer'] = self.field_reasoner(application, facts, config)
+                from .intelligence.engine import CandidateEngine
+                intelligence = CandidateEngine(self.db, settings=config)
+                if intelligence.enabled:
+                    config['_candidate_engine'] = intelligence
+                    config['_job_context'] = application
                 result = await self.browser.fill_application(
                     application, facts, documents, application["mode"].upper(), config
                 )

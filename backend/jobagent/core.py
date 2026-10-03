@@ -216,7 +216,7 @@ def facts_list(
     limit: int = Query(100, ge=1, le=500),
     offset: int = Query(0, ge=0),
 ):
-    clauses, params = [], []
+    clauses, params = ["category!='knowledge'"], []
     if category:
         clauses.append("category=?")
         params.append(category)
@@ -313,6 +313,8 @@ def fact_create(payload: FactPayload, request: Request):
 def fact_update(fact_id: str, payload: FactPatch, request: Request):
     db = get_db(request)
     fact = required(db, "facts", fact_id)
+    if db.one('SELECT fact_id FROM knowledge_facts WHERE fact_id=?', (fact_id,)):
+        raise HTTPException(409, 'Edit this typed fact in Profile → Knowledge')
     changes = payload.model_dump(exclude_unset=True, exclude_none=True)
     if (
         fact["locked"]
@@ -1391,3 +1393,61 @@ async def settings_patch(payload: dict, request: Request):
         else:
             await automation.resume()
     return get_settings(get_db(request))
+
+
+@router.get('/intelligence')
+def intelligence_get(request: Request):
+    from .intelligence.diagnostics import knowledge_view
+    return knowledge_view(get_db(request))
+
+
+@router.put('/intelligence/facts/{fact_id}')
+def intelligence_fact_put(fact_id: str, payload: ApplicationProfilePayload, request: Request):
+    from .intelligence.store import update_fact
+    try:
+        update_fact(get_db(request), fact_id, payload.value, payload.confirmed)
+    except ValueError as exc:
+        raise HTTPException(422,str(exc)) from exc
+    return {'id':fact_id}
+
+
+@router.post('/intelligence/answer')
+async def intelligence_answer(payload: dict, request: Request):
+    from .intelligence.engine import CandidateEngine
+    question=str(payload.get('question','')).strip()
+    if not question or len(question)>4000:
+        raise HTTPException(422,'Enter a question of up to 4000 characters')
+    engine=CandidateEngine(get_db(request),settings=get_settings(get_db(request)))
+    return await engine.answer(question,payload.get('field',{}),payload.get('job',{}))
+
+
+@router.put('/intelligence/policies/{policy_id}')
+def intelligence_policy_put(policy_id: str, payload: ApplicationProfilePayload, request: Request):
+    from .intelligence.store import policy
+    row=required(get_db(request),'candidate_policies',policy_id)
+    current=json.loads(row['value'])
+    value=payload.value
+    if isinstance(current,bool):
+        if value not in {'Yes','No'}:
+            raise HTTPException(422,'Use Yes or No')
+        value=value=='Yes'
+    elif isinstance(current,dict) and 'target' in current:
+        try:
+            value={**current,'target':float(value)}
+            if not math.isfinite(value['target']) or value['target']<0:
+                raise ValueError()
+        except ValueError as exc:
+            raise HTTPException(422,'Enter a nonnegative amount') from exc
+    elif not isinstance(current,str):
+        raise HTTPException(422,'This structured policy needs its specific editor')
+    policy(get_db(request),row['subject'],value,json.loads(row['scope']),confirmed=payload.confirmed)
+    return {'id':policy_id}
+
+
+@router.get('/intelligence/documents/{document_id}/proposals')
+def intelligence_document_proposals(document_id: str, request: Request):
+    from .intelligence.ingestion import document_proposals
+    try:
+        return document_proposals(get_db(request),document_id)
+    except ValueError as exc:
+        raise HTTPException(404,str(exc)) from exc

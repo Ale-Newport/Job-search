@@ -1,3 +1,4 @@
+import { CandidateIntelligence } from "./intelligence";
 import { useEffect, useRef, useState } from "react";
 import {
   ArrowDownToLine,
@@ -428,6 +429,7 @@ export function Settings({
     ["automation", "Automation", ShieldCheck],
     ["ai", "AI & providers", Cpu],
     ["backup", "Backup & restore", Database],
+    ["intelligence", "Candidate Intelligence", Fingerprint],
   ] as const;
   return (
     <>
@@ -448,6 +450,7 @@ export function Settings({
           </button>
         ))}
       </div>
+      {tab === "intelligence" && <CandidateIntelligence ctx={ctx} coverageOnly />}
       <Resource {...r} retry={r.reload}>
         {tab === "general" && (
           <>

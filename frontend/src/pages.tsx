@@ -68,6 +68,7 @@ import {
 } from "./components";
 import type { Field } from "./components";
 import { SetupGuide } from "./onboarding";
+import { CandidateIntelligence } from "./intelligence";
 import { ApplicationProfile } from "./application-profile";
 
 const STATUS = [
@@ -1596,6 +1597,7 @@ export function Profile({ ctx }: { ctx: AppContext }) {
           Private on this Mac
         </Tag>
       </div>
+      <CandidateIntelligence ctx={ctx} />
       <ApplicationProfile ctx={ctx} />
       <div className="toolbar">
         <SearchInput

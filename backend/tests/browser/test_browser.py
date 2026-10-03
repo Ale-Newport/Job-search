@@ -312,7 +312,8 @@ async def test_hidden_required_upload_cannot_be_declared_ready(browser, fixture_
     browser._active_application_id = "hidden-upload"
     result = await browser.fill_application({"id": "hidden-upload", "url": fixture_server + "/generic.html"}, candidate, [])
     assert result["status"] == "human_required"
-    assert any(q["kind"] == "unsupported_widget" for q in result["questions"])
+    # The wrapping label is now a supported upload proxy, but no CV was selected.
+    assert any(q["kind"] == "document" and q["question"] == "Resume" for q in result["questions"])
     assert await browser.page.evaluate("window.submissions") == 0
 
 
@@ -542,3 +543,112 @@ async def test_general_profile_fills_infers_skips_conditions_and_marks_review(br
     # Visible badges must not invalidate the approval snapshot.
     await browser._validate_snapshot(result['snapshot_id'])
     assert await browser.page.evaluate('window.submissions')==0
+
+
+async def test_typed_intelligence_live_dom_formats_and_submission_gate(browser,fixture_server,tmp_path):
+    from jobagent.db import Database
+    from jobagent.intelligence.engine import CandidateEngine
+    from jobagent.intelligence.ingestion import import_bundle
+    db=Database(tmp_path/'intelligence.sqlite')
+    import_bundle(db,{'source':'test evidence','entities':[
+        {'key':'bsc','kind':'education','name':'North University','facts':{'institution':'North University','level':"Bachelor's degree",'rank':1,'status':'completed','classification':'First Class Honours','average':79.94}},
+        {'key':'msc','kind':'education','name':'South University','facts':{'institution':'South University','level':"Master's degree",'rank':2,'start_date':'2026-09-28','end_date':'2027-09-27','status':'studying'}},
+        {'key':'project','kind':'project','name':'Project','facts':{'story':'I built the frontend and backend of an educational product.','tags':['ownership']}}
+    ]},trusted_user_input=True)
+    engine=CandidateEngine(db,as_of='2026-10-03')
+    result=await browser.fill_application({'id':'intelligence','url':fixture_server+'/candidate_intelligence.html'},[],[],settings={'_candidate_engine':engine,'assisted_autofill':True,'skip_optional_unknown':True})
+    assert result['status']=='human_required'
+    assert await browser.page.locator('[name="card[0]"]').input_value()=='South University'
+    assert await browser.page.locator('[name="card[1]"]').input_value()=='ba'
+    assert await browser.page.locator('[name="card[2]"]').input_value()=='first'
+    assert await browser.page.locator('[name="start"]').input_value()=='2027-09-28'
+    assert await browser.page.locator('[name="grade"]').input_value()=='80'
+    assert 'educational product' in await browser.page.locator('[name="story"]').input_value()
+    assert not await browser.page.locator('[name="consent"]').is_checked()
+    assert await browser.page.evaluate('window.submissions')==0
+    assert len([q for q in result['questions'] if 'GDPR' in q['question']])==1
+
+
+async def test_hidden_lever_upload_and_ambiguous_attach_keep_document_types(browser,tmp_path):
+    cv=tmp_path/'cv.pdf'
+    cv.write_text('Synthetic CV')
+    letter=tmp_path/'letter.pdf'
+    letter.write_text('Synthetic letter')
+    await browser.start()
+    await browser.page.set_content('''<form><a href="#">ATTACH RESUME/CV<input type="file" name="resume" style="display:none"></a><label>Attach<input id="cover_letter" type="file"></label></form>''')
+    snapshot=await browser.observe()
+    uploads=[e for e in snapshot['elements'] if e['type']=='file']
+    assert len(uploads)==2
+    documents=[{'kind':'cv','path':str(cv)},{'kind':'cover_letter','path':str(letter)}]
+    assert browser._documents_for(uploads[0]['label'],documents)[0]['kind']=='cv'
+    assert browser._documents_for(uploads[1]['label'],documents)[0]['kind']=='cover_letter'
+    assert browser._documents_for('Attach',[documents[0]])==[]
+    browser.allowed_uploads={cv,letter}
+    await browser.execute(Decision(Operation.UPLOAD,uploads[0]['index']),snapshot,file_path=cv)
+    assert await browser.page.locator('[name=resume]').evaluate('n=>n.files.length')==1
+    assert await browser.page.locator('#cover_letter').evaluate('n=>n.files.length')==0
+
+
+async def test_intelligence_missing_fact_accepts_scoped_browser_confirmation(browser,fixture_server,tmp_path,candidate):
+    from jobagent.db import Database
+    from jobagent.intelligence.engine import CandidateEngine
+    from jobagent.intelligence.store import entity,ingest_fact
+    db=Database(tmp_path/'knowledge.sqlite')
+    person=entity(db,'person','Example')
+    ingest_fact(db,person,'email','alex@example.test',source='verified',evidence={},verified=True)
+    await browser.open(fixture_server+'/generic.html')
+    await browser.page.evaluate("""document.querySelector('form').insertAdjacentHTML('afterbegin','<label>Expected salary<input name="salary" required type="number"></label>')""")
+    browser._active_application_id='confirmed-salary'
+    memory={**fact('Expected salary','42000'),'profile_explicit':True}
+    result=await browser.fill_application({'id':'confirmed-salary','url':fixture_server+'/generic.html'},candidate+[memory],[],settings={'_candidate_engine':CandidateEngine(db),'assisted_autofill':True,'skip_optional_unknown':True})
+    assert await browser.page.locator('[name=salary]').input_value()=='42000'
+    assert result['status']=='needs_review',result
+    assert await browser.page.evaluate('window.submissions')==0
+
+
+async def test_react_select_and_select2_observed_options(browser):
+    await browser.page.set_content('''<form onsubmit="window.submissions++;return false">
+    <label for="country">Country</label><div class="select__control" onclick="country.style.opacity=1;menu.hidden=false;country.setAttribute('aria-expanded','true')"><span class="select__single-value"></span>
+    <input role="combobox" id="country" aria-expanded="false" onclick="menu.hidden=false;this.setAttribute('aria-expanded','true')"></div>
+    <div id="menu" hidden><div role="option" onclick="document.querySelector('.select__single-value').textContent=this.textContent;country.value='';country.setAttribute('aria-expanded','false');country.style.opacity=0;menu.hidden=true">United Kingdom +44</div></div>
+    <div class="application-question">University<span class="select2-container"><span role="combobox" tabindex="0" aria-expanded="false" onclick="universities.hidden=false;this.setAttribute('aria-expanded','true')" id="university">Select</span></span></div>
+    <div class="select2-results" id="universities" hidden><div role="treeitem" onclick="university.textContent=this.textContent;university.setAttribute('aria-expanded','false');universities.hidden=true">Example University (EU)</div></div>
+    <button type="submit">Submit application</button></form><script>window.submissions=0</script>''')
+    browser._active_application_id = 'widgets'
+    result = await browser.fill_application({'id':'widgets','url':'https://example.test'}, [fact('Country','United Kingdom'),fact('University','Example University')], [], settings={'assisted_autofill':True})
+    assert result['status'] == 'needs_review', result
+    assert await browser.page.locator('.select__single-value').inner_text() == 'United Kingdom +44'
+    assert await browser.page.locator('#university').inner_text() == 'Example University (EU)'
+    assert await browser.page.evaluate('window.submissions') == 0
+
+
+async def test_apply_entry_opens_observed_href_without_clicking_submission_code(browser, fixture_server):
+    await browser.page.set_content(f'<a role="button" href="{fixture_server}/generic.html" onclick="window.clicked=true;return false">Apply</a>')
+    snapshot = await browser.observe()
+    target = snapshot['elements'][0]
+    with pytest.raises(HumanRequired):
+        await browser.execute(Decision(Operation.CLICK,target['index']),snapshot)
+    old_page = browser.page
+    await browser.execute(Decision(Operation.OPEN_TAB,target['index']),snapshot)
+    assert browser.page.url == fixture_server + '/generic.html'
+    assert not await old_page.evaluate('Boolean(window.clicked)')
+    await browser.page.set_content(f'<form><input aria-label="Name"><a role="button" href="{fixture_server}/generic.html">Apply</a></form>')
+    snapshot = await browser.observe()
+    target = next(e for e in snapshot['elements'] if e['tag']=='a')
+    with pytest.raises(HumanRequired):
+        await browser.execute(Decision(Operation.OPEN_TAB,target['index']),snapshot)
+
+
+async def test_clipped_upload_uses_only_associated_attach_button(browser, tmp_path):
+    await browser.page.set_content('''<style>.visually-hidden{position:absolute;width:1px;height:1px;clip:rect(0,0,0,0)}</style>
+    <div><button type="button">Attach</button><label class="visually-hidden" for="resume">Attach</label><input id="resume" class="visually-hidden" type="file"></div>
+    <div><button type="button">Attach</button><input id="cover_letter" class="visually-hidden" type="file"></div>''')
+    path = tmp_path/'cv.txt'
+    path.write_text('Synthetic CV')
+    browser.allowed_uploads = {path}
+    snapshot = await browser.observe()
+    target = next(e for e in snapshot['elements'] if e['id']=='resume')
+    assert target['upload_proxy_id']
+    await browser.execute(Decision(Operation.UPLOAD,target['index']),snapshot,file_path=path)
+    assert await browser.page.locator('#resume').evaluate('n=>n.files.length') == 1
+    assert await browser.page.locator('#cover_letter').evaluate('n=>n.files.length') == 0

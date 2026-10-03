@@ -83,7 +83,8 @@ def fact_value(fact: dict) -> str:
 
 
 def approved_facts(facts: list[dict]) -> list[dict]:
-    return [f for f in facts if (f.get("verification_status") == "verified" or f.get("locked") is True or
+    # Typed knowledge is resolved by CandidateEngine, never by flat-key matching.
+    return [f for f in facts if f.get('category') != 'knowledge' and (f.get("verification_status") == "verified" or f.get("locked") is True or
                                 f.get("locked") == 1) and fact_value(f)]
 
 
@@ -158,7 +159,7 @@ def option_for(answer: str, options: list[dict], *, question: str = "") -> dict 
                norm in {normalize(o.get("label", "")), normalize(o.get("value", ""))}]
     if len(matches) == 1:
         return matches[0]
-    if canonical_key(question) in {"location", "city"}:
+    if canonical_key(question) in {"location", "city"} or re.search(r'\b(?:location|city|town|residence)\b', normalize(question)):
         # Geocoders expand a verified city/country into city/county/region/country.
         # Require every supplied component, including country, and a unique result.
         aliases = {"uk": "united kingdom", "gb": "united kingdom", "u k": "united kingdom"}
@@ -177,4 +178,16 @@ def option_for(answer: str, options: list[dict], *, question: str = "") -> dict 
 
 
 def selected_choice_matches(question: str, answer: str, value: str) -> bool:
-    return option_for(answer, [{"label": value, "value": value}], question=question) is not None
+    from ..intelligence.formatting import choice
+    return choice(answer, [{"label": value, "value": value}], question=question) is not None
+
+
+def dropdown_search_value(resolution: dict) -> str:
+    answer = resolution['answer']
+    if resolution.get('canonical_intent') == 'LANGUAGE' and re.match(r'^fluent\b', answer, re.I):
+        return 'Fluent'
+    if resolution.get('canonical_intent') == 'LOCATION' and ',' in answer:
+        # Search the locality; use the full verified city/country to choose
+        # among results. Some geocoders reject a comma-separated search query.
+        return answer.split(',', 1)[0].strip()
+    return answer

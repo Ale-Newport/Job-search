@@ -344,11 +344,18 @@ def select_facts(db, fact_ids=None):
     return facts
 
 
-def compose_document(job: dict, kind: str, facts: list[dict]) -> str:
+def compose_document(job: dict, kind: str, facts: list[dict], *, narrative=None) -> str:
+    if kind == "cover_letter" and narrative and narrative.get("answer"):
+        return f"Application — {job['title']}\n{job['company']}\n\n{narrative['answer']}"
     relevant = extract_skills(job.get("description", ""))
     facts = sorted(facts, key=lambda f: (-sum(skill in f["value"].lower() for skill in relevant), f["created_at"]))
     name = next((f["value"] for f in facts if f["key"].lower() in {"name", "full_name", "full name"}), "")
     if kind == "cover_letter":
+        from .intelligence.narratives import compose_cover_letter
+
+        narrative = compose_cover_letter(None, job, flat_facts=facts)
+        if narrative["answer"]:
+            return f"Application — {job['title']}\n{job['company']}\n\n{narrative['answer']}"
         professional = [
             f for f in facts if f["category"] in {"experience", "project", "education", "skill", "publication"}
         ]
@@ -453,8 +460,25 @@ def generate_document(db, data_dir, job_id, kind, fact_ids=None, approved=False)
     job = db.one("SELECT * FROM jobs WHERE id=?", (job_id,))
     if job is None:
         raise ValueError("Job not found")
-    facts = select_facts(db, fact_ids)
-    text = compose_document(job, kind, facts)
+    narrative = None
+    if kind == "cover_letter":
+        from .intelligence.narratives import compose_cover_letter
+        from .intelligence.store import Knowledge
+
+        knowledge = Knowledge(db)
+        if knowledge.entities:
+            # An explicit selection remains an evidence boundary. The default
+            # uses authoritative typed records, with conflicts/expiry respected.
+            selected = select_facts(db, fact_ids) if fact_ids else []
+            narrative = compose_cover_letter(knowledge, job, flat_facts=selected, allowed_ids=fact_ids or None)
+            if narrative["answer"] is None:
+                raise ValueError("A cover letter needs verified professional experience relevant to the role")
+            facts = narrative["facts"]
+        else:
+            facts = select_facts(db, fact_ids)
+    else:
+        facts = select_facts(db, fact_ids)
+    text = compose_document(job, kind, facts, narrative=narrative)
     existing = db.one("SELECT * FROM documents WHERE job_id=? AND kind=? ORDER BY created_at LIMIT 1", (job_id, kind))
     previous = (
         db.one(
@@ -483,6 +507,7 @@ def generate_document(db, data_dir, job_id, kind, fact_ids=None, approved=False)
         "facts_used": [{"id": f["id"], "value": f["value"], "source": f["source"]} for f in facts],
         "approved": bool(approved),
         "kind": kind,
+        **({"rules_used": narrative["rules"], "role_context": narrative["context"]} if narrative else {}),
     }
     if approved:
         pdf = render_pdf(text)

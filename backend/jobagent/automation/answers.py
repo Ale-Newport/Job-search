@@ -6,6 +6,8 @@ import json
 import re
 import unicodedata
 
+from .disclosures import disclosure_resolution
+
 
 def normalize(value: str) -> str:
     value = unicodedata.normalize("NFKD", str(value)).encode("ascii", "ignore").decode().lower()
@@ -98,6 +100,9 @@ def canonical_key(label: str) -> str | None:
 
 def resolve_answer(question: str, facts: list[dict], *, hints: list[str] | None = None,
                    policies: dict | None = None) -> dict:
+    disclosure = disclosure_resolution(question, policies=policies)
+    if disclosure:
+        return disclosure
     category = classify_question(question)
     result = {"question": question, "kind": category, "answer": None, "fact_ids": [], "verified": False,
               "confidence": 0.0, "leave_blank": False}

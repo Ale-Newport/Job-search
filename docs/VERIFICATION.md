@@ -1,3 +1,15 @@
+# Contexto y privacidad — 4 de octubre de 2026
+
+Corregido el paso de la descripción real del puesto al motor y la interpretación de preguntas con títulos genéricos y aclaraciones. Las respuestas de motivación, uso de IA, experiencia y las cover letters comparten una composición desde hechos verificados, con selección por responsabilidades del puesto. El visado se explica con el contexto académico confirmado; no se deducen permisos de trabajo ni caducidades.
+
+La preferencia explícita de dejar datos personales en blanco prevalece sobre respuestas guardadas y antiguas opciones de rechazo. El motor observa también radios/checkboxes ocultos por CSS con etiquetas visibles asociadas, verifica valores y puede borrar selecciones anteriores. Si el empleador exige un dato protegido por esta preferencia, o un control no permite borrarlo de forma comprobable, muestra el límite en el navegador con Recheck/Pause y no inventa una respuesta.
+
+Validación final: **972 pruebas Python y 3 Rust**, lint y typecheck superados. Incluye paráfrasis, descripciones de preguntas, preguntas compuestas, empleadores/puestos distintos, límites de evidencia en documentos, controles ocultos, valores previos y avisos del navegador.
+
+Repetición autorizada y sin envío en Trainline: **23 campos observados; 12 respuestas/adjuntos verificados, incluidos los 8 obligatorios; 9 preguntas personales vacías; 1 condición no aplicable vacía; consentimiento opcional de contacto sin marcar.** Los textos de motivación y uso de IA y el estado del visado se comprobaron en los valores finales del formulario. La observación nueva detecta las cuatro preguntas de pronombres y salud que antes omitía. Evidencia privada en `.local-data/context-quality/`.
+
+Estos resultados prueban los casos descritos y las regresiones incluidas; no garantizan cobertura de cualquier formulario desconocido. No se ha enviado ninguna candidatura. La preferencia queda guardada en Knowledge y los textos generados siguen sujetos a revisión.
+
 # Candidate Intelligence — 3 de octubre de 2026
 
 La app incorpora un modelo tipado con hechos, entidades, relaciones, políticas y procedencia de respuestas. El perfil local se ha enriquecido desde las instrucciones del usuario, el CV verificado y observaciones de repositorios públicos. Los datos personales y evidencias quedan fuera de Git. La migración de producción es `0007_candidate_intelligence`; se conservaron copias previas de la base y de ambas apps.

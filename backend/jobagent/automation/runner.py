@@ -11,9 +11,11 @@ from .adapters import get_adapter
 from .answers import normalize, selected_choice_matches, classify_question, SENSITIVE, dropdown_search_value
 from ..intelligence.formatting import choice as option_for
 from .reasoning import conditional_state, profile_resolution
+from .disclosures import disclosure_resolution, disclosure_clear_operation, has_disclosure_value, inherit_disclosure_context
 from .browser import BrowserSession, confirmation_evidence
 from .browser import PROGRESS, is_submit
 from .engines import make_engine
+from .job_context import enrich_job_context
 from .consent import action_key, section_plan
 from .types import AutomationError, Decision, HumanRequired, Operation, Paused, StaleState
 
@@ -91,6 +93,9 @@ class BrowserManager(BrowserSession):
 
         async def resolve(element):
             field = adapter.question(element)
+            disclosure = disclosure_resolution(field, element, policies)
+            if disclosure:
+                return disclosure
             if re.search(r'\babove (?:university|institution|school)\b', field, re.I):
                 preceding = [e for e in snapshot['elements'] if e['index'] < element['index'] and e.get('form_id') == element.get('form_id') and e.get('document_id') == element.get('document_id') and re.search(r'university|institution|school', adapter.question(e), re.I)]
                 if preceding:
@@ -128,7 +133,18 @@ class BrowserManager(BrowserSession):
             page_advances = 0
             stale_retries = 0
             pending_dropdown = None
+            cleared_disclosures = set()
             while len(steps) < max_steps:
+                job_context = enrich_job_context(settings.get('_job_context', application), snapshot)
+                settings['_job_context'] = job_context
+                policies['_job_context'] = job_context
+                intelligence = settings.get('_candidate_engine')
+                if intelligence:
+                    intelligence.reload()
+                    disclosure_policy = intelligence.knowledge.get_policy('personal_disclosures', job_context)
+                    policies.pop('personal_disclosures', None)
+                    if disclosure_policy:
+                        policies['personal_disclosures'] = disclosure_policy['value']
                 self._check_pause()
                 if snapshot["blocked"]:
                     reason = "Human verification required" if snapshot["challenge"] else "Complete sign-in or multi-factor authentication in the visible browser."
@@ -180,6 +196,28 @@ class BrowserManager(BrowserSession):
                     pending_dropdown = None
                     continue
                 for element in snapshot["elements"]:
+                    inherit_disclosure_context(element, snapshot["elements"], adapter)
+                    disclosure = disclosure_resolution(adapter.question(element), element, policies)
+                    if disclosure:
+                        field = adapter.question(element)
+                        self._omitted[field] = {"question": field, "reason": disclosure["reason"],
+                                                "policy": disclosure["policy"], "required": bool(element.get("required")),
+                                                "state": "clear_required" if has_disclosure_value(element) else "left_blank"}
+                        identity = (element["document_id"], element["node_id"])
+                        clear = disclosure_clear_operation(element)
+                        if clear and identity not in cleared_disclosures:
+                            operation, value = clear
+                            action = Decision(Operation(operation), element["index"])
+                            break
+                        if has_disclosure_value(element):
+                            self._omitted[field]['reason'] = "An existing personal disclosure could not be safely cleared; remove it in the browser."
+                            questions.append({"question": field, "kind": "personal_disclosure_clear",
+                                              "reason": "Your policy requires this field to be blank. Its existing selection could not be safely cleared; remove it in the browser.",
+                                              "skip_inline_question": True})
+                        elif element.get("required"):
+                            questions.append({"question": field, "kind": "personal_disclosure_policy",
+                                              "reason": disclosure["reason"], "skip_inline_question": True})
+                        continue
                     condition = conditional_state(element, snapshot['elements'], adapter)
                     element['_condition'] = condition or {}
                     self._omitted.pop(adapter.question(element), None)
@@ -318,11 +356,17 @@ class BrowserManager(BrowserSession):
                         snapshot = await self.wait_until_ready()
                         continue
                     await self._record_step(result, steps, snapshot)
+                    cleared = next((e for e in snapshot["elements"] if e["index"] == action.target), None)
+                    if cleared and disclosure_resolution(adapter.question(cleared), cleared, policies):
+                        cleared_disclosures.add((cleared["document_id"], cleared["node_id"]))
                     snapshot = await self.observe()
                     continue
-                questions.extend({"question": e["label"] or "Required hidden control", "kind": "unsupported_widget",
-                                  "reason": "A required form control is hidden and needs manual handling."}
-                                 for e in snapshot.get("unresolved_required", []))
+                for hidden in snapshot.get("unresolved_required", []):
+                    question = hidden["label"] or "Required hidden control"
+                    disclosure = disclosure_resolution(question, {**hidden, "required": True}, policies)
+                    questions.append({"question": question, "kind": "personal_disclosure_policy" if disclosure else "unsupported_widget",
+                                      "reason": disclosure["reason"] if disclosure else "A required form control is hidden and needs manual handling.",
+                                      "skip_inline_question": bool(disclosure)})
                 if any(frame.get("unavailable") for frame in snapshot["frames"]):
                     questions.append({"question": "A frame could not be inspected. Check the complete application in the browser.",
                                       "kind": "unavailable_frame"})

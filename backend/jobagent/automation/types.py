@@ -14,6 +14,7 @@ class Operation(StrEnum):
     SELECT = "SELECT"
     CHECK = "CHECK"
     UNCHECK = "UNCHECK"
+    CLEAR = "CLEAR"
     UPLOAD = "UPLOAD"
     SCROLL_UP = "SCROLL_UP"
     SCROLL_DOWN = "SCROLL_DOWN"
@@ -28,7 +29,7 @@ class Operation(StrEnum):
 
 TARGET_OPERATIONS = {
     Operation.CLICK, Operation.TYPE_TEXT, Operation.SELECT, Operation.CHECK,
-    Operation.UNCHECK, Operation.UPLOAD, Operation.OPEN_TAB,
+    Operation.UNCHECK, Operation.CLEAR, Operation.UPLOAD, Operation.OPEN_TAB,
 }
 
 

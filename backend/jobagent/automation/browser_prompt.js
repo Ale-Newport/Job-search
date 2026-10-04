@@ -20,40 +20,43 @@
   el('header','✦ MERIDIAN · APPLICATION ASSISTANT');
   el('small',data.company+' · '+data.remaining+' question(s) remaining');
   el('h2',data.question);
-  el('p',data.description || 'This answer is missing from your confirmed profile. Complete it here to continue.');
-  el('small',data.manual ? 'Complete this step in the form, then choose Recheck form.' : data.required ? 'Required by this form' : 'Optional — you can leave it blank');
-  const label=el('label','Your answer'); label.htmlFor='answer';
+  el('p',data.description || (data.read_only_policy ? 'Your saved personal-disclosure preference keeps this question blank.' : 'This answer is missing from your confirmed profile. Complete it here to continue.'));
+  el('small',data.read_only_policy ? 'Your personal-disclosure preference is active.' : data.manual ? 'Complete this step in the form, then choose Recheck form.' : data.required ? 'Required by this form' : 'Optional — you can leave it blank');
   let input;
+  if(!data.read_only_policy){
+  const label=el('label','Your answer'); label.htmlFor='answer';
   if(data.options?.length){input=el('select');el('option','Choose an answer',input).value=''; for(const option of data.options) el('option',option,input).value=option;}
   else input=el(data.multiline ? 'textarea' : 'input');
   input.id='answer'; input.setAttribute('aria-label','Your answer');input.maxLength=20000;
   if(input.tagName==='INPUT')input.type=data.type==='number'?'number':data.type==='date'?'date':'text';
   input.value=data.answer || '';
   if(data.manual){label.hidden=true;input.hidden=true;}
+  }
   let reuse;
-  if(data.can_reuse){const row=el('label');reuse=el('input',null,row);reuse.type='checkbox';el('span',data.reuse_label || 'Remember for matching questions in future applications',row);}
+  if(data.can_reuse && !data.read_only_policy){const row=el('label');reuse=el('input',null,row);reuse.type='checkbox';el('span',data.reuse_label || 'Remember for matching questions in future applications',row);}
   const status=el('p',data.message || '');status.className='status';status.setAttribute('role','status');
   const buttons=[];
   function send(action,e){
     if(!e.isTrusted)return;
+    if(data.read_only_policy && !['rescan','pause'].includes(action))return;
     if(action==='answer' && !input.value.trim()){status.textContent='Enter an answer first, or leave this optional question blank.';return;}
     if(action==='answer' && !input.checkValidity()){input.reportValidity();return;}
-    buttons.forEach(b=>b.disabled=true);status.textContent=action==='draft'?'Writing a draft from your verified experience…':'Saving…';
-    globalThis[data.binding](JSON.stringify({token:data.token, action, answer:input.value, reusable:!!reuse?.checked}));
+    buttons.forEach(b=>b.disabled=true);status.textContent=action==='rescan'?'Rechecking form…':action==='pause'?'Pausing…':action==='draft'?'Writing a draft from your verified experience…':'Saving…';
+    globalThis[data.binding](JSON.stringify({token:data.token, action, answer:input?.value || '', reusable:!!reuse?.checked}));
   }
   function button(text,action,parent=section,primary=false){const b=el('button',text,parent);b.type='button';if(primary)b.className='primary';b.addEventListener('click',e=>send(action,e));buttons.push(b);return b;}
-  if(!data.manual)button('Save answer & continue','answer',section,true);
+  if(!data.manual && !data.read_only_policy)button('Save answer & continue','answer',section,true);
   const actions=el('div');actions.className='row';
-  if(data.can_draft)button('Draft with AI','draft',actions);
-  if(!data.required && !data.manual)button('Leave blank','skip',actions);
+  if(data.can_draft && !data.read_only_policy)button('Draft with AI','draft',actions);
+  if(!data.required && !data.manual && !data.read_only_policy)button('Leave blank','skip',actions);
   const tools=el('div');tools.className='row';button('Recheck form','rescan',tools);button('Pause','pause',tools);
-  el('p','Saved on this Mac. “Save answer & continue” fills this answer in '+data.company+'’s form. It does not submit your application.').className='privacy';
+  el('p',data.read_only_policy ? 'This notice does not change your preference or submit your application.' : 'Saved on this Mac. “Save answer & continue” fills this answer in '+data.company+'’s form. It does not submit your application.').className='privacy';
   root.addEventListener('keydown',e=>e.stopPropagation());root.addEventListener('input',e=>e.stopPropagation());
   root.addEventListener('click',e=>e.stopPropagation());
   document.documentElement.append(host);
   globalThis.__meridianPrompt = {
     root,
     remove(){host.remove();delete globalThis.__meridianPrompt;},
-    update(update){if(update.answer!==undefined)input.value=update.answer;status.textContent=update.message || '';buttons.forEach(b=>b.disabled=false);}
+    update(update){if(input && update.answer!==undefined)input.value=update.answer;status.textContent=update.message || '';buttons.forEach(b=>b.disabled=false);}
   };
 })(__DATA__)

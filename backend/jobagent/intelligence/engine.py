@@ -6,10 +6,32 @@ import re
 
 from ..db import dumps, now, uid
 from ..automation.answers import classify_question, normalize
+from ..automation.disclosures import disclosure_resolution
+from .narratives import compose_narrative
 from .store import Knowledge
 from .semantics import interpret, semantic_interpret
 from .temporal import interval, exposure, requested_date
 from .formatting import adapt, choice
+
+NARRATIVE_INTENTS = {
+    "MOTIVATION",
+    "COMPANY_INTEREST",
+    "ROLE_INTEREST",
+    "CAREER_GOALS",
+    "ADDITIONAL_CONTEXT",
+    "COVER_LETTER",
+    "AI_USAGE",
+    "LLM_USAGE",
+    "PROJECT",
+    "OWNERSHIP",
+    "LEADERSHIP",
+    "TEAMWORK",
+    "CHALLENGE",
+    "FAILURE",
+    "PROBLEM_SOLVING",
+    "ACHIEVEMENT",
+    "WORK_EXPERIENCE",
+}
 
 
 def val(record, key, default=None):
@@ -88,6 +110,18 @@ class CandidateEngine:
 
     def answer_question(self, question, form_context=None, job_context=None, *, semantic=None):
         field, job = form_context or {}, dict(job_context or {})
+        s = semantic or interpret(question, field)
+        policy = self.knowledge.get_policy("personal_disclosures", job)
+        disclosure = disclosure_resolution(question, field, {"personal_disclosures": policy["value"]} if policy else {})
+        if disclosure:
+            return {
+                **self.unknown(question, s),
+                **disclosure,
+                "confidence_level": "POLICY",
+                "requires_confirmation": False,
+                "rules_used": ["policy:" + policy["id"] + ":" + str(policy["revision"])],
+                "reasoning_summary": disclosure["reason"],
+            }
         if not job.get("country") and re.search(
             r"\b(?:london|united kingdom|uk|england|scotland|wales)\b", normalize(job.get("location", ""))
         ):
@@ -103,7 +137,15 @@ class CandidateEngine:
             parts = re.split(r"\s+(?:and also|and|;)\s+", question, flags=re.I)
             parsed = [interpret(part, field) for part in parts]
             signatures = {(p["intent"], p["attribute"], p["selector"]) for p in parsed}
-            if len(parts) > 1 and len(signatures) > 1 and all(p["intent"] != "OTHER" for p in parsed):
+            cohesive_narrative = s["intent"] in NARRATIVE_INTENTS and all(
+                p["intent"] in NARRATIVE_INTENTS for p in parsed
+            )
+            if (
+                len(parts) > 1
+                and len(signatures) > 1
+                and all(p["intent"] != "OTHER" for p in parsed)
+                and not cohesive_narrative
+            ):
                 components = [self.answer_question(part, field, job, semantic=p) for part, p in zip(parts, parsed)]
                 base = self.unknown(question, parsed[0], "MULTI_INTENT_REQUIRES_MORE_EVIDENCE")
                 base["canonical_intents"] = [p["intent"] for p in parsed]
@@ -115,7 +157,9 @@ class CandidateEngine:
                             answer=text,
                             form_value=text,
                             confidence=0.9,
-                            confidence_level="DERIVED_HIGH",
+                            confidence_level="GENERATED"
+                            if any(c["confidence_level"] == "GENERATED" for c in components)
+                            else "DERIVED_HIGH",
                             inferred=True,
                             root_cause=None,
                             fact_ids=list(dict.fromkeys(f for c in components for f in c["fact_ids"])),
@@ -124,7 +168,6 @@ class CandidateEngine:
                             reason="Each component resolved independently from evidence",
                         )
                 return base
-        s = semantic or interpret(question, field)
         out = self.unknown(question, s)
         k = self.knowledge
         used = []
@@ -174,6 +217,11 @@ class CandidateEngine:
             return e
 
         intent, text = s["intent"], s["text"]
+        employer_request = (
+            intent == "WORK_EXPERIENCE"
+            and re.search(r"employer|company", text)
+            and not re.search(r"describe|experience|background|responsibilities|achiev|learn", text)
+        )
         answer = None
         if intent in {"IDENTITY", "CONTACT", "ADDRESS", "NATIONALITY", "LINKEDIN", "GITHUB", "PORTFOLIO"}:
             key = s["attribute"] if intent in {"IDENTITY", "CONTACT", "ADDRESS"} else intent.lower()
@@ -417,6 +465,38 @@ class CandidateEngine:
                     answer = read(record, "route")
                     if re.search(r"expir|valid until", text):
                         answer = read(record, "valid_until")
+                    elif (
+                        answer
+                        and not field.get("options")
+                        and not s["boolean"]
+                        and (
+                            field.get("tag") == "textarea" or re.search(r"status|detail|explain|confirm|describe", text)
+                        )
+                    ):
+                        route = str(answer)
+                        visa_country = read(record, "country")
+                        country_label = (
+                            "the " + visa_country
+                            if visa_country in {"United Kingdom", "United States"}
+                            else visa_country
+                        )
+                        answer = (
+                            f"I currently hold a {route} visa" + (f" in {country_label}" if country_label else "") + "."
+                        )
+                        if normalize(route) == "student":
+                            current_study = education("current")
+                            if current_study:
+                                degree = read(current_study, "degree")
+                                institution = read(current_study, "institution")
+                                end = read(current_study, "end_date")
+                                if degree and institution:
+                                    answer += f" I am studying for an {degree} at {institution}"
+                                    if end:
+                                        end_date = date.fromisoformat(end + "-01" if len(end) == 7 else end)
+                                        answer += f", with my course expected to finish in {end_date.strftime('%B %Y')}"
+                                    answer += "."
+                        rules.append("visa_status_with_verified_study_context")
+                        confidence = "DERIVED_HIGH"
                 else:
                     key = (
                         ("permanent_unrestricted" if s["qualifier"] == "permanent" else "current_right_to_work")
@@ -493,7 +573,7 @@ class CandidateEngine:
                     break
             if answer is None and person("employment_history_complete") is True:
                 answer = False
-        elif intent == "WORK_EXPERIENCE" and re.search(r"employer|company", text):
+        elif employer_request:
             rows = k.records("experience")
             current = s["selector"] == "current"
             if current:
@@ -519,6 +599,14 @@ class CandidateEngine:
             "SOFTWARE_ENGINEERING",
             "PROJECT",
         }:
+            if (
+                intent == "PROJECT"
+                and not s["boolean"]
+                and not re.search(r"(?:largest|biggest|maximum).*data\s?set", text)
+            ):
+                answer = self.narrative(s, job, used, rules, out)
+                if answer is not None:
+                    confidence = "GENERATED"
             if re.search(r"(?:largest|biggest|maximum).*data\s?set", text):
                 datasets = [
                     r
@@ -562,8 +650,10 @@ class CandidateEngine:
                     confidence = "DERIVED_HIGH"
                     rules.append("skill_evidence_exists")
             if answer is None and intent == "PROJECT":
-                answer = self.narrative(s, job, used, rules)
-        if intent == "WORK_EXPERIENCE" and re.search(r"employer|company", text):
+                answer = self.narrative(s, job, used, rules, out)
+                if answer is not None:
+                    confidence = "GENERATED"
+        if employer_request:
             return out if answer is None else self._finish_evidence_answer(out, answer, used, rules, s, field)
         if (
             intent
@@ -573,11 +663,15 @@ class CandidateEngine:
                 "LEADERSHIP",
                 "TEAMWORK",
                 "CHALLENGE",
+                "FAILURE",
+                "PROBLEM_SOLVING",
                 "ACHIEVEMENT",
                 "MOTIVATION",
                 "COMPANY_INTEREST",
                 "ROLE_INTEREST",
                 "CAREER_GOALS",
+                "ADDITIONAL_CONTEXT",
+                "COVER_LETTER",
                 "AI_USAGE",
                 "LLM_USAGE",
                 "WORK_EXPERIENCE",
@@ -596,7 +690,7 @@ class CandidateEngine:
                     if threshold:
                         answer = n >= int(threshold[1]) if "at least" in text else n > int(threshold[1])
             else:
-                answer = self.narrative(s, job, used, rules)
+                answer = self.narrative(s, job, used, rules, out)
             if answer is not None and not isinstance(answer, (int, bool)):
                 confidence = "GENERATED"
         if answer is None:
@@ -698,87 +792,14 @@ class CandidateEngine:
             "evidence_count": count,
         }
 
-    def narrative(self, s, job, used, rules):
-        """Claim-safe generation: compose verified clauses, not unconstrained prose.
-
-        Evidence selection varies by question and role. No model-supplied sentence
-        enters autofill; free-form model drafts remain a separate manual workflow.
-        """
-        intent = s["intent"]
-        words = set(normalize(job.get("title", "") + " " + s["text"]).split())
-        records = self.knowledge.records("project") + self.knowledge.records("experience")
-        targets = {
-            "LEADERSHIP": "leadership",
-            "OWNERSHIP": "ownership",
-            "AI_USAGE": "ai",
-            "TEAMWORK": "teamwork",
-            "CHALLENGE": "challenge",
-            "WORK_EXPERIENCE": "teaching",
-        }
-        target = targets.get(intent)
-        if intent == "CHALLENGE":
-            target = None  # describe the technical work without inventing a difficulty or emotion
-        if intent == "FAILURE":
-            return None
-        if intent == "AI_USAGE" and re.search(r"current|day to day|now", s["text"]):
-            records = [r for r in records if val(r, "ongoing") is True]
-        eligible = []
-        for r in records:
-            tags = set(normalize(" ".join(val(r, "tags", []))).split())
-            if target and target not in tags:
-                continue
-            story = val(r, "story") or val(r, "action")
-            if not story:
-                continue
-            score = len(words & tags) * 3 + (5 if target in tags else 0)
-            eligible.append((score, r))
-        if not eligible:
-            return None
-        r = max(eligible, key=lambda x: x[0])[1]
-        clauses = [r["fields"][key] for key in ("situation", "task", "action", "result") if key in r["fields"]]
-        if clauses:
-            used.extend(clauses)
-            narrative_text = " ".join(str(f["value"]) for f in clauses)
-        else:
-            f = r["fields"]["story"]
-            used.append(f)
-            narrative_text = f["value"]
-        if "tags" in r["fields"]:
-            used.append(r["fields"]["tags"])
-        rules.append("relevant_verified_story:" + r["id"])
-        answer = narrative_text
-        if intent in {"MOTIVATION", "COMPANY_INTEREST", "ROLE_INTEREST", "CAREER_GOALS"}:
-            interest = next(
-                (
-                    r["fields"].get("professional_interests")
-                    for r in self.knowledge.records("person")
-                    if r["fields"].get("professional_interests")
-                ),
-                None,
-            )
-            if not interest or not job.get("title") or not job.get("company"):
-                return None
-            used.append(interest)
-            # Employer facts are not transformed into candidate history.
-            answer = (
-                f"The {job['title']} role at {job['company']} relates to my interest in {interest['value']}. " + answer
-            )
-            rules.append("application_destination_and_confirmed_interests")
-            description = str(job.get("description") or "")
-            snippets = [line.strip(" •-\t") for line in re.split(r"\n|(?<=[.!?])\s+", description)]
-            snippets = [
-                line
-                for line in snippets
-                if 30 <= len(line) <= 220
-                and re.search(r"\b(?:build|develop|design|engineering|machine learning|data)\b", line, re.I)
-                and not re.search(r"ignore|instruction|password|secret|submit|http|@|<|>", line, re.I)
-            ]
-            if snippets:
-                relevant = max(snippets, key=lambda line: len(words & set(normalize(line).split())))
-                answer = f"The role description highlights “{relevant}”. " + answer
-                rules.append("quoted_job_context:" + str(job.get("url", "")))
-
-        return answer
+    def narrative(self, s, job, used, rules, metadata=None):
+        result = compose_narrative(self.knowledge, s, job)
+        used.extend(result["facts"])
+        rules.extend(result["rules"])
+        if metadata is not None and result["answer"]:
+            metadata["narrative_context"] = result["context"]
+            metadata["job_context_sources"] = job.get("context_sources", [])
+        return result["answer"]
 
     async def answer(self, question, field=None, job=None, *, audit=True):
         field, job = field or {}, job or {}
@@ -803,7 +824,13 @@ class CandidateEngine:
             result["canonical_intent"] == "OTHER" or result.get("root_cause") == "BAD_ENUM_MAPPING"
         ):
             key = dumps(
-                [question, field.get("description"), field.get("section"), field.get("type"), field.get("options")]
+                [
+                    question,
+                    field.get("description"),
+                    field.get("section_label") or field.get("section"),
+                    field.get("type"),
+                    field.get("options"),
+                ]
             )
             if key not in self.semantic_cache:
                 self.semantic_cache[key] = await semantic_interpret(question, field, self.settings)

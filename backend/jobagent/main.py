@@ -559,7 +559,8 @@ def create_app(data_dir: Path | None = None, token: str | None = None, secret_st
         job = app.state.db.one("SELECT * FROM jobs WHERE id=?", (payload.get("job_id"),))
         if not job:
             raise ValueError("Select a job before generating an answer")
-        await ensure_text_runtime()
+        if not app.state.text_ai.uses_grounded_cover_letter(payload.get("question", "")):
+            await ensure_text_runtime()
         return await app.state.text_ai.draft(
             get_settings(app.state.db), payload.get("question", ""), job, payload.get("fact_ids", [])
         )

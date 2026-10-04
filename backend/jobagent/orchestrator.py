@@ -95,11 +95,14 @@ class Orchestrator:
 
     def application(self, application_id):
         application = self.db.one(
-            "SELECT a.*,j.title,j.company,j.location,j.application_url,j.url,j.match_score,j.ats FROM applications a JOIN jobs j ON a.job_id=j.id WHERE a.id=?",
+            "SELECT a.*,j.title,j.company,j.location,j.application_url,j.url,j.url AS job_url,j.description,"
+            "j.skills,j.metadata,j.source,j.updated_at AS job_updated_at,j.match_score,j.ats "
+            "FROM applications a JOIN jobs j ON a.job_id=j.id WHERE a.id=?",
             (application_id,),
         )
         if not application:
             raise ValueError("Application not found")
+        application = decode_row(application)
         application["url"] = application["application_url"] or application["url"]
         return application
 
@@ -288,13 +291,17 @@ class Orchestrator:
                 from .usage import decision_settings
 
                 config = decision_settings(self.db, config, SecretStore())
+                from .automation.job_context import prepare_job_context
+                config['_job_context'] = await prepare_job_context(application)
                 if config['assisted_autofill'] and self.text_service:
-                    config['_reason_answer'] = self.field_reasoner(application, facts, config)
+                    config['_reason_answer'] = self.field_reasoner(config['_job_context'], facts, config)
                 from .intelligence.engine import CandidateEngine
                 intelligence = CandidateEngine(self.db, settings=config)
+                disclosure = intelligence.knowledge.get_policy('personal_disclosures', application)
+                if disclosure:
+                    config['sensitive_policies']['personal_disclosures'] = disclosure['value']
                 if intelligence.enabled:
                     config['_candidate_engine'] = intelligence
-                    config['_job_context'] = application
                 result = await self.browser.fill_application(
                     application, facts, documents, application["mode"].upper(), config
                 )
@@ -393,12 +400,15 @@ class Orchestrator:
     async def show_browser_question(self, run_id, application, result, facts):
         from .application_profile import question_field, profile, draft_fact_ids, remember_answer
         from .automation.answers import classify_question, SENSITIVE
-        question = next((q for q in result.get('questions', []) if q.get('target') and q.get('kind') != 'document'), None)
-        question = question or next(iter(result.get('questions', [])), None)
+        eligible = [q for q in result.get('questions', []) if not q.get('skip_inline_question')]
+        question = next((q for q in eligible if q.get('target') and q.get('kind') != 'document'), None)
+        question = question or next(iter(eligible), None)
+        question = question or next((q for q in result.get('questions', []) if q.get('skip_inline_question')), None)
+        read_only_policy = bool(question and question.get('skip_inline_question'))
         if not question or not self.browser.page or self.browser.page.is_closed():
             return
-        spec = question_field(question['question'], application)
-        suggested = next((f for f in profile(self.db)['fields'] if spec and f['key'] == spec['key']), None)
+        spec = None if read_only_policy else question_field(question['question'], application)
+        suggested = None if read_only_policy else next((f for f in profile(self.db)['fields'] if spec and f['key'] == spec['key']), None)
         options = [o['label'] for o in question.get('options', []) if o.get('label') and not o.get('disabled') and o.get('value') != '']
         if not options and spec:
             options = spec['options']
@@ -406,7 +416,9 @@ class Orchestrator:
         can_draft = (question.get('multiline') or kind == 'free_text') and kind not in {*SENSITIVE, 'work_authorization', 'salary'}
         safe_reuse = kind != 'legal_certification' and (kind not in {'work_authorization', 'salary'} or bool(spec and spec.get('scope')))
         answer = question.get('current_value') or (suggested['value'] if suggested else '')
-        manual = not question.get('target') or question.get('kind') == 'document'
+        manual = read_only_policy or not question.get('target') or question.get('kind') == 'document'
+        if read_only_policy:
+            options, answer = [], ''
         if manual:
             can_draft = safe_reuse = False
         # The original question remains visible alongside the browser-owned guide.
@@ -431,6 +443,8 @@ class Orchestrator:
                 self.launch(application['id'], resume=True)
                 return
             self.browser._check_pause()
+            if read_only_policy:
+                raise ValueError('Your personal-disclosure preference keeps this question blank. Use Recheck form or Pause.')
             if manual:
                 raise ValueError('Complete this step in the form, then choose Recheck form')
             await self.browser._validate_snapshot(result['snapshot_id'])
@@ -463,8 +477,8 @@ class Orchestrator:
             'remaining': len(result['questions']), 'options': options, 'answer': answer,
             'multiline': question.get('multiline') or kind == 'free_text' or bool(spec and spec['multiline']),
             'type': question.get('type'), 'can_draft': bool(can_draft), 'can_reuse': safe_reuse,
-            'description': question.get('description'),
-            'manual': manual,
+            'description': (question.get('reason') or 'Your saved personal-disclosure preference keeps this question blank.') if read_only_policy else question.get('description'),
+            'manual': manual, 'read_only_policy': read_only_policy,
             'reuse_label': 'Remember for matching questions' + (' ('+spec['scope']+' only)' if spec and spec.get('scope') else ' in future applications'),
             'message': 'Suggested answer — confirm or edit it.' if suggested and suggested['state'] == 'suggested' and answer else '',
         }, handle)

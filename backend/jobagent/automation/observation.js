@@ -38,6 +38,24 @@
   };
   const fieldFor = node => node.closest('[data-field-path],.ashby-application-form-field-entry');
   const questionFor = node => fieldFor(node)?.querySelector('.ashby-application-form-question-title');
+  const plainCopy = node => {
+    if (!node || node.matches('[role="alert"],.field-error,.error-message,[data-applicant-answer],[data-candidate-answer]')) return '';
+    const copy = node.cloneNode(true);
+    copy.querySelectorAll('input,textarea,select,button,script,style,[contenteditable="true"],' +
+      '[role="combobox"],[role="listbox"],[role="option"],.select2-container,.select__container,' +
+      '[role="alert"],.field-error,.error-message,[data-applicant-answer],[data-candidate-answer]').forEach(n => n.remove());
+    return copy.textContent.replace(/\s+/g, ' ').trim();
+  };
+  const descriptionFor = node => {
+    const root = node.getRootNode();
+    const described = (node.getAttribute('aria-describedby') || '').split(/\s+/)
+      .map(id => plainCopy(root.getElementById?.(id))).filter(Boolean);
+    const field = fieldFor(node) || node.closest('.application-question,.application-field,.form-field,.field');
+    const hints = field ? [...field.querySelectorAll('.ashby-application-form-question-description,' +
+      '.application-question-description,.field-description,.description,.help-text,.hint,[data-description]')]
+      .filter(hint => !hint.closest('[hidden],[aria-hidden="true"]')).map(plainCopy) : [];
+    return [...new Set([...hints, ...described])].join(' ').slice(0, 2400);
+  };
   const questionContainerText = node => {
     const container = node.closest('.application-question') || node.closest('.application-field')?.parentElement;
     if (!container || container.tagName === 'FORM') return '';
@@ -59,6 +77,17 @@
     return /resume|\bcv\b|cover letter|transcript/i.test(identityHint) ? identityHint.trim() : '';
   };
   const comboProxy = node => node.getAttribute('role') === 'combobox' && !visible(node) ? node.closest('.select__control') : null;
+  const toggleProxy = node => {
+    if (node.tagName !== 'INPUT' || !['radio','checkbox'].includes(node.type)) return null;
+    const rect = node.getBoundingClientRect();
+    const style = getComputedStyle(node);
+    const clipped = rect.width <= 2 || rect.height <= 2 || style.clipPath !== 'none' ||
+      (style.clip !== 'auto' && style.clip !== 'rect(auto, auto, auto, auto)');
+    if (visible(node) && !clipped) return null;
+    // Native association is essential: a nearby text label is not permission
+    // to click a different control or a submit action.
+    return [...(node.labels || [])].find(candidate => candidate.control === node && visible(candidate)) || null;
+  };
   const selectedText = node => {
     const selection = node.closest('.select__control')?.querySelector('.select__single-value');
     if (!selection) return '';
@@ -79,7 +108,7 @@
   }
   const elements = [];
   const sectionFor = node => {
-    const container = node.closest('fieldset,section,[role="group"],[role="region"]');
+    const container = node.closest('fieldset,section,[role="group"],[role="region"],.ashby-application-form-section');
     const heading = container?.querySelector('legend,h1,h2,h3,h4,[role="heading"]');
     return {section_id: container ? `section-${identity(container)}` : 'page',
       section_label: (heading?.innerText || container?.getAttribute('aria-label') || 'Application details').slice(0, 160)};
@@ -87,7 +116,8 @@
   for (const node of all) {
     // Ashby's optional resume parser is separate from the actual resume field.
     if (node.closest('.ashby-application-form-autofill-input-root')) continue;
-    const proxy = uploadProxy(node) || comboProxy(node);
+    const toggle = toggleProxy(node);
+    const proxy = uploadProxy(node) || comboProxy(node) || toggle;
     if (['hidden', 'password'].includes(node.type) || !(proxy ? visible(proxy) : visible(node))) continue;
     if (node.type === 'checkbox' && node.closest('.ashby-application-form-input-yesno')) continue;
     const tag = node.tagName.toLowerCase();
@@ -111,12 +141,19 @@
     else operations = ['CLICK'];
     if (tag === 'a') operations.push('OPEN_TAB');
     if (role === 'combobox' && !operations.includes('CLICK')) operations.push('CLICK');
+    const clearProxy = node.closest('.select__control')?.querySelector('.select__clear-indicator');
+    const nativeClear = (['input','textarea','select'].includes(tag) &&
+      (role !== 'combobox' || tag === 'select') &&
+      !['file','submit','button','reset','image','hidden','password'].includes(type) && !readonly);
+    if (nativeClear || (role === 'combobox' && !readonly && clearProxy && visible(clearProxy))) operations.push('CLEAR');
     const rect = node.getBoundingClientRect();
     const question = questionFor(node)?.innerText?.trim();
     elements.push({node_id: identity(node), role, tag, type, explicit_type: node.getAttribute('type'),
       label: role === 'combobox' || role === 'upload' ? question || fileQuestion(node) || questionContainerText(node) || label(node) : label(node), ...sectionFor(node),
       upload_proxy_id: type === 'file' && proxy && visible(proxy) ? identity(proxy) : null,
       interaction_proxy_id: role === 'combobox' && proxy && visible(proxy) ? identity(proxy) : null,
+      toggle_proxy_id: toggle ? identity(toggle) : null,
+      clear_proxy_id: role === 'combobox' && clearProxy && visible(clearProxy) ? identity(clearProxy) : null,
       form_id: node.closest('form') ? identity(node.closest('form')) : 'page',
       max_length: node.maxLength > 0 ? node.maxLength : null, step: node.getAttribute('step'), min: node.getAttribute('min'), max: node.getAttribute('max'),
       field_path: fieldFor(node)?.getAttribute('data-field-path') || '',
@@ -128,6 +165,7 @@
       required: required(node),
       enabled, readonly, operations: enabled ? operations : [],
       name: node.name || '', id: node.id || '', autocomplete: node.autocomplete || '',
+      placeholder: node.getAttribute('placeholder') || '',
       href: tag === 'a' ? node.href : null,
       options: tag === 'select' ? [...node.options].map(o => ({label:o.label, value:o.value,
         disabled:o.disabled || !!o.closest('optgroup[disabled]')})) : [],
@@ -137,7 +175,7 @@
         (tag !== 'input' && tag !== 'select' ? node.innerText : '') : '',
       context: question || (role === 'checkbox' && fieldFor(node)?.querySelector('.ashby-application-form-question-description')?.innerText) || node.closest('fieldset')?.querySelector('legend')?.innerText ||
         node.closest('[role="group"],[role="radiogroup"]')?.getAttribute('aria-label') || questionContainerText(node) || '',
-      description: (fieldFor(node)?.querySelector('.ashby-application-form-question-description')?.innerText || (node.getAttribute('aria-describedby') || '').split(/\s+/).map(id => document.getElementById(id)?.textContent || '').join(' ')).slice(0, 1600),
+      description: descriptionFor(node),
       in_viewport: rect.bottom > 0 && rect.top < innerHeight && rect.right > 0 && rect.left < innerWidth
     });
   }
@@ -151,10 +189,36 @@
     .filter(visible).map(n => n.innerText || label(n)).filter(t => t && !/\bpage is loaded\s*$/i.test(t)).slice(0, 30);
   const unresolved_required = all.filter(node => (node.required || node.getAttribute('aria-required') === 'true') &&
     !node.matches(':disabled') && node.type !== 'hidden' && node.type !== 'password' &&
-    !visible(node) && !uploadProxy(node) && !comboProxy(node) &&
+    !visible(node) && !uploadProxy(node) && !comboProxy(node) && !toggleProxy(node) &&
     !(node.getAttribute('aria-hidden') === 'true' && node.closest('.select__container,.select-shell')?.querySelector('[role="combobox"]')) &&
     (node.validity ? !node.validity.valid : !node.value))
     .map(node => ({label:label(node),type:node.type || node.getAttribute('role')}));
+  // Keep employer material separate from applicant answers. Never use the full
+  // page text as narrative context: forms can expose names, emails and drafts.
+  const employerSections = [];
+  const employerText = node => {
+    const copy = node.cloneNode(true);
+    copy.querySelectorAll('form,input,textarea,select,button,script,style,nav,footer,' +
+      '[contenteditable="true"],[role="combobox"],[role="listbox"],.select__container,.select2-container,' +
+      '[data-field-path],.ashby-application-form-field-entry,.application-question,.application-field,' +
+      '[data-applicant-answer],[data-candidate-answer],[role="alert"],.field-error,.error-message').forEach(n => n.remove());
+    return copy.textContent.replace(/\s+/g, ' ').trim().slice(0, 24000);
+  };
+  const jobSelectors = '[itemprop="description"],.ashby-job-posting-description,.posting-description,' +
+    '.section-wrapper.page-full-width,[data-automation-id="jobPostingDescription"],' +
+    '#job_description,#job-description,.job-description,#content';
+  for (const node of document.querySelectorAll(jobSelectors)) {
+    if (!visible(node) || node.closest('form,[data-field-path],.application-question,.application-field')) continue;
+    // Broad ATS layout wrappers are useful only on the listing side. An
+    // application wrapper is not a job description after its form is removed.
+    if (node.matches('#content,.section-wrapper.page-full-width') &&
+      node.querySelector('form,input,textarea,select,[contenteditable="true"]')) continue;
+    const text = employerText(node);
+    if (text.length >= 80 && !employerSections.some(s => s.text.includes(text)))
+      employerSections.push({kind:'job_description',text});
+  }
+  const jobContext = {title:document.querySelector('h1,[itemprop="title"],[data-automation-id="jobPostingHeader"]')?.textContent?.trim() || '',
+    sections:employerSections.slice(0, 8)};
   return {document_id:cache.documentId,url:location.href,title:document.title,text,elements,
-    challenge,mfa,login,errors,unresolved_required,scroll:{y:scrollY,height:document.documentElement.scrollHeight,viewport:innerHeight}};
+    job_context:jobContext,challenge,mfa,login,errors,unresolved_required,scroll:{y:scrollY,height:document.documentElement.scrollHeight,viewport:innerHeight}};
 }

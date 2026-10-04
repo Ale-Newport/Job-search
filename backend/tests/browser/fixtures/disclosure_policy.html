@@ -1,0 +1,12 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><title>Disclosure policy regression fixture</title>
+<style>label,fieldset{display:block;margin:16px}input,select{padding:8px}.select__control{margin:16px;padding:10px;border:1px solid;width:200px}.select__clear-indicator{cursor:pointer;padding:8px}</style>
+<form onsubmit="event.preventDefault();window.submissions++">
+<label>First name <input name="first_name" required></label>
+<label>Preferred pronouns <input name="pronouns" value="he/him"></label>
+<label>Ethnic origin <select name="ethnicity"><option value="" disabled>Select…</option><option value="group" selected>Example</option><option value="decline">Prefer not to say</option></select></label>
+<label><input name="disabled" type="checkbox" checked> I have a disability</label>
+<fieldset><legend>What is your gender identity?</legend><label><input name="gender" type="radio" value="male" checked>Male</label><label><input name="gender" type="radio" value="female">Female</label></fieldset>
+<div class="select__control"><div class="select__single-value">Example faith</div><input role="combobox" aria-label="Religion" aria-expanded="false"><button type="button" class="select__clear-indicator" aria-label="Clear religion" onclick="this.parentElement.querySelector('.select__single-value').remove();this.remove()">×</button></div>
+<label>What is your mental health status? <input id="required_health" name="health" required value="A saved answer"></label>
+<label>Describe software you built for mental health services <textarea name="work"></textarea></label>
+<button type="submit">Submit application</button></form><script>window.submissions=0;</script></html>

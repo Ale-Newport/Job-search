@@ -4,6 +4,7 @@ from pathlib import Path
 
 from ..intelligence.formatting import choice as option_for
 from .reasoning import conditional_state, profile_resolution
+from .disclosures import disclosure_resolution, disclosure_clear_operation, inherit_disclosure_context
 
 from .answers import normalize, selected_choice_matches, dropdown_search_value
 
@@ -24,6 +25,16 @@ def section_plan(snapshot, target, adapter, facts, documents, policies, document
     fields, keys = [], []
     for element in snapshot["elements"]:
         if element["document_id"] != target["document_id"] or element.get("section_id", "page") != section:
+            continue
+        inherit_disclosure_context(element, snapshot["elements"], adapter)
+        disclosure = disclosure_resolution(adapter.question(element), element, policies)
+        if disclosure:
+            clear = disclosure_clear_operation(element)
+            if clear:
+                operation, value = clear
+                keys.append(action_key(element, operation, value))
+                fields.append({"question": adapter.question(element), "answer": "", "operation": operation,
+                               "reason": disclosure["reason"], "policy": disclosure["policy"]})
             continue
         condition = conditional_state(element, snapshot['elements'], adapter)
         element['_condition'] = condition or {}

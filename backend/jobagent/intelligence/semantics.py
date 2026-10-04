@@ -19,7 +19,7 @@ AVAILABILITY RELOCATION REMOTE_WORK HYBRID_WORK OFFICE_POLICY TRAVEL WORK_AUTHOR
 SECURITY_CLEARANCE CRIMINAL_HISTORY DISABILITY DEMOGRAPHIC PRONOUNS GENDER ETHNICITY RELIGION VETERAN_STATUS
 REASONABLE_ADJUSTMENTS GDPR CONSENT CONFLICT_OF_INTEREST PREVIOUS_EMPLOYMENT EMPLOYEE_REFERRAL SOURCE_OF_APPLICATION
 PORTFOLIO GITHUB LINKEDIN PUBLICATIONS RESEARCH OPEN_SOURCE AI_USAGE LLM_USAGE CLOUD DATA MACHINE_LEARNING
-SOFTWARE_ENGINEERING ACADEMIC_RESULT OTHER""".split()
+SOFTWARE_ENGINEERING ACADEMIC_RESULT ADDITIONAL_CONTEXT COVER_LETTER OTHER""".split()
 )
 
 # Concepts and modifiers are independent: no question -> answer lookup.
@@ -37,7 +37,7 @@ CONCEPTS = [
         r"classification|honou?rs|weighted|degree.*(?:average|percentage)|academic result|numeric percentage|\bgrade\b|\bmarks\b",
     ),
     ("GRADUATION", r"\bgraduat|(?:finish|complete|end).*stud(?:y|ies)|(?:master|msc).*(?:finish|complete|end)"),
-    ("START_DATE", r"(?:start|join|commenc|available|availability).*|how soon.*(?:work|employment)"),
+    ("START_DATE", r"(?:when|date|how soon|how early).*\b(?:start|join|commenc|available)|(?:start|commencement|joining) date|\bavailability\b|\bavailable (?:from|to start|for work)\b"),
     ("REASONABLE_ADJUSTMENTS", r"adjustment|accommodation.*(?:recruit|interview|process)"),
     ("CRIMINAL_HISTORY", r"criminal|convict|arrest"),
     ("SECURITY_CLEARANCE", r"security clearance"),
@@ -69,12 +69,12 @@ CONCEPTS = [
     ),
     ("LEADERSHIP", r"leadership|\bled\b|lead a|managed.*team|team.*(?:size|led|manage)|how many.*(?:people|engineer)"),
     ("OWNERSHIP", r"ownership|from scratch|co found|founded|built.*product"),
-    ("FAILURE", r"fail(?:ure|ed)|mistake"),
+    ("FAILURE", r"\bfail(?:ure|ed|ing|s)?\b|mistake|unsuccessful|(?:did not|didn t|not) work\b|went wrong|fell short"),
     ("CHALLENGE", r"challenge|difficult|complex problem"),
     ("TEAMWORK", r"teamwork|collaborat"),
     ("ACHIEVEMENT", r"achievement|proud"),
     ("AI_USAGE", r"(?:use|using|apply|applying).*\b(?:ai|llm)|\bai.*(?:day to day|workflow)"),
-    ("MOTIVATION", r"why|motivat|interested|interest.*(?:role|company)|career goals"),
+    ("MOTIVATION", r"motivation|interest.*(?:role|position|company)|career goals"),
     ("LINKEDIN", r"linkedin"),
     ("GITHUB", r"github"),
     ("PORTFOLIO", r"portfolio|personal website"),
@@ -90,21 +90,51 @@ CONCEPTS = [
     ("EDUCATION", r"universit|college|school|institution|studying|student|enroll|academic"),
     (
         "WORK_EXPERIENCE",
-        r"employer|current company|most recent company|employment|teaching|taught|mentor|work experience",
+        r"employer|current company|most recent company|employment|teaching|taught|mentor|work experience|"
+        r"professional (?:experience|background|history)|career (?:history|background)|previous roles|"
+        r"experience (?:from|in|across) (?:your )?(?:previous|past|professional) (?:roles|jobs|work)",
     ),
     ("PROJECT", r"project|built|developed|implemented|deployed|dataset|data set"),
     ("SKILL", r"experience|proficien|skill|familiar|have you|can you|used|technolog|framework|programming|cloud"),
 ]
 
 
+MOTIVATION_PURPOSE = re.compile(
+    r"\bmotivat\w*.{0,80}\b(?:apply|applying|application|role|position|join|company|career)\b|"
+    r"\b(?:application|role|company|career).{0,35}\bmotivat\w*|^motivation\b|"
+    r"\bwhy\b.{0,60}\b(?:join|apply|applying|work for|work at|hire you|hire me|choose you|choose me)\b|"
+    r"\bwhy (?:this|our) (?:role|position|company|team|opportunity)\b|\bwhy us\b|"
+    r"\binterest\w*.{0,65}\b(?:role|position|company|opportunity|career)\b|"
+    r"\bwhat attracts\b.{0,65}\b(?:us|role|company|position|opportunity)\b|\bcareer goals\b"
+)
+
+
 def interpret(question, field=None):
     field = field or {}
     text = normalize(question)
     text = re.sub(r"^(?:please )?(?:name|identify) (?:the |your |my )?", "", text)
-    context = normalize(" ".join(str(field.get(k) or "") for k in ("description", "section", "placeholder")))
+    context = normalize(" ".join(str(field.get(k) or "") for k in ("description", "section_label", "section", "placeholder")))
+    generic_context = bool(re.search(
+        r"anything else|additional (?:information|context)|further (?:information|details)|tell us more about yourself|"
+        r"^(?:your response|please (?:elaborate|specify)|supporting information)$", text))
+    if generic_context:
+        # A weak headline cannot erase the actual question below it. Carry its
+        # qualifiers too: e.g. 'highest completed degree' must exclude an MSc
+        # in progress even when the field's short label says 'Further details'.
+        qualifier = field.get("description") or field.get("placeholder") or field.get("section_label") or field.get("section")
+        if qualifier:
+            text += " " + normalize(str(qualifier))
     intent = next((i for i, p in CONCEPTS if re.search(p, text)), "OTHER")
-    if intent == "OTHER" and re.search(r"anything else|additional (?:information|context)", text):
-        intent = "PROJECT"
+    # Interpret the communication purpose before topic words in its examples.
+    # A request for motivation mentioning a project is still about motivation.
+    if re.search(r"cover(?:ing)? letter|letter of (?:motivation|interest)", text):
+        intent = "COVER_LETTER"
+    elif MOTIVATION_PURPOSE.search(text):
+        intent = "MOTIVATION"
+    elif re.search(r"(?:how|ways|describe).*\b(?:use|using|apply|applying)\b.*\b(?:ai|artificial intelligence|llms?)\b|\bai\b.*(?:day to day|workflow)", text):
+        intent = "AI_USAGE"
+    elif generic_context and intent == "OTHER":
+        intent = "ADDITIONAL_CONTEXT"
     if intent == "OTHER" and context:
         intent = next((i for i, p in CONCEPTS if re.search(p, context)), "OTHER")
     if re.search(r"gdpr|privacy|terms|consent", text):
@@ -113,8 +143,6 @@ def interpret(question, field=None):
         r"permanent|unrestricted", text
     ):
         intent = "WORK_AUTHORIZATION"
-    if intent == "OTHER" and re.search(r"anything else|additional (?:information|context)", text):
-        intent = "PROJECT"
     # The requested head noun outranks a modifying clause (university from
     # which I graduated asks for an institution, not a graduation date).
     institution = re.search(r"\b(?:university|institution|college|school)\b", text)
@@ -208,6 +236,7 @@ def interpret(question, field=None):
         "output": output,
         "boolean": boolean,
         "text": text,
+        "context": context,
         "parser": "compositional",
         "confidence": 0.94,
     }
@@ -253,7 +282,7 @@ async def semantic_interpret(question, field, settings):
                                 {
                                     "question": question[:2500],
                                     "description": field.get("description", "")[:1000],
-                                    "section": field.get("section", ""),
+                                    "section": field.get("section_label") or field.get("section", ""),
                                     "type": field.get("type"),
                                     "options": [o.get("label") for o in field.get("options", [])][:60],
                                 }

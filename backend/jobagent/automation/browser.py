@@ -280,6 +280,30 @@ class BrowserSession:
                         visible_node = proxy_handle.as_element()
                         if visible_node is None:
                             raise StaleState('The observed dropdown control changed.')
+                    if element.get('toggle_proxy_id'):
+                        proxy_handle = await node.evaluate_handle("""(node, id) => {
+                            const proxy = window.__meridianObservedControlsV1.nodes.get(id);
+                            return node.isConnected && proxy?.isConnected && node instanceof HTMLInputElement &&
+                                ['radio','checkbox'].includes(node.type) && !node.disabled &&
+                                proxy instanceof HTMLLabelElement && proxy.control === node &&
+                                [...(node.labels || [])].includes(proxy) ? proxy : null;
+                        }""", element['toggle_proxy_id'])
+                        visible_node = proxy_handle.as_element()
+                        if visible_node is None:
+                            raise StaleState('The observed toggle label changed.')
+                    if op == Operation.CLEAR and element.get("clear_proxy_id"):
+                        if proxy_handle:
+                            await proxy_handle.dispose()
+                        proxy_handle = await node.evaluate_handle("""(node, id) => {
+                            const clear = window.__meridianObservedControlsV1.nodes.get(id);
+                            const container = node.closest('.select__control');
+                            return node.isConnected && clear?.isConnected && container &&
+                                container.contains(clear) && clear.matches('.select__clear-indicator') &&
+                                node.getAttribute('role') === 'combobox' ? clear : null;
+                        }""", element["clear_proxy_id"])
+                        visible_node = proxy_handle.as_element()
+                        if visible_node is None:
+                            raise StaleState("The observed dropdown clear control changed.")
                     if op == Operation.UPLOAD and element.get("upload_proxy_id"):
                         proxy_handle = await node.evaluate_handle("""(node, id) => {
                             const proxy = window.__meridianObservedControlsV1.nodes.get(id);
@@ -293,7 +317,7 @@ class BrowserSession:
                         if visible_node is None:
                             raise StaleState("The observed upload control changed.")
                     await visible_node.scroll_into_view_if_needed()
-                    valid = await visible_node.evaluate("""node => {
+                    valid = await visible_node.evaluate("""(node, nativeToggleId) => {
                         if (!node.isConnected || node.ownerDocument !== document) return 'document';
                         if (node.matches(':disabled') || node.closest('[aria-disabled="true"],[inert]')) return 'disabled';
                         const r = node.getBoundingClientRect(), s = getComputedStyle(node);
@@ -302,10 +326,15 @@ class BrowserSession:
                         const y = Math.max(0, Math.min(innerHeight - 1, r.y + r.height / 2));
                         let top = document.elementFromPoint(x, y);
                         while (top?.shadowRoot?.elementFromPoint(x,y)) top = top.shadowRoot.elementFromPoint(x,y);
+                        // A transparent native input can intentionally cover its
+                        // own visible label. Only that exact observed input may
+                        // be the hit target; other overlays still block action.
+                        if (nativeToggleId && top === window.__meridianObservedControlsV1.nodes.get(nativeToggleId)) return 'native';
                         return top === node || node.contains(top) ? 'ok' : 'covered';
-                    }""")
-                    if valid != "ok":
+                    }""", node_id if element.get('toggle_proxy_id') else None)
+                    if valid not in {"ok", "native"}:
                         raise StaleState(f"The observed control is {valid}; no action was performed.")
+                    toggle_click_node = node if valid == "native" else visible_node
                     if frame.parent_frame:
                         iframe = await frame.frame_element()
                         outer_valid = await iframe.evaluate("""node => {
@@ -323,6 +352,42 @@ class BrowserSession:
                         if element['role'] == 'combobox' and not element.get('expanded'):
                             await visible_node.click()
                         await node.fill(value)
+                    elif op == Operation.CLEAR:
+                        if value is not None:
+                            raise InvalidDecision("Clearing cannot include a replacement answer.")
+                        if element.get("clear_proxy_id"):
+                            await visible_node.click()
+                        elif element.get("tag") == "select":
+                            # Selecting no options differs from selecting a decline answer,
+                            # and supports forms whose empty placeholder is disabled.
+                            await node.select_option([])
+                        elif element.get("type") == "checkbox":
+                            if element.get('toggle_proxy_id'):
+                                if await node.is_checked():
+                                    await toggle_click_node.click()
+                            else:
+                                await node.set_checked(False)
+                        elif element.get("type") == "radio":
+                            # Browsers have no uncheck gesture for native radio inputs.
+                            # Mutate this exact observed input only, then let the form's
+                            # handlers update state. The runner independently re-observes
+                            # and blocks if a controlled component restores the answer.
+                            await node.evaluate("""node => {
+                                if (!(node instanceof HTMLInputElement) || node.type !== 'radio')
+                                    throw new Error('The observed radio control changed.');
+                                Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'checked')
+                                    .set.call(node, false);
+                                node.dispatchEvent(new Event('input', {bubbles:true}));
+                                node.dispatchEvent(new Event('change', {bubbles:true}));
+                                // React tracks checkable input changes from clicks.
+                                // A generic Event notifies handlers without the
+                                // activation behavior that would re-check a radio.
+                                node.dispatchEvent(new Event('click', {bubbles:true}));
+                            }""")
+                        elif element.get("role") != "combobox" and "TYPE_TEXT" in element.get("operations", []):
+                            await node.fill("")
+                        else:
+                            raise InvalidDecision("No supported observed clear operation exists for this control.")
                     elif op == Operation.SELECT:
                         option = next((o for o in element["options"] if o["value"] == value and not o["disabled"]), None)
                         if option is None:
@@ -330,7 +395,10 @@ class BrowserSession:
                         await node.select_option(value=value)
                     elif op in {Operation.CHECK, Operation.UNCHECK}:
                         desired = op == Operation.CHECK
-                        if element["type"] in {"checkbox", "radio"}:
+                        if element.get('toggle_proxy_id'):
+                            if await node.is_checked() != desired:
+                                await toggle_click_node.click()
+                        elif element["type"] in {"checkbox", "radio"}:
                             await node.set_checked(desired)
                         elif bool(element["checked"]) != desired:
                             await node.click()

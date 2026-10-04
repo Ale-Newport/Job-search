@@ -1,6 +1,6 @@
 {
-  "verified_at": "2026-10-03T11:11:11.150665+00:00",
-  "source_commit": "05e70dd4de581f6a9f841505a423c10c3f857e4e",
+  "verified_at": "2026-10-04T13:14:41.266169+00:00",
+  "source_commit": "9b055e4d74f16952f5008e92d1a2c83dfe2c2331",
   "version": "0.1.0",
   "platform": "macOS 15+, Apple Silicon arm64",
   "installed_apps": [
@@ -8,16 +8,16 @@
     "/Users/alejandro/Applications/Meridian.app"
   ],
   "dmg": "/Users/alejandro/Projects/Job-search/src-tauri/target/release/bundle/dmg/Meridian_0.1.0_aarch64.dmg",
-  "dmg_sha256": "cb048ceb2e254c8f90bc6c1f2d563c9b3e47578051f10371c6438bca150746fd",
-  "dmg_bytes": 88219580,
+  "dmg_sha256": "f2861b5d9a5cfb80de7ffa184fac16d0f3e23bbc2c43f0960be470c3cb280c69",
+  "dmg_bytes": 88475640,
   "executables": {
     "meridian": {
-      "sha256": "d16d56ebf299eb86b0f442d509bb2bbf8b6acb68dab5128a48e2a6446e21e15f",
+      "sha256": "c5f60e4c7a7bf32e711aeb2950e9aa15697d7ffab35b90b5d2a454b292995e3c",
       "system_copy_matches_build": true,
       "installed_copy_matches_build": true
     },
     "meridian-backend": {
-      "sha256": "db5c3200389a297c1bb8700d66503e1cbceacb34bbd2141b6f9a39ec130cc892",
+      "sha256": "f777bed25c5094a03eab2260da5ab7e3328779af7c6746e9aa50c2b12e83db86",
       "system_copy_matches_build": true,
       "installed_copy_matches_build": true
     }
@@ -25,77 +25,59 @@
   "database_revision": "0007_candidate_intelligence",
   "production_record_counts": {
     "facts": 247,
-    "jobs": 1870,
+    "jobs": 1904,
     "applications": 4,
-    "email_messages": 49,
+    "email_messages": 51,
     "browser_answers": 5,
     "knowledge_entities": 55,
     "knowledge_facts": 128,
     "knowledge_relationships": 53,
-    "candidate_policies": 2
+    "candidate_policies": 3
   },
   "validation": {
-    "python_tests_passed": 795,
+    "python_tests_passed": 972,
     "rust_tests_passed": 3,
-    "candidate_intelligence_tests_passed": 564,
     "generated_semantic_questions": 500,
     "lint": "passed",
     "typecheck": "passed",
     "production_build": "passed",
     "codesign_deep_strict": "passed for both installed copies",
     "dmg_checksum": "passed",
-    "native_profile": "passed; typed identity, contact, education and derived availability visible",
-    "native_reasoning_probe": "passed; recent STEM graduate resolved Yes with DERIVED_MEDIUM and an explicit recency assumption",
-    "ollama": "real local classifier exercised; a bad live classification led to a grounded-answer guard and four additional regressions"
+    "native_apply_with_review": "passed from installed app: Trainline, 12 grounded answers/uploads; 9 privacy questions left blank; separate final approval untouched",
+    "native_answer_review": "passed: detailed Student status, broad AI usage, role-specific motivation visible in saved answers"
   },
   "signing": "Stable Apple Development identity; not notarized",
   "real_applications_sent_by_assistant": 0,
   "calibration": {
+    "jobs_attempted": 1,
+    "status": "needs_review",
+    "observed_fields": 23,
+    "answered": 12,
+    "verified": 12,
+    "required": 8,
+    "required_verified": 8,
+    "personal_disclosures": 9,
+    "personal_disclosures_blank": true,
+    "inapplicable_conditionals": 1,
+    "inapplicable_conditionals_blank": true,
+    "submitted": 0
+  },
+  "previous_ten_destination_calibration": {
+    "source_commit": "05e70dd4de581f6a9f841505a423c10c3f857e4e",
+    "date": "2026-10-03",
     "jobs_attempted": 10,
-    "accessible_application_forms": 7,
-    "application_fields_observed": 93,
-    "unique_questions": 56,
-    "unique_intents": 26,
-    "answerable_fields": 66,
-    "answers_verified_in_final_dom": 66,
-    "answerable_required_fields": 39,
-    "required_answers_verified_in_final_dom": 39,
-    "derived_answers": 12,
-    "narrative_answers": 5,
-    "inapplicable_conditionals_left_blank": 2,
+    "accessible_forms": 7,
+    "verified_answers": 66,
+    "verified_required_answers": 39,
     "submitted": 0,
-    "remaining_roots": {
-      "MISSING_FACT": 17,
-      "BAD_ENUM_MAPPING": 1,
-      "MISSING_CURRENT_IMMIGRATION_EVIDENCE": 5,
-      "EXPLICIT_CONFIRMATION_REQUIRED": 2
-    },
-    "unverified_answerable_fields": []
+    "scope": "Historical evidence; the 4 October regression replay is reported separately above."
   },
-  "calibration_limits": {
-    "accessible_forms": [
-      "Trainline",
-      "Mytos",
-      "Shift Technology",
-      "Blenheim Chalcot (two roles)",
-      "Fifty One Degrees",
-      "Elwood"
-    ],
-    "external_or_platform_blocks": [
-      "Haleon: Indeed manual handoff and external verification",
-      "British Council: Indeed manual handoff/sign-in",
-      "BlackRock: Workday application page exposed no usable form"
-    ],
-    "remaining_information": [
-      "contractual notice",
-      "current employer verification",
-      "current immigration working conditions",
-      "employer-specific salary and office preferences",
-      "separate legal consent"
-    ],
-    "ambiguous_enum": "Mytos combines visa route, sponsorship and work authorization; no unsupported choice selected",
-    "required_denominator": "Controls observed as required and answerable from existing evidence; inaccessible steps excluded"
+  "privacy_policy": {
+    "subject": "personal_disclosures",
+    "action": "leave_blank",
+    "persisted": true,
+    "required_field_behavior": "Leave blank and show a browser-local policy boundary, never substitute a decline answer."
   },
-  "private_audit": ".local-data/intelligence-release/final-audit.json",
-  "validation_note": "Ten authorized fill-only attempts; seven accessible forms, 66 grounded answers/uploads independently verified, including 39 answerable required controls. No application submitted. This is bounded calibration evidence, not universal ATS coverage. Prior release evidence remains in docs/VERIFICATION.md."
+  "private_audit": ".local-data/context-quality/final-audit.json",
+  "validation_note": "Bounded regression evidence, not universal ATS coverage. No candidate data, live snapshots or CV evidence are committed."
 }

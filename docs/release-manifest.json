@@ -1,6 +1,6 @@
 {
-  "verified_at": "2026-10-04T13:14:41.266169+00:00",
-  "source_commit": "9b055e4d74f16952f5008e92d1a2c83dfe2c2331",
+  "verified_at": "2026-10-04T14:00:02.960924+00:00",
+  "source_commit": "eab2fb7d1949e6e2ef5408efc13824d74ec3509e",
   "version": "0.1.0",
   "platform": "macOS 15+, Apple Silicon arm64",
   "installed_apps": [
@@ -8,34 +8,34 @@
     "/Users/alejandro/Applications/Meridian.app"
   ],
   "dmg": "/Users/alejandro/Projects/Job-search/src-tauri/target/release/bundle/dmg/Meridian_0.1.0_aarch64.dmg",
-  "dmg_sha256": "f2861b5d9a5cfb80de7ffa184fac16d0f3e23bbc2c43f0960be470c3cb280c69",
-  "dmg_bytes": 88475640,
+  "dmg_sha256": "7abee176785b52537b9926303173c69a5a9f62c6809aecb936f16926db2faef2",
+  "dmg_bytes": 88280248,
   "executables": {
     "meridian": {
-      "sha256": "c5f60e4c7a7bf32e711aeb2950e9aa15697d7ffab35b90b5d2a454b292995e3c",
+      "sha256": "5f2c4a0f89610a94e768a544f3155e2e3fb962931ce870b6ae60cd46f0a6bf2e",
       "system_copy_matches_build": true,
       "installed_copy_matches_build": true
     },
     "meridian-backend": {
-      "sha256": "f777bed25c5094a03eab2260da5ab7e3328779af7c6746e9aa50c2b12e83db86",
+      "sha256": "3697582b52b8837e4aa17ad8f9d0f03373711564023c7aab7c60c9eecd4e75f8",
       "system_copy_matches_build": true,
       "installed_copy_matches_build": true
     }
   },
   "database_revision": "0007_candidate_intelligence",
   "production_record_counts": {
-    "facts": 247,
+    "facts": 263,
     "jobs": 1904,
     "applications": 4,
     "email_messages": 51,
     "browser_answers": 5,
     "knowledge_entities": 55,
-    "knowledge_facts": 128,
+    "knowledge_facts": 136,
     "knowledge_relationships": 53,
     "candidate_policies": 3
   },
   "validation": {
-    "python_tests_passed": 972,
+    "python_tests_passed": 1102,
     "rust_tests_passed": 3,
     "generated_semantic_questions": 500,
     "lint": "passed",
@@ -43,25 +43,13 @@
     "production_build": "passed",
     "codesign_deep_strict": "passed for both installed copies",
     "dmg_checksum": "passed",
-    "native_apply_with_review": "passed from installed app: Trainline, 12 grounded answers/uploads; 9 privacy questions left blank; separate final approval untouched",
-    "native_answer_review": "passed: detailed Student status, broad AI usage, role-specific motivation visible in saved answers"
+    "native_profile": "passed: eight explicitly confirmed values displayed as VERIFIED with edit controls",
+    "native_disclosure_policy": "passed: Use confirmed profile answers displayed in installed app",
+    "local_disclosure_browser": "passed: eight answers independently verified against observed final values; unspecified adjustments blank; no submission",
+    "public_options_audit": "read-only: opened empty Trainline disclosure menus and inspected labels; no personal answers, uploads or submissions"
   },
   "signing": "Stable Apple Development identity; not notarized",
   "real_applications_sent_by_assistant": 0,
-  "calibration": {
-    "jobs_attempted": 1,
-    "status": "needs_review",
-    "observed_fields": 23,
-    "answered": 12,
-    "verified": 12,
-    "required": 8,
-    "required_verified": 8,
-    "personal_disclosures": 9,
-    "personal_disclosures_blank": true,
-    "inapplicable_conditionals": 1,
-    "inapplicable_conditionals_blank": true,
-    "submitted": 0
-  },
   "previous_ten_destination_calibration": {
     "source_commit": "05e70dd4de581f6a9f841505a423c10c3f857e4e",
     "date": "2026-10-03",
@@ -74,10 +62,41 @@
   },
   "privacy_policy": {
     "subject": "personal_disclosures",
-    "action": "leave_blank",
+    "action": "use_confirmed",
     "persisted": true,
-    "required_field_behavior": "Leave blank and show a browser-local policy boundary, never substitute a decline answer."
+    "explicit_profile_values_saved": 8,
+    "required_field_behavior": "Use the precise confirmed attribute when supported; otherwise ask in the browser.",
+    "optional_field_behavior": "Unspecified attributes remain blank. Unsupported existing values and unmatched options require browser review.",
+    "inferred_protected_attributes": false
   },
-  "private_audit": ".local-data/context-quality/final-audit.json",
-  "validation_note": "Bounded regression evidence, not universal ATS coverage. No candidate data, live snapshots or CV evidence are committed."
+  "private_audit": ".local-data/confirmed-disclosures/local-calibration-evidence.json",
+  "validation_note": "Bounded local and read-only public regression evidence, not universal ATS coverage. No candidate values, live snapshots or CV evidence are committed.",
+  "previous_context_privacy_calibration": {
+    "jobs_attempted": 1,
+    "status": "needs_review",
+    "observed_fields": 23,
+    "answered": 12,
+    "verified": 12,
+    "required": 8,
+    "required_verified": 8,
+    "personal_disclosures": 9,
+    "personal_disclosures_blank": true,
+    "inapplicable_conditionals": 1,
+    "inapplicable_conditionals_blank": true,
+    "submitted": 0,
+    "source_commit": "9b055e4d74f16952f5008e92d1a2c83dfe2c2331",
+    "date": "2026-10-04",
+    "scope": "Historical Trainline fill-only replay with the previous leave_blank policy; no new protected personal values were entered."
+  },
+  "calibration": {
+    "scope": "Local browser fixture using copied public option labels and a separate calibration database",
+    "forms": 1,
+    "status": "needs_review",
+    "observed_fields": 9,
+    "answered": 8,
+    "verified": 8,
+    "unspecified_adjustments_blank": true,
+    "submitted": 0,
+    "external_personal_values_entered": 0
+  }
 }

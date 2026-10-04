@@ -77,6 +77,22 @@
     return /resume|\bcv\b|cover letter|transcript/i.test(identityHint) ? identityHint.trim() : '';
   };
   const comboProxy = node => node.getAttribute('role') === 'combobox' && !visible(node) ? node.closest('.select__control') : null;
+  const dropdownTrigger = node => {
+    if (!node.matches('input[role="combobox"][aria-haspopup="listbox"]')) return null;
+    // A dedicated two-control widget can expose a separate icon toggle. A
+    // nearby form button is not enough evidence to click it.
+    const parent = node.parentElement;
+    if (!parent || parent.children.length !== 2 ||
+      parent.querySelectorAll(':scope > input[role="combobox"]').length !== 1) return null;
+    const button = [...parent.children].find(child => child.tagName === 'BUTTON');
+    if (!button || button.matches(':disabled,[aria-disabled="true"]') || !visible(button) ||
+      button.textContent.trim() || !button.querySelector('svg') ||
+      (button.form && button.getAttribute('type') !== 'button') ||
+      (button.getAttribute('type') && button.getAttribute('type') !== 'button')) return null;
+    const name = `${button.getAttribute('aria-label') || ''} ${button.getAttribute('title') || ''}`.trim();
+    if (name && !/^(?:open|show|toggle)(?: (?:the )?(?:options|menu|suggestions|dropdown|list))?$/i.test(name)) return null;
+    return button;
+  };
   const toggleProxy = node => {
     if (node.tagName !== 'INPUT' || !['radio','checkbox'].includes(node.type)) return null;
     const rect = node.getBoundingClientRect();
@@ -148,10 +164,12 @@
     if (nativeClear || (role === 'combobox' && !readonly && clearProxy && visible(clearProxy))) operations.push('CLEAR');
     const rect = node.getBoundingClientRect();
     const question = questionFor(node)?.innerText?.trim();
+    const dropdown = dropdownTrigger(node);
     elements.push({node_id: identity(node), role, tag, type, explicit_type: node.getAttribute('type'),
       label: role === 'combobox' || role === 'upload' ? question || fileQuestion(node) || questionContainerText(node) || label(node) : label(node), ...sectionFor(node),
       upload_proxy_id: type === 'file' && proxy && visible(proxy) ? identity(proxy) : null,
       interaction_proxy_id: role === 'combobox' && proxy && visible(proxy) ? identity(proxy) : null,
+      dropdown_trigger_id: dropdown ? identity(dropdown) : null,
       toggle_proxy_id: toggle ? identity(toggle) : null,
       clear_proxy_id: role === 'combobox' && clearProxy && visible(clearProxy) ? identity(clearProxy) : null,
       form_id: node.closest('form') ? identity(node.closest('form')) : 'page',

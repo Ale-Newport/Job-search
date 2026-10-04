@@ -1,3 +1,11 @@
+# Respuestas personales confirmadas — 4 de octubre de 2026
+
+Knowledge permite elegir entre dejar las preguntas personales vacías y utilizar los valores expresamente confirmados del perfil. El segundo modo distingue cada atributo y mantiene vacíos los opcionales sin información. Los obligatorios desconocidos, las selecciones previas sin respaldo y las opciones incompatibles se revisan dentro del navegador. Las ediciones y los borrados del perfil invalidan respuestas anteriores; no se generan datos personales mediante IA.
+
+Validación final: **1.102 pruebas Python y 3 Rust**, lint y typecheck superados. Incluye perfiles sintéticos y formularios locales con radios, selects, menús de flecha, títulos genéricos duplicados, condiciones y consentimiento por sección. La inspección pública de Trainline se limita a abrir menús vacíos y leer etiquetas: cero respuestas personales introducidas, cero adjuntos y cero envíos. Las ocho respuestas confirmadas se contrastan con esas opciones en la base local de calibración y se verifican en los valores finales de un formulario local; ajustes no especificados permanece vacío. Los valores personales y las evidencias permanecen fuera de Git, en `.local-data/confirmed-disclosures/`.
+
+Los apartados siguientes conservan la validación histórica de las preferencias anteriores. El manifiesto de release registra la política y las pruebas de la versión instalada.
+
 # Contexto y privacidad — 4 de octubre de 2026
 
 Corregido el paso de la descripción real del puesto al motor y la interpretación de preguntas con títulos genéricos y aclaraciones. Las respuestas de motivación, uso de IA, experiencia y las cover letters comparten una composición desde hechos verificados, con selección por responsabilidades del puesto. El visado se explica con el contexto académico confirmado; no se deducen permisos de trabajo ni caducidades.

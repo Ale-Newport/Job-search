@@ -29,8 +29,8 @@ EQUIVALENTS = [
 ]
 
 
-def choice(value, options, **kwargs):
-    result = option_for(str(value), options, **kwargs)
+def choice(value, options, *, question="", disclosure_concept=None):
+    result = option_for(str(value), options, question=question)
     if result:
         return result
     norm = normalize(value)
@@ -39,6 +39,43 @@ def choice(value, options, **kwargs):
         for o in options
         if not o.get("disabled") and (o.get("role") == "option" or o.get("value", o.get("label")) not in ("", None))
     ]
+    from ..automation.disclosures import disclosure_profile_key
+
+    concept = disclosure_concept or disclosure_profile_key(question)
+    aliases = {
+        "pronouns": [
+            {"he", "he him", "he him his"},
+            {"she", "she her", "she her hers"},
+            {"they", "they them", "they them theirs"},
+        ],
+        "gender": [{"man", "male", "hombre"}, {"woman", "female", "mujer"}, {"non binary", "nonbinary"}],
+        "sex": [{"male", "masculino"}, {"female", "femenino"}],
+        "sexual_orientation": [{"heterosexual", "straight", "heterosexual straight", "straight heterosexual"}],
+        "ethnicity": [
+            {
+                "white other",
+                "other white",
+                "white any other white background",
+                "any other white background",
+                "other white background",
+            }
+        ],
+    }
+    for group in aliases.get(concept, []):
+        if norm in group:
+            matches = [o for o in labels if normalize(o["label"]) in group]
+            if len(matches) == 1:
+                return matches[0]
+    # Atheism can be represented by a broader no-religion option. The reverse
+    # implication is not valid: no religious affiliation does not imply atheism.
+    if concept == "religion" and norm in {"atheist", "atheism", "ateo"}:
+        for group in (
+            {"atheist", "atheism", "ateo"},
+            {"no religion", "no religion or belief", "no religion or atheist", "no religious beliefs", "none"},
+        ):
+            matches = [o for o in labels if normalize(o["label"]) in group]
+            if len(matches) == 1:
+                return matches[0]
     # Phone country menus decorate country names with international dial codes.
     countries = [o for o in labels if normalize(re.sub(r"\s+\+\d[\d\s-]*$", "", o["label"])) == norm]
     if len(countries) == 1:
@@ -88,7 +125,12 @@ def adapt(value, semantic, field):
         value = str(value).removesuffix(".0")
     value = str(value)
     if field.get("options"):
-        option = choice(value, field["options"])
+        option = choice(
+            value,
+            field["options"],
+            question=semantic.get("text", ""),
+            disclosure_concept=semantic.get("attribute") if semantic.get("intent") == "DEMOGRAPHIC" else None,
+        )
         if not option:
             return None, "BAD_ENUM_MAPPING"
         value = option["label"]

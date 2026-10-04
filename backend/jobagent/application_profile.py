@@ -253,8 +253,16 @@ def memory_superseded(db, question, updated_at):
         'availability': ['earliest_start_month', 'availability'],
         'graduation_year': ['masters_completion_month'],
     }.get(key, [])
+    from .automation.disclosures import disclosure_profile_key
+
+    disclosure_key = disclosure_profile_key(question)
+    if disclosure_key in BY_KEY:
+        dependencies.append(disclosure_key)
     for dependency in dependencies:
-        row = db.one('SELECT updated_at FROM facts WHERE source=?', ('application_profile:'+dependency,))
+        row = db.one(
+            'SELECT updated_at FROM facts WHERE source=? AND category!=? ORDER BY updated_at DESC LIMIT 1',
+            ('application_profile:' + dependency, 'knowledge'),
+        )
         if row and row['updated_at'] > updated_at:
             return True
     return False
@@ -368,7 +376,17 @@ def scope_matches(scope, application):
     return False
 
 
-def question_field(question, application):
+def question_field(question, application, element=None):
+    from .automation.disclosures import disclosure_profile_key, personal_disclosure_kind
+
+    disclosure_key = disclosure_profile_key(question, element)
+    disclosure = BY_KEY.get(disclosure_key)
+    if disclosure and scope_matches(disclosure["scope"], application):
+        return disclosure
+    if personal_disclosure_kind(question, element):
+        # A broad or historical request must not fall back to a current-attribute
+        # alias, or to a professional summary merely because its label is vague.
+        return None
     norm, key = normalize(question), canonical_key(question)
     for f in FIELDS:
         if not scope_matches(f["scope"], application):
@@ -425,17 +443,18 @@ def application_knowledge(db, application, facts):
     return base, skipped
 
 
-def remember_answer(db, application, question, answer, *, reusable=False, skip=False):
+def remember_answer(db, application, question, answer, *, reusable=False, skip=False, element=None):
     from .core import invalidate_fact_evidence
     from .automation.answers import classify_question
+    from .automation.disclosures import disclosure_memory_key
 
-    spec = question_field(question, application)
+    spec = question_field(question, application, element)
     # Employer wording and regulated/disclosure answers stay local unless the user explicitly opts in.
     # Even then, unknown legal and country-specific questions cannot gain global reuse.
     kind = classify_question(question)
     if kind in {"legal_certification", "work_authorization", "salary"} and (not spec or not spec.get("scope")):
         reusable = False
-    norm = normalize(question)
+    norm = disclosure_memory_key(question, element)
     with db.transaction() as conn:
         previous = conn.execute(
             "SELECT * FROM browser_answers WHERE application_id=? AND question=?", (application["id"], norm)
@@ -486,6 +505,10 @@ def remember_answer(db, application, question, answer, *, reusable=False, skip=F
         )
     if reusable and spec and not skip:
         write_profile(db, spec["key"], answer, True, "Confirmed in browser: " + application["company"])
+        # The answer and its reusable profile fact are one user confirmation.
+        # A later profile edit may supersede this memory, but its own promotion
+        # must not immediately hide the exact response just given in the form.
+        db.execute("UPDATE browser_answers SET updated_at=? WHERE id=?", (now(), identifier))
     return fact_id
 
 

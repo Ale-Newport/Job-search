@@ -1,0 +1,16 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><title>Confirmed disclosures fixture</title>
+<style>label,fieldset{display:block;margin:16px}input,select{padding:8px}</style>
+<form onsubmit="event.preventDefault();window.submissions++">
+<section><h2>Diversity Survey</h2>
+<label>Preferred pronouns <select name="pronouns"><option value="">Select…</option><option value="he">He / Him</option><option value="she">She / Her</option><option value="decline">Prefer not to say</option></select></label>
+<fieldset><legend>What is your gender identity?</legend><label><input name="gender" type="radio" value="g0" required>Man</label><label><input name="gender" type="radio" value="g1">Woman</label><label><input name="gender" type="radio" value="g2">Other</label></fieldset>
+<label>If you selected Other for your gender, please specify <input name="gender_other" value="Old unsupported detail"></label>
+<label>Sex assigned at birth <select name="sex"><option value="">Select…</option><option value="m">Male</option><option value="f">Female</option><option value="decline">Prefer not to say</option></select></label>
+<label>Sexual orientation <select name="orientation"><option value="">Select…</option><option value="straight">Heterosexual / straight</option><option value="decline">Prefer not to say</option></select></label>
+<label>Ethnic origin <select name="ethnicity"><option value="">Select…</option><option value="white_other">White - Any other White background</option><option value="mixed">Mixed or multiple ethnic groups</option><option value="other">Other</option><option value="decline">Prefer not to say</option></select></label>
+<label>Religion or belief <select name="religion"><option value="">Select…</option><option value="none">No religion</option><option value="decline">Prefer not to say</option></select></label>
+<label>What is your mental health status? <input name="mental_health"></label>
+<fieldset><legend>Do you consider yourself neurodivergent?</legend><label><input name="neurodivergence" type="radio" value="yes">Yes</label><label><input name="neurodivergence" type="radio" value="no">No</label><label><input name="neurodivergence" type="radio" value="decline">Prefer not to say</label></fieldset>
+<fieldset><legend>Do you have a disability?</legend><label><input name="disability" type="radio" value="yes">Yes</label><label><input name="disability" type="radio" value="no">No</label><label><input name="disability" type="radio" value="decline">Prefer not to say</label></fieldset>
+<label>Do you need adjustments for interviews? <select name="adjustments"><option value="">Select…</option><option value="yes">Yes</option><option value="no">No</option><option value="decline">Prefer not to say</option></select></label>
+</section><button type="submit">Submit application</button></form><script>window.submissions=0;</script></html>

@@ -1427,7 +1427,10 @@ def intelligence_policy_put(policy_id: str, payload: ApplicationProfilePayload, 
     row=required(get_db(request),'candidate_policies',policy_id)
     current=json.loads(row['value'])
     value=payload.value
-    if isinstance(current,bool):
+    if row['subject'] == 'personal_disclosures':
+        if value not in {'leave_blank', 'use_confirmed'}:
+            raise HTTPException(422,'Choose Leave blank or Use confirmed profile answers')
+    elif isinstance(current,bool):
         if value not in {'Yes','No'}:
             raise HTTPException(422,'Use Yes or No')
         value=value=='Yes'

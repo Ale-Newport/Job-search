@@ -6,7 +6,13 @@ import re
 
 from ..db import dumps, now, uid
 from ..automation.answers import classify_question, normalize
-from ..automation.disclosures import disclosure_resolution
+from ..automation.disclosures import (
+    disclosure_action,
+    disclosure_memory_key,
+    disclosure_profile_key,
+    disclosure_resolution,
+    personal_disclosure_kind,
+)
 from .narratives import compose_narrative
 from .store import Knowledge
 from .semantics import interpret, semantic_interpret
@@ -64,7 +70,7 @@ class CandidateEngine:
             return result
         semantic = result.get("semantic", {})
         intent = result["canonical_intent"]
-        concept = (
+        concept = result.get("disclosure_concept") or (
             semantic.get("attribute") if intent in {"IDENTITY", "CONTACT", "ADDRESS", "LOCATION"} else intent.lower()
         )
         if any(
@@ -74,10 +80,16 @@ class CandidateEngine:
             return result
         from ..automation.answers import resolve_answer
 
-        confirmed = resolve_answer(question, [f for f in facts if f.get("profile_explicit")], policies=policies)
+        explicit_disclosure = result.get("explicit_disclosure")
+        memory_question = result.get("disclosure_memory_key") or question
+        confirmed = resolve_answer(
+            memory_question, [f for f in facts if f.get("profile_explicit")], policies={} if explicit_disclosure else policies
+        )
         return (
-            {**confirmed, "canonical_intent": intent}
-            if confirmed["answer"] is not None and confirmed["verified"]
+            {**confirmed, "question": question, "canonical_intent": intent}
+            if confirmed["answer"] is not None
+            and confirmed["verified"]
+            and (not explicit_disclosure or confirmed.get("fact_ids"))
             else result
         )
 
@@ -121,6 +133,44 @@ class CandidateEngine:
                 "requires_confirmation": False,
                 "rules_used": ["policy:" + policy["id"] + ":" + str(policy["revision"])],
                 "reasoning_summary": disclosure["reason"],
+            }
+        if (
+            policy
+            and disclosure_action(policy["value"]) == "use_confirmed"
+            and personal_disclosure_kind(question, field)
+        ):
+            concept = disclosure_profile_key(question, field)
+            semantic = {**s, "intent": "DEMOGRAPHIC", "attribute": concept or "disclosure_detail"}
+            out = self.unknown(question, semantic, "MISSING_CONFIRMED_DISCLOSURE")
+            out.update(disclosure_concept=concept, explicit_disclosure=True, sensitivity="personal",
+                       disclosure_memory_key=disclosure_memory_key(question, field))
+            people = self.knowledge.records("person")
+            fact = people[0]["fields"].get(concept) if len(people) == 1 and concept else None
+            if not fact:
+                return out
+            value, error = adapt(fact["value"], semantic, field)
+            rules = [
+                "explicit_personal_disclosure:" + str(concept),
+                "policy:" + policy["id"] + ":" + str(policy["revision"]),
+            ]
+            return {
+                **out,
+                "answer": value,
+                "form_value": value,
+                "fact_ids": [fact["id"]],
+                "facts_used": [fact["id"]],
+                "rules_used": rules,
+                "verified": not error,
+                "confidence": 1 if not error else 0,
+                "confidence_level": "EXACT" if not error else "UNKNOWN",
+                "requires_review": bool(error),
+                "requires_confirmation": bool(error),
+                "reason": error or "Your explicitly confirmed personal-disclosure answer",
+                "reasoning_summary": error
+                or "Uses only your confirmed "
+                + str(concept).replace("_", " ")
+                + "; no related personal attributes are inferred.",
+                "root_cause": error,
             }
         if not job.get("country") and re.search(
             r"\b(?:london|united kingdom|uk|england|scotland|wales)\b", normalize(job.get("location", ""))

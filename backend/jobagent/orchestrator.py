@@ -400,6 +400,7 @@ class Orchestrator:
     async def show_browser_question(self, run_id, application, result, facts):
         from .application_profile import question_field, profile, draft_fact_ids, remember_answer
         from .automation.answers import classify_question, SENSITIVE
+        from .automation.disclosures import personal_disclosure_kind
         eligible = [q for q in result.get('questions', []) if not q.get('skip_inline_question')]
         question = next((q for q in eligible if q.get('target') and q.get('kind') != 'document'), None)
         question = question or next(iter(eligible), None)
@@ -407,7 +408,7 @@ class Orchestrator:
         read_only_policy = bool(question and question.get('skip_inline_question'))
         if not question or not self.browser.page or self.browser.page.is_closed():
             return
-        spec = None if read_only_policy else question_field(question['question'], application)
+        spec = None if read_only_policy else question_field(question['question'], application, question)
         suggested = None if read_only_policy else next((f for f in profile(self.db)['fields'] if spec and f['key'] == spec['key']), None)
         options = [o['label'] for o in question.get('options', []) if o.get('label') and not o.get('disabled') and o.get('value') != '']
         if not options and spec:
@@ -415,6 +416,9 @@ class Orchestrator:
         kind = classify_question(question['question'])
         can_draft = (question.get('multiline') or kind == 'free_text') and kind not in {*SENSITIVE, 'work_authorization', 'salary'}
         safe_reuse = kind != 'legal_certification' and (kind not in {'work_authorization', 'salary'} or bool(spec and spec.get('scope')))
+        if personal_disclosure_kind(question['question'], question) or (spec and spec.get('sensitive')):
+            can_draft = False
+            safe_reuse = bool(spec)
         answer = question.get('current_value') or (suggested['value'] if suggested else '')
         manual = read_only_policy or not question.get('target') or question.get('kind') == 'document'
         if read_only_policy:
@@ -468,7 +472,7 @@ class Orchestrator:
                 except ValueError:
                     raise ValueError('Enter a finite number') from None
             remember_answer(self.db, application, question['question'], value if action == 'answer' else '',
-                            reusable=payload['reusable'] and safe_reuse, skip=action == 'skip')
+                            reusable=payload['reusable'] and safe_reuse, skip=action == 'skip', element=question)
             await self.prompt.close()
             self.launch(application['id'], resume=True)
 

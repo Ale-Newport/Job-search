@@ -8,15 +8,15 @@ from pathlib import Path
 import re
 
 from .adapters import get_adapter
-from .answers import normalize, selected_choice_matches, classify_question, SENSITIVE, dropdown_search_value
+from .answers import normalize, classify_question, SENSITIVE, dropdown_search_value
 from ..intelligence.formatting import choice as option_for
 from .reasoning import conditional_state, profile_resolution
-from .disclosures import disclosure_resolution, disclosure_clear_operation, has_disclosure_value, inherit_disclosure_context
+from .disclosures import disclosure_resolution, disclosure_clear_operation, disclosure_memory_key, has_disclosure_value, inherit_disclosure_context, personal_disclosure_kind
 from .browser import BrowserSession, confirmation_evidence
 from .browser import PROGRESS, is_submit
 from .engines import make_engine
 from .job_context import enrich_job_context
-from .consent import action_key, section_plan
+from .consent import action_key, dropdown_open_target, radio_group, resolution_element, section_plan, selected_resolution_matches
 from .types import AutomationError, Decision, HumanRequired, Operation, Paused, StaleState
 
 
@@ -92,6 +92,7 @@ class BrowserManager(BrowserSession):
         reasoning_cache = {}
 
         async def resolve(element):
+            element = resolution_element(element, snapshot['elements'])
             field = adapter.question(element)
             disclosure = disclosure_resolution(field, element, policies)
             if disclosure:
@@ -167,7 +168,8 @@ class BrowserManager(BrowserSession):
                     resolution = pending_dropdown["resolution"]
                     for _ in range(20):
                         options = [e for e in snapshot["elements"] if e["role"] == "option" and "CLICK" in e["operations"]]
-                        choice = enum_choice(resolution["answer"], options, question=resolution["question"])
+                        choice = enum_choice(resolution["answer"], options, question=resolution["question"],
+                                             disclosure_concept=resolution.get("disclosure_concept"))
                         choices = [choice] if choice else []
                         if choices or snapshot["blocked"]:
                             break
@@ -212,10 +214,12 @@ class BrowserManager(BrowserSession):
                         if has_disclosure_value(element):
                             self._omitted[field]['reason'] = "An existing personal disclosure could not be safely cleared; remove it in the browser."
                             questions.append({"question": field, "kind": "personal_disclosure_clear",
+                                              "target": element["index"],
                                               "reason": "Your policy requires this field to be blank. Its existing selection could not be safely cleared; remove it in the browser.",
                                               "skip_inline_question": True})
                         elif element.get("required"):
                             questions.append({"question": field, "kind": "personal_disclosure_policy",
+                                              "target": element["index"],
                                               "reason": disclosure["reason"], "skip_inline_question": True})
                         continue
                     condition = conditional_state(element, snapshot['elements'], adapter)
@@ -225,35 +229,51 @@ class BrowserManager(BrowserSession):
                         self._omitted[adapter.question(element)] = {'question': adapter.question(element), 'reason': condition['reason']}
                     if condition and condition['applies'] is not True:
                         if condition['applies'] is None and element.get('required'):
-                            questions.append({'question': adapter.question(element), 'kind': 'conditional', 'reason': condition['reason']})
+                            questions.append({'question': adapter.question(element), 'kind': 'conditional', 'reason': condition['reason'], 'target': element['index']})
                         # Inapplicable fields must remain blank even when an exact saved answer exists.
                         elif condition['applies'] is False and element.get('value') and 'TYPE_TEXT' in element['operations']:
                             action, value = Decision(Operation.TYPE_TEXT, element['index']), ''
                             break
                         continue
-                    if not element.get("required") and normalize(adapter.question(element)) in settings.get("_skipped_questions", []):
+                    if not element.get("required") and disclosure_memory_key(adapter.question(element), element) in settings.get("_skipped_questions", []):
                         continue
-                    if settings.get('assisted_autofill') and not element.get('required') and classify_question(adapter.question(element)) in {*SENSITIVE, 'work_authorization'}:
+                    if settings.get('assisted_autofill') and not element.get('required') and (
+                        personal_disclosure_kind(adapter.question(element), element)
+                        or classify_question(adapter.question(element)) in {*SENSITIVE, 'work_authorization'}
+                    ):
                         explicit = await resolve(element) if settings.get('_candidate_engine') else profile_resolution(adapter.question(element), facts, element=element, policies=policies)
                         if explicit['answer'] is None:
-                            self._omitted[adapter.question(element)] = {'question': adapter.question(element), 'reason': 'Optional disclosure not provided; left unchanged without inferring personal data.'}
+                            if has_disclosure_value(element):
+                                questions.append({'question': adapter.question(element), 'kind': explicit['kind'],
+                                                  'target': element['index'],
+                                                  'reason': 'The existing personal answer has no confirmed supporting fact. Review it in the browser.'})
+                            elif explicit.get('root_cause') == 'BAD_ENUM_MAPPING':
+                                questions.append({'question': adapter.question(element), 'kind': explicit['kind'],
+                                                  'target': element['index'],
+                                                  'reason': 'None of the available choices matches your confirmed answer. Review this question in the browser.'})
+                            else:
+                                self._omitted[adapter.question(element)] = {'question': adapter.question(element), 'reason': 'Optional disclosure not provided; left blank without inferring personal data.'}
                             continue
                     operations = element["operations"]
                     if element["role"] == "combobox" and "CLICK" in operations and "SELECT" not in operations:
                         resolution = await resolve(element)
-                        if resolution["leave_blank"] and not element.get("required"):
+                        if resolution["leave_blank"] and not element.get("required") and not has_disclosure_value(element):
                             continue
                         if resolution["answer"] is None:
                             if element.get("required") or not skip_optional or element.get('selected_text') or element.get('value'):
-                                questions.append({"question": adapter.question(element), "kind": resolution["kind"], "required": element.get("required", False)})
+                                questions.append({"question": adapter.question(element), "kind": resolution["kind"], "required": element.get("required", False), "target": element["index"]})
                             continue
-                        if not element.get("expanded") and selected_choice_matches(resolution["question"], resolution["answer"], element.get("selected_text") or element.get("value", "")):
+                        if not element.get("expanded") and selected_resolution_matches(resolution, element.get("selected_text") or element.get("value", "")):
                             self._add_answer(answers, dict(resolution))
                             continue
                         pending_dropdown = {"resolution": resolution, "node_id": element["node_id"],
                                             "document_id": element["document_id"]}
-                        action = Decision(Operation.TYPE_TEXT if "TYPE_TEXT" in operations else Operation.CLICK, element["index"])
-                        value = dropdown_search_value(resolution)
+                        trigger = dropdown_open_target(element, snapshot["elements"])
+                        if trigger:
+                            action, value = Decision(Operation.CLICK, trigger["index"]), None
+                        else:
+                            action = Decision(Operation.TYPE_TEXT if "TYPE_TEXT" in operations else Operation.CLICK, element["index"])
+                            value = dropdown_search_value(resolution)
                         break
                     if not any(op in operations for op in ("TYPE_TEXT", "SELECT", "CHECK", "UNCHECK", "UPLOAD")):
                         continue
@@ -282,8 +302,12 @@ class BrowserManager(BrowserSession):
                     resolution = await resolve(element)
                     if resolution["leave_blank"]:
                         if element.get("required"):
-                            questions.append({"question": field, "kind": resolution["kind"], "reason": "This field is required but your policy is to leave it blank."})
-                        if not element.get("required"):
+                            questions.append({"question": field, "kind": resolution["kind"], "reason": "This field is required but your policy is to leave it blank.", "target": element["index"]})
+                        elif has_disclosure_value(element):
+                            questions.append({"question": field, "kind": resolution["kind"],
+                                              "target": element["index"],
+                                              "reason": "The existing answer has no confirmed supporting fact. Review it in the browser."})
+                        else:
                             handled.add(signature)
                         continue
                     if resolution["answer"] is None:
@@ -299,19 +323,19 @@ class BrowserManager(BrowserSession):
                         if element["value"] != answer:
                             operation, value = Operation.TYPE_TEXT, answer
                     elif "SELECT" in operations:
-                        option = option_for(answer, element["options"])
+                        option = option_for(answer, element["options"], question=field, disclosure_concept=resolution.get("disclosure_concept"))
                         if option is None:
-                            questions.append({"question": field, "kind": "option", "reason": "The verified answer does not match any observed option."})
+                            questions.append({"question": field, "kind": "option", "reason": "The verified answer does not match any observed option.", "target": element["index"]})
                             continue
                         if element["value"] != option["value"]:
                             operation, value = Operation.SELECT, option["value"]
                     elif element["role"] == "radio":
                         if normalize(answer) not in {normalize(element["label"]), normalize(element["value"])}:
                             # Resolve the group as a whole, not one radio independently.
-                            siblings = [e for e in snapshot["elements"] if e.get("group") == element.get("group") and e["role"] == "radio"]
+                            siblings = radio_group(element, snapshot["elements"])
                             has_option = any(normalize(answer) in {normalize(e["label"]), normalize(e["value"])} for e in siblings)
                             if not has_option:
-                                questions.append({"question": field, "kind": "option", "reason": "No radio option matches the verified answer."})
+                                questions.append({"question": field, "kind": "option", "reason": "No radio option matches the verified answer.", "target": element["index"]})
                             else:
                                 handled.add(signature)
                             continue
@@ -320,7 +344,7 @@ class BrowserManager(BrowserSession):
                     else:
                         truth = normalize(answer)
                         if truth not in {"yes", "no", "true", "false", "1", "0"}:
-                            questions.append({"question": field, "kind": "checkbox", "reason": "A verified yes/no answer is required."})
+                            questions.append({"question": field, "kind": "checkbox", "reason": "A verified yes/no answer is required.", "target": element["index"]})
                             continue
                         desired = truth in {"yes", "true", "1"}
                         if desired != element["checked"]:
@@ -370,23 +394,30 @@ class BrowserManager(BrowserSession):
                 if any(frame.get("unavailable") for frame in snapshot["frames"]):
                     questions.append({"question": "A frame could not be inspected. Check the complete application in the browser.",
                                       "kind": "unavailable_frame"})
-                questions = self._dedupe_questions(questions)
                 if questions:
                     for question in questions:
-                        element = next((e for e in snapshot["elements"] if adapter.question(e) == question["question"]), None)
+                        if question.get("target") is not None:
+                            element = next((e for e in snapshot["elements"] if e["index"] == question["target"]), None)
+                        else:
+                            matches = [e for e in snapshot["elements"] if adapter.question(e) == question["question"]]
+                            element = matches[0] if len(matches) == 1 else None
                         if element:
                             question.update(target=element["index"], required=bool(element.get("required")),
                                             current_value=element.get("value", ""), node_id=element["node_id"],
                                             document_id=element["document_id"], type=element.get("type"),
+                                            form_id=element.get("form_id"), group=element.get("group"),
                                             role=element.get("role"), description=element.get("description", ""),
+                                            context=element.get("context", ""), section_label=element.get("section_label", ""),
+                                            _disclosure_parent_question=element.get("_disclosure_parent_question", ""),
                                             multiline=element.get("tag") == "textarea", options=element.get("options", []))
                             if element["role"] == "radio":
-                                question["options"] = [{"label": e["label"], "value": e["value"]} for e in snapshot["elements"]
-                                                       if e.get("group") == element.get("group") and e["role"] == "radio"]
-                                question["current_value"] = next((e["label"] for e in snapshot["elements"] if e.get("group") == element.get("group") and e["role"] == "radio" and e["checked"]), "")
+                                siblings = radio_group(element, snapshot["elements"])
+                                question["options"] = [{"label": e["label"], "value": e["value"]} for e in siblings]
+                                question["current_value"] = next((e["label"] for e in siblings if e["checked"]), "")
                             elif element["role"] == "checkbox":
                                 question["options"] = [{"label": "Yes"}, {"label": "No"}]
                                 question["current_value"] = "Yes" if element["checked"] else ""
+                    questions = self._dedupe_questions(questions)
                     return self._result("human_required", snapshot, answers=answers, questions=questions,
                                         steps=steps, adapter=adapter.name)
                 if snapshot["errors"]:
@@ -553,7 +584,9 @@ class BrowserManager(BrowserSession):
         seen = set()
         result = []
         for question in questions:
-            key = (question["question"], question["kind"])
+            control = (question.get("group") or question.get("node_id")) if question.get("role") == "radio" else question.get("node_id")
+            identity = (question.get("document_id"), question.get("form_id"), control)
+            key = (disclosure_memory_key(question["question"], question), question["kind"], identity)
             if key not in seen:
                 result.append(question)
                 seen.add(key)

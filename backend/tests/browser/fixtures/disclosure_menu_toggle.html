@@ -1,0 +1,20 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><title>Disclosure menu toggle fixture</title>
+<style>body{padding:24px}fieldset{margin:24px}input{padding:12px}button{padding:10px}[role=option]{padding:10px;border:1px solid #aaa}</style>
+<div data-field-path="gender"><fieldset><label class="ashby-application-form-question-title">Describe your gender</label>
+<div id="gender_widget"><input id="gender" role="combobox" aria-haspopup="listbox" aria-expanded="false" aria-autocomplete="list" placeholder="Start typing..." oninput="window.searches.push(this.value);showOptions(this.value)"><button onclick="showOptions('')"><svg viewBox="0 0 16 16" width="16" height="16"><path d="M1 5L8 12L15 5"/></svg></button></div>
+</fieldset></div>
+<button type="submit" onclick="window.submissions++">Submit application</button>
+<script>
+window.submissions=0;window.searches=[];
+function showOptions(query){
+  const widget=document.querySelector('#gender_widget'),input=document.querySelector('#gender');
+  widget.querySelector('[role=listbox]')?.remove();input.setAttribute('aria-expanded','true');
+  const menu=document.createElement('div');menu.setAttribute('role','listbox');
+  for(const label of ['Female','Male','Nonbinary','Prefer not to say']){
+    if(!label.toLowerCase().includes(query.toLowerCase()))continue;
+    const option=document.createElement('div');option.setAttribute('role','option');option.textContent=label;
+    option.onclick=()=>{input.value=label;input.setAttribute('aria-expanded','false');menu.remove()};menu.append(option);
+  }
+  widget.append(menu);
+}
+</script></html>

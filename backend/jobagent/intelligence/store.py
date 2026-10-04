@@ -280,6 +280,8 @@ class Knowledge:
 
 def sync_profile_fact(db, key, value, confirmed):
     """Keep edits in the established Profile editor authoritative over imported data."""
+    from ..core import invalidate_fact_evidence
+
     people = db.query("SELECT id FROM knowledge_entities WHERE kind='person'")
     if len(people) != 1:
         return
@@ -297,12 +299,27 @@ def sync_profile_fact(db, key, value, confirmed):
         "portfolio",
         "nationality",
         "date_of_birth",
+        "age",
+        "gender",
+        "sex",
+        "pronouns",
+        "sexual_orientation",
+        "ethnicity",
+        "religion",
+        "disability",
+        "neurodivergence",
+        "mental_health",
+        "veteran",
+        "adjustments",
         "current_company",
         "current_title",
     }
     if key not in keys:
         return
-    rows = db.query("SELECT fact_id FROM knowledge_facts WHERE entity_id=? AND concept=?", (people[0]["id"], key))
+    rows = db.query(
+        "SELECT f.* FROM facts f JOIN knowledge_facts k ON k.fact_id=f.id WHERE k.entity_id=? AND k.concept=?",
+        (people[0]["id"], key),
+    )
     # An explicit profile edit is recorded as a new source; competing historical
     # values remain available in the fact explorer and historical evidence.
     identifier = ingest_fact(
@@ -317,13 +334,21 @@ def sync_profile_fact(db, key, value, confirmed):
         priority=100,
         sensitivity="personal",
     )
-    db.execute("UPDATE knowledge_facts SET source_priority=100,revision=revision+1 WHERE fact_id=?", (identifier,))
-    db.execute(
-        "UPDATE facts SET verification_status=?,updated_at=? WHERE id=?",
-        ("verified" if confirmed else "unverified", now(), identifier),
-    )
-    for row in rows:
-        if row["fact_id"] != identifier:
-            db.execute(
-                "UPDATE knowledge_facts SET source_priority=MIN(source_priority,90) WHERE fact_id=?", (row["fact_id"],)
-            )
+    with db.transaction() as conn:
+        # Previously composed answers may refer to any historical typed source,
+        # not only to the flat Profile row. Retain that evidence and invalidate
+        # its reuse before lowering its priority or changing confirmation.
+        seen = set()
+        for row in rows:
+            invalidate_fact_evidence(db, conn, row, seen)
+        conn.execute("UPDATE knowledge_facts SET source_priority=100,revision=revision+1 WHERE fact_id=?", (identifier,))
+        conn.execute(
+            "UPDATE facts SET verification_status=?,locked=0,updated_at=? WHERE id=?",
+            ("verified" if confirmed else "unverified", now(), identifier),
+        )
+        for row in rows:
+            if row["id"] != identifier:
+                conn.execute(
+                    "UPDATE knowledge_facts SET source_priority=MIN(source_priority,90),revision=revision+1 WHERE fact_id=?",
+                    (row["id"],),
+                )

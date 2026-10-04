@@ -6,7 +6,7 @@ from ..intelligence.formatting import choice as option_for
 from .reasoning import conditional_state, profile_resolution
 from .disclosures import disclosure_resolution, disclosure_clear_operation, inherit_disclosure_context
 
-from .answers import normalize, selected_choice_matches, dropdown_search_value
+from .answers import normalize, dropdown_search_value
 
 
 def action_key(element, operation, value=None, file_path=None, upload_name=None):
@@ -18,6 +18,53 @@ def action_key(element, operation, value=None, file_path=None, upload_name=None)
         str(Path(file_path).resolve()) if file_path else None,
         upload_name,
     )
+
+
+def radio_group(element, elements):
+    """Only observed peers in this radio control's own document and form."""
+    if element.get("role") != "radio":
+        return []
+    group = element.get("group")
+    if not group:
+        return [element]
+    return [
+        peer for peer in elements
+        if peer.get("role") == "radio"
+        and peer.get("group") == group
+        and peer.get("document_id") == element.get("document_id")
+        and peer.get("form_id") == element.get("form_id")
+    ]
+
+
+def resolution_element(element, elements):
+    """Present native radio choices to the same enum resolver used by selects."""
+    if element.get("role") != "radio":
+        return element
+    return {
+        **element,
+        "options": [
+            {"label": peer["label"], "value": peer.get("value") or peer["label"],
+             "disabled": not peer.get("enabled", True) or "CHECK" not in peer.get("operations", [])}
+            for peer in radio_group(element, elements)
+        ],
+    }
+
+
+def dropdown_open_target(element, elements):
+    """Use only a menu toggle explicitly linked by the current DOM observation."""
+    trigger_id = element.get("dropdown_trigger_id")
+    if trigger_id is None or element.get("expanded"):
+        return None
+    return next((peer for peer in elements
+                 if peer.get("document_id") == element.get("document_id")
+                 and peer.get("node_id") == trigger_id and peer.get("role") == "button"
+                 and "CLICK" in peer.get("operations", [])), None)
+
+
+def selected_resolution_matches(resolution, value):
+    return option_for(resolution["answer"], [{"label": value, "value": value}],
+                      question=resolution["question"],
+                      disclosure_concept=resolution.get("disclosure_concept")) is not None
 
 
 def section_plan(snapshot, target, adapter, facts, documents, policies, documents_for):
@@ -45,6 +92,7 @@ def section_plan(snapshot, target, adapter, facts, documents, policies, document
             continue
         ops = element["operations"]
         question = adapter.question(element)
+        action_target = element
         operation, value, file_path, filename = None, None, None, None
         if "UPLOAD" in ops:
             candidates = documents_for(question, documents)
@@ -58,12 +106,13 @@ def section_plan(snapshot, target, adapter, facts, documents, policies, document
             answer = filename
             evidence = {"document_version_id": document.get("id"), "fact_ids": []}
         else:
+            field = resolution_element(element, snapshot["elements"])
             resolved = profile_resolution(
-                question, facts, element=element, hints=[element.get("name", ""), element.get("autocomplete", "")], policies=policies
+                question, facts, element=field, hints=[element.get("name", ""), element.get("autocomplete", "")], policies=policies
             )
             intelligence = policies.get('_candidate_engine')
             if intelligence:
-                candidate = intelligence.answer_question(question, element, policies.get('_job_context', {}))
+                candidate = intelligence.answer_question(question, field, policies.get('_job_context', {}))
                 candidate = intelligence.confirmed_fallback(question, candidate, facts, policies)
                 if candidate['canonical_intent'] != 'OTHER':
                     resolved = candidate
@@ -72,12 +121,16 @@ def section_plan(snapshot, target, adapter, facts, documents, policies, document
                 continue
             evidence = {"fact_ids": resolved["fact_ids"], "kind": resolved["kind"]}
             if element["role"] == "combobox" and "CLICK" in ops and "SELECT" not in ops:
-                if element.get("expanded") or not selected_choice_matches(question, answer, element.get("selected_text") or element.get("value", "")):
-                    operation, value = "TYPE_TEXT" if "TYPE_TEXT" in ops else "CLICK", dropdown_search_value(resolved)
+                if element.get("expanded") or not selected_resolution_matches(resolved, element.get("selected_text") or element.get("value", "")):
+                    trigger = dropdown_open_target(element, snapshot["elements"])
+                    if trigger:
+                        action_target, operation, value = trigger, "CLICK", None
+                    else:
+                        operation, value = "TYPE_TEXT" if "TYPE_TEXT" in ops else "CLICK", dropdown_search_value(resolved)
             elif "TYPE_TEXT" in ops and element["value"] != answer:
                 operation, value = "TYPE_TEXT", answer
             elif "SELECT" in ops:
-                option = option_for(answer, element["options"])
+                option = option_for(answer, element["options"], question=question, disclosure_concept=resolved.get("disclosure_concept"))
                 if option and element["value"] != option["value"]:
                     operation, value = "SELECT", option["value"]
             elif element["role"] == "radio" and "CHECK" in ops:
@@ -93,6 +146,6 @@ def section_plan(snapshot, target, adapter, facts, documents, policies, document
                     if desired != element["checked"]:
                         operation = "CHECK" if desired else "UNCHECK"
         if operation:
-            keys.append(action_key(element, operation, value, file_path, filename))
+            keys.append(action_key(action_target, operation, value, file_path, filename))
             fields.append({"question": question, "answer": answer, "operation": operation, **evidence})
     return fields, keys

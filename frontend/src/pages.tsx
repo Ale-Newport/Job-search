@@ -2201,12 +2201,15 @@ export function Email({ ctx }: { ctx: AppContext }) {
     return () => window.removeEventListener("focus", reloadIntegrations);
   }, [reloadIntegrations]);
   useEffect(() => {
-    const timer = window.setInterval(() => {
-      reloadIntegrations();
-      reloadMailStatus();
-    }, 2500);
-    return () => window.clearInterval(timer);
-  }, [reloadIntegrations, reloadMailStatus]);
+    if (integrations.loading) return;
+    const timer = window.setTimeout(reloadIntegrations, 2500);
+    return () => window.clearTimeout(timer);
+  }, [reloadIntegrations, integrations.loading]);
+  useEffect(() => {
+    if (mailStatus.loading) return;
+    const timer = window.setTimeout(reloadMailStatus, 2500);
+    return () => window.clearTimeout(timer);
+  }, [reloadMailStatus, mailStatus.loading]);
   useEffect(() => reloadMessages(), [syncRevision, reloadMessages]);
   return (
     <>

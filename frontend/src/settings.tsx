@@ -178,9 +178,10 @@ export function Automation({ ctx }: { ctx: AppContext }) {
     [session, setSession] = useState<Data | null>(null),
     d = r.data || {};
   useEffect(() => {
-    const timer = setInterval(r.reload, 5000);
-    return () => clearInterval(timer);
-  }, [r.reload]);
+    if (r.loading) return;
+    const timer = setTimeout(r.reload, 5000);
+    return () => clearTimeout(timer);
+  }, [r.reload, r.loading]);
   return (
     <>
       <SectionTitle
@@ -321,6 +322,22 @@ export function Automation({ ctx }: { ctx: AppContext }) {
             </div>
           </Panel>
         </div>
+        <Panel title="Worker monitor" description="Each workflow owns its browser, checkpoints and retry budget. Controls affect only the selected task.">
+          <label className="field">Concurrent applications<select value={d.settings?.application_concurrency || 2} onChange={e => ctx.act("concurrency", () => api("/settings", "PATCH", { application_concurrency: Number(e.target.value) }))}>
+            {[1,2,3,4,5,6].map(n => <option key={n} value={n}>{n}</option>)}
+          </select></label>
+          <div className="table-scroll"><table><thead><tr><th>Task</th><th>Status / step</th><th>Worker</th><th>Actions</th></tr></thead><tbody>
+            {(d.tasks || []).map((task: Data) => { const worker = (d.workers || []).find((w: Data) => w.task_id === task.id); return <tr key={task.id}>
+              <td>{label(task.kind)}<small>{task.id.slice(0,8)} · attempt {task.attempts}/{task.max_attempts}</small></td>
+              <td>{label(task.state)}<small>{worker?.operation || task.error || "Queued"}</small></td>
+              <td>{worker ? `PID ${worker.process_id}` : "—"}<small>{worker ? `${Math.round(worker.memory_bytes / 1048576)} MB` : ""}</small></td>
+              <td><div className="panel-actions">
+                {['retry','restart','resume','cancel'].map(action => <Button secondary key={action} disabled={action === 'cancel' && ['COMPLETED','FAILED','CANCELLED'].includes(task.state)} onClick={() => ctx.act(`task-${task.id}`, () => api(`/automation/tasks/${task.id}/${action}`, "POST", {}))}>{label(action)}</Button>)}
+                <Button secondary onClick={async () => { const logs = await ctx.act("task-logs", () => api(`/automation/tasks/${task.id}/logs`)); if (logs) setSession(logs); }}>View logs</Button>
+              </div></td>
+            </tr>; })}
+          </tbody></table></div>
+        </Panel>
         <Panel
           title="Browser runs"
           description="Live status. Open a run to inspect the decision trail."
@@ -1057,10 +1074,10 @@ function LocalLaya({ ctx }: { ctx: AppContext }) {
     state = r.data || {};
   const reload = r.reload;
   useEffect(() => {
-    if (!["installing", "starting"].includes(state.state)) return;
-    const timer = setInterval(reload, 4000);
-    return () => clearInterval(timer);
-  }, [state.state, reload]);
+    if (r.loading || !["installing", "starting"].includes(state.state)) return;
+    const timer = setTimeout(reload, 4000);
+    return () => clearTimeout(timer);
+  }, [state.state, reload, r.loading]);
   return (
     <Panel
       title="Local Laya runtime"

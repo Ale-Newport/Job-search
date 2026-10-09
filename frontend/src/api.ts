@@ -29,31 +29,72 @@ export async function api<T = Data>(
   body?: unknown,
   signal?: AbortSignal,
 ): Promise<T> {
-  const c = await getConnection();
-  const isForm = body instanceof FormData;
-  const response = await fetch(`${c.base_url}${path}`, {
-    method,
-    signal,
-    headers: {
-      Authorization: `Bearer ${c.token}`,
-      ...(!isForm && body !== undefined
-        ? { "Content-Type": "application/json" }
-        : {}),
-    },
-    body: body === undefined ? undefined : isForm ? body : JSON.stringify(body),
+  const controller = new AbortController();
+  const timeoutMs = method === "GET" ? 15000 : 90000;
+  let timedOut = false;
+  const abort = () => controller.abort();
+  signal?.addEventListener("abort", abort, { once: true });
+  if (signal?.aborted) abort();
+  const timer = setTimeout(() => {
+    timedOut = true;
+    connection = undefined;
+    controller.abort();
+  }, timeoutMs);
+  let onAbort: () => void;
+  const cancelled = new Promise<never>((_, reject) => {
+    onAbort = () => reject(new DOMException("Request cancelled", "AbortError"));
+    controller.signal.addEventListener("abort", onAbort, { once: true });
+    if (controller.signal.aborted) onAbort();
   });
-  if (!response.ok) {
-    const error = await response
-      .json()
-      .catch(() => ({ detail: response.statusText }));
-    const detail =
-      error.detail ?? error.message ?? `Request failed (${response.status})`;
-    throw new Error(
-      typeof detail === "string" ? detail : JSON.stringify(detail),
-    );
+  try {
+    return await Promise.race([
+      (async () => {
+        const c = await getConnection();
+        const isForm = body instanceof FormData;
+        let response: Response;
+        try {
+          response = await fetch(`${c.base_url}${path}`, {
+            method,
+            signal: controller.signal,
+            headers: {
+              Authorization: `Bearer ${c.token}`,
+              ...(!isForm && body !== undefined
+                ? { "Content-Type": "application/json" }
+                : {}),
+            },
+            body: body === undefined ? undefined : isForm ? body : JSON.stringify(body),
+          });
+        } catch (error) {
+          // Reconnect on the next request; never replay a mutation whose outcome is unknown.
+          if (!controller.signal.aborted) connection = undefined;
+          throw error;
+        }
+        if (!response.ok) {
+          if (response.status === 401) connection = undefined;
+          const error = await response
+            .json()
+            .catch(() => ({ detail: response.statusText }));
+          const detail = error.detail ?? error.message ?? `Request failed (${response.status})`;
+          throw new Error(typeof detail === "string" ? detail : JSON.stringify(detail));
+        }
+        if (response.status === 204) return {} as T;
+        return response.json() as Promise<T>;
+      })(),
+      cancelled,
+    ]);
+  } catch (error) {
+    if (timedOut)
+      throw new Error(
+        method === "GET"
+          ? "The local service took too long to respond. Retry to reconnect."
+          : "The local service took too long to respond. Check the latest status before retrying; the operation may still have completed.",
+      );
+    throw error instanceof Error ? error : new Error(String(error));
+  } finally {
+    clearTimeout(timer);
+    signal?.removeEventListener("abort", abort);
+    controller.signal.removeEventListener("abort", onAbort!);
   }
-  if (response.status === 204) return {} as T;
-  return response.json();
 }
 export async function download(path: string, name: string) {
   if (desktop()) {
@@ -74,6 +115,7 @@ export async function download(path: string, name: string) {
     : `${c.base_url}${path}`;
   const response = await fetch(url, {
     headers: { Authorization: `Bearer ${c.token}` },
+    signal: AbortSignal.timeout(90000),
   });
   if (!response.ok) throw new Error(`Download failed (${response.status})`);
   const blob = await response.blob();
@@ -92,6 +134,18 @@ export async function openExternal(url: string) {
     throw new Error("Only HTTP and HTTPS links can be opened.");
   if (desktop()) await (await import("@tauri-apps/plugin-opener")).openUrl(url);
   else window.open(url, "_blank", "noopener,noreferrer");
+}
+export async function taskResult(result: Data): Promise<Data> {
+  if (!result.task_id) return result;
+  const deadline = Date.now() + 75000;
+  while (Date.now() < deadline) {
+    const task = await api(`/automation/tasks/${result.task_id}`);
+    if (task.state === "COMPLETED") return task.checkpoint;
+    if (["FAILED", "CANCELLED", "WAITING_FOR_USER"].includes(task.state))
+      throw new Error(task.error || "This task needs attention. Open Automation to inspect it.");
+    await new Promise(resolve => setTimeout(resolve, 500));
+  }
+  throw new Error("Generation is still running. Check Automation or Documents before generating another version.");
 }
 export function useResource<T = Data>(path: string | null, refresh = 0) {
   const [data, setData] = useState<T | null>(null),
@@ -112,7 +166,7 @@ export function useResource<T = Data>(path: string | null, refresh = 0) {
         if (!controller.signal.aborted) setData(value);
       })
       .catch((e) => {
-        if (e.name !== "AbortError") setError(e.message);
+        if (!controller.signal.aborted && e.name !== "AbortError") setError(e.message);
       })
       .finally(() => {
         if (!controller.signal.aborted) setLoading(false);

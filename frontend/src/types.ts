@@ -64,6 +64,7 @@ export type Page =
   | "jobs"
   | "applications"
   | "review"
+  | "networking"
   | "companies"
   | "profile"
   | "documents"

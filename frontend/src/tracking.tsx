@@ -28,6 +28,9 @@ import "./tracking.css";
 const stages = [
   "APPLIED",
   "CONFIRMED",
+  "UNDER_REVIEW",
+  "SUBMISSION_PENDING",
+  "SUBMISSION_UNCONFIRMED",
   "RECRUITER_SCREEN",
   "ASSESSMENT",
   "TECHNICAL_TEST",
@@ -36,6 +39,7 @@ const stages = [
   "OFFER",
   "REJECTED",
   "WITHDRAWN",
+  "CLOSED",
   "GHOSTED",
 ];
 const todayInput = () =>
@@ -290,9 +294,10 @@ export function Daily({ ctx }: { ctx: AppContext }) {
     [query, setQuery] = useState("");
   const reload = r.reload;
   useEffect(() => {
-    const timer = setInterval(reload, 10000);
-    return () => clearInterval(timer);
-  }, [reload]);
+    if (r.loading) return;
+    const timer = setTimeout(reload, 10000);
+    return () => clearTimeout(timer);
+  }, [reload, r.loading]);
   const d = r.data,
     jobs = (d?.items || []).filter((j: Data) =>
       `${j.title} ${j.company} ${j.location}`
@@ -416,9 +421,9 @@ export function Daily({ ctx }: { ctx: AppContext }) {
                       <div className="tags">
                         <Tag>{j.source || "Imported"}</Tag>
                         {j.found_today && <Tag tone="green">Found today</Tag>}
-                        {j.metadata?.application_deadline && (
+                        {j.application_deadline && (
                           <Tag tone="amber">
-                            Closes {date(j.metadata.application_deadline)}
+                            Closes {date(j.application_deadline)}
                           </Tag>
                         )}
                         {j.remote && <Tag>Remote</Tag>}
@@ -551,17 +556,20 @@ export function Tracker({
     ),
     [status, setStatus] = useState(""),
     [source, setSource] = useState(""),
+    [availability, setAvailability] = useState(""),
+    [deadline, setDeadline] = useState(""),
     [offset, setOffset] = useState(0),
     [add, setAdd] = useState(false);
   const r = useResource(
-      `/tracker?q=${encodeURIComponent(query)}&scope=${scope}&status=${status}&source=${encodeURIComponent(source)}&offset=${offset}&limit=50`,
+      `/tracker?q=${encodeURIComponent(query)}&scope=${scope}&status=${status}&source=${encodeURIComponent(source)}&confirmed_open=${availability === "open"}${deadline ? `&deadline_days=${deadline}` : ""}&offset=${offset}&limit=50`,
       ctx.refresh,
     ),
     reload = r.reload;
   useEffect(() => {
-    const timer = setInterval(reload, 15000);
-    return () => clearInterval(timer);
-  }, [reload]);
+    if (r.loading) return;
+    const timer = setTimeout(reload, 15000);
+    return () => clearTimeout(timer);
+  }, [reload, r.loading]);
   return (
     <>
       <SectionTitle
@@ -571,6 +579,12 @@ export function Tracker({
         actions={<Button onClick={() => setAdd(true)}>Add opportunity</Button>}
       />
       <div className="tracker-filters">
+        <select aria-label="Filter job availability" value={availability} onChange={e => { setAvailability(e.target.value); setOffset(0); }}>
+          <option value="">All availability</option><option value="open">Verified open</option>
+        </select>
+        <select aria-label="Filter application deadline" value={deadline} onChange={e => { setDeadline(e.target.value); setOffset(0); }}>
+          <option value="">All published & unknown deadlines</option><option value="7">Closes within 7 days</option><option value="14">Closes within 14 days</option>
+        </select>
         <SearchInput
           value={query}
           onChange={(v) => {
@@ -707,9 +721,10 @@ export function Tracker({
                           <small>{j.deadline_kind}</small>
                         </>
                       ) : (
-                        "Not supplied"
+                        "Not published"
                       )}
                     </td>
+                    <td><Tag>{label(j.availability || "UNKNOWN")}</Tag><small>{j.last_verified ? `Verified ${date(j.last_verified)}` : "Awaiting verification"}</small></td>
                     <td>
                       {j.last_email ? (
                         <>

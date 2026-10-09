@@ -30,7 +30,7 @@ async def main():
         page.on("pageerror", lambda error: errors.append(str(error)))
         health = await page.request.get(base + "/api/health", headers=headers)
         assert health.ok, await health.text()
-        assert (await health.json())["data_dir"].rstrip("/").endswith(("/.local-data/qa", "/.local-data/onboarding-ui-qa", "/.local-data/tracking-qa")), "Refusing to modify a non-QA workspace"
+        assert (await health.json())["data_dir"].rstrip("/").endswith(("/.local-data/qa", "/.local-data/onboarding-ui-qa", "/.local-data/tracking-qa", "/.local-data/upgrade-ui")), "Refusing to modify a non-QA workspace"
         response = await page.request.get(base + "/api/onboarding", headers=headers)
         assert response.ok, await response.text()
         original = await response.json()

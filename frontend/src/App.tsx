@@ -37,6 +37,7 @@ import {
   Email,
   Profile,
 } from "./pages";
+import { Networking } from "./networking";
 import { Daily, Tracker } from "./tracking";
 import { Automation, Settings } from "./settings";
 import { Detail } from "./details";
@@ -55,6 +56,7 @@ const navigation = [
   { id: "jobs", label: "Opportunities", icon: BriefcaseBusiness },
   { id: "applications", label: "Tracker", icon: LayoutDashboard },
   { id: "review", label: "Review queue", icon: ShieldCheck },
+  { id: "networking", label: "Networking", icon: Building2 },
   { id: "companies", label: "Companies", icon: Building2 },
   { id: "profile", label: "Profile", icon: GraduationCap },
   { id: "documents", label: "Documents", icon: FileText },
@@ -152,18 +154,19 @@ export default function App() {
     return () => clearTimeout(t);
   }, [notice]);
   useEffect(() => {
-    const interval = setInterval(() => {
+    if (health.loading || automation.loading || tasks.loading) return;
+    const interval = setTimeout(() => {
       reloadHealth();
       reloadAutomation();
       reloadTasks();
     }, 20000);
-    return () => clearInterval(interval);
-  }, [reloadHealth, reloadAutomation, reloadTasks]);
+    return () => clearTimeout(interval);
+  }, [health.loading, automation.loading, tasks.loading, reloadHealth, reloadAutomation, reloadTasks]);
   useEffect(() => {
-    if (!health.error) return;
+    if (!health.error || health.loading) return;
     const timer = setTimeout(() => setRefresh((v) => v + 1), 3000);
     return () => clearTimeout(timer);
-  }, [health.error, refresh]);
+  }, [health.error, health.loading, refresh]);
   const setTheme = useCallback((value: string) => {
     setThemeState(value);
     localStorage.setItem("meridian-theme", value);
@@ -343,6 +346,8 @@ export default function App() {
             <Tracker ctx={ctx} />
           ) : page === "review" ? (
             <Applications ctx={ctx} review />
+          ) : page === "networking" ? (
+            <Networking ctx={ctx} />
           ) : page === "companies" ? (
             <Companies ctx={ctx} />
           ) : page === "profile" ? (

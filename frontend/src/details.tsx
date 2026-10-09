@@ -1,4 +1,5 @@
 import { OpportunityActions } from "./tracking";
+import { Networking } from "./networking";
 import { useEffect, useRef, useState } from "react";
 import {
   ArrowDownToLine,
@@ -14,6 +15,7 @@ import {
   Play,
   ShieldCheck,
   Sparkles,
+  Square,
   ThumbsDown,
   ThumbsUp,
 } from "lucide-react";
@@ -35,6 +37,7 @@ import {
   pretty,
   showReviewWindow,
   time,
+  taskResult,
   useResource,
 } from "./api";
 import {
@@ -91,6 +94,7 @@ export function JobDetail({ id, ctx }: { id: string; ctx: AppContext }) {
     [prepare, setPrepare] = useState(false),
     [generate, setGenerate] = useState(false),
     [feedback, setFeedback] = useState(false),
+    [people, setPeople] = useState(false),
     j = r.data;
   return (
     <Resource {...r} retry={r.reload}>
@@ -134,6 +138,7 @@ export function JobDetail({ id, ctx }: { id: string; ctx: AppContext }) {
               <Sparkles size={15} />
               Tailor documents
             </Button>
+            <Button secondary onClick={() => setPeople(true)}>Relevant people</Button>
             <Button
               secondary
               onClick={() =>
@@ -191,7 +196,7 @@ export function JobDetail({ id, ctx }: { id: string; ctx: AppContext }) {
                 <KeyValues
                   data={{
                     deadline:
-                      j.metadata?.application_deadline || "Not supplied",
+                      j.application_deadline || j.metadata?.application_deadline || "Not published",
                     cv_required:
                       j.metadata?.cv_required == null
                         ? "Not supplied"
@@ -260,6 +265,9 @@ export function JobDetail({ id, ctx }: { id: string; ctx: AppContext }) {
           {prepare && (
             <PrepareJob job={j} ctx={ctx} onClose={() => setPrepare(false)} />
           )}{" "}
+          {people && <Modal wide title="Relevant people" onClose={() => setPeople(false)}>
+            <Networking ctx={{ ...ctx, target: id }} />
+          </Modal>}
           {generate && (
             <GenerateDocument
               job={j}
@@ -495,12 +503,12 @@ function GenerateDocument({
     setBusy(true);
     setError("");
     try {
-      const r = await api("/documents/generate", "POST", {
+      const r = await taskResult(await api("/documents/generate", "POST", {
         job_id: job.id,
         kind,
         fact_ids: selected,
         approved,
-      });
+      }));
       setResult(r);
       if (approved) {
         await ctx.act(
@@ -630,7 +638,15 @@ export function ApplicationDetail({
     a = r.data;
   const refreshApplication = r.reload;
   const previousRunStatus = useRef<string | undefined>(undefined);
-  const runStatus = a?.runs?.at(-1)?.status;
+  const latestRun = a?.runs?.at(-1);
+  const runStatus = latestRun?.status;
+  const closed = [
+    "APPLIED", "CONFIRMED", "RECRUITER_SCREEN", "ASSESSMENT", "TECHNICAL_TEST",
+    "INTERVIEW", "FINAL_INTERVIEW", "OFFER", "REJECTED", "WITHDRAWN",
+  ].includes(a?.status || "");
+  const uncertain = a?.runs?.some((run) =>
+    ["interrupted", "unconfirmed", "submitting"].includes(run.status),
+  );
   useEffect(() => {
     const wasRunning = ["running", "submitting"].includes(
       previousRunStatus.current || "",
@@ -649,12 +665,16 @@ export function ApplicationDetail({
     ctx.busy === "apply" ||
     ctx.busy === "approve" ||
     ctx.busy === "approve-section" ||
-    ["running", "submitting", "browser_question"].includes(a?.runs?.at(-1)?.status);
+    ctx.busy === "resume" ||
+    ["running", "submitting"].includes(runStatus);
+  const watching = !closed && [
+    "running", "submitting", "browser_question", "section_review", "needs_review", "ready_for_review", "human_required",
+  ].includes(runStatus);
   useEffect(() => {
-    if (!active) return;
-    const timer = setInterval(refreshApplication, 2500);
-    return () => clearInterval(timer);
-  }, [active, refreshApplication]);
+    if ((!active && !watching) || r.loading) return;
+    const timer = setTimeout(refreshApplication, 2500);
+    return () => clearTimeout(timer);
+  }, [active, watching, r.loading, refreshApplication]);
   return (
     <Resource {...r} loading={r.loading && !r.data} retry={r.reload}>
       {a && (
@@ -684,9 +704,9 @@ export function ApplicationDetail({
             </Button>
           </div>
           <div className="detail-actions">
-            {a.mode !== "manual" && (
+            {a.mode !== "manual" && !closed && (
               <>
-                {a.runs?.at(-1)?.status === "section_review" ? (
+                {uncertain ? null : runStatus === "section_review" ? (
                   <Button onClick={() => setSectionReview(true)}>
                     <ShieldCheck size={15} />
                     Review section
@@ -699,15 +719,6 @@ export function ApplicationDetail({
                     Review & approve submission
                   </Button>
                 ) : (
-                  ![
-                    "APPLIED",
-                    "CONFIRMED",
-                    "OFFER",
-                    "REJECTED",
-                    "WITHDRAWN",
-                    "INTERVIEW",
-                    "FINAL_INTERVIEW",
-                  ].includes(a.status) && (
                     <Button
                       loading={active}
                       onClick={() =>
@@ -719,9 +730,22 @@ export function ApplicationDetail({
                       }
                     >
                       <Play size={15} />
-                      Apply
+                      {["error", "blocked", "paused"].includes(runStatus) ? "Retry Auto Apply" : "Apply"}
                     </Button>
-                  )
+                )}
+                {active && (
+                  <Button
+                    secondary
+                    loading={ctx.busy === "cancel-run"}
+                    onClick={() => ctx.act(
+                      "cancel-run",
+                      () => api(`/applications/${id}/cancel`, "POST", {}),
+                      "Browser operation stopped. Check its latest status before continuing.",
+                    )}
+                  >
+                    <Square size={15} />
+                    Stop attempt
+                  </Button>
                 )}
                 <Button
                   secondary
@@ -738,6 +762,7 @@ export function ApplicationDetail({
                 </Button>
                 <Button
                   secondary
+                  disabled={active || uncertain}
                   onClick={() =>
                     ctx.act(
                       "resume",
@@ -749,12 +774,8 @@ export function ApplicationDetail({
                   <Play size={15} />
                   Resume agent
                 </Button>
-                {a.runs?.some((run) =>
-                  ["interrupted", "unconfirmed", "submitting"].includes(
-                    run.status,
-                  ),
-                ) && (
-                  <Button secondary onClick={() => setReconcile(true)}>
+                {uncertain && (
+                  <Button secondary disabled={active} onClick={() => setReconcile(true)}>
                     <ShieldCheck size={15} />
                     Reconcile submission
                   </Button>
@@ -769,6 +790,15 @@ export function ApplicationDetail({
               <ArrowRight size={15} />
             </Button>
           </div>
+          {latestRun?.error && !closed && (
+            <ErrorBox error={latestRun.error} />
+          )}
+          {runStatus === "browser_question" && !closed && (
+            <div className="tracking-callout">
+              <Hand size={20} />
+              <p>Waiting for your answer in Chrome. If you closed the form, resume the agent to reopen it.</p>
+            </div>
+          )}
           {a.section_consent && a.runs?.at(-1)?.status === "section_review" && (
             <div className="tracking-callout">
               <ShieldCheck size={20} />
@@ -1557,12 +1587,12 @@ export function RunDetail({ id, ctx }: { id: string; ctx: AppContext }) {
     run = r.data,
     steps = run?.steps || [];
   const refreshRun = r.reload;
-  const active = ["running", "submitting"].includes(run?.status);
+  const active = ["running", "submitting", "browser_question", "section_review", "needs_review", "ready_for_review", "human_required"].includes(run?.status);
   useEffect(() => {
-    if (!active) return;
-    const timer = setInterval(refreshRun, 2500);
-    return () => clearInterval(timer);
-  }, [active, refreshRun]);
+    if (!active || r.loading) return;
+    const timer = setTimeout(refreshRun, 2500);
+    return () => clearTimeout(timer);
+  }, [active, r.loading, refreshRun]);
   return (
     <Resource {...r} loading={r.loading && !r.data} retry={r.reload}>
       {run && (

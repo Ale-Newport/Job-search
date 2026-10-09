@@ -76,9 +76,10 @@ const statusLabels = {
 export function SetupGuide({ ctx }: { ctx: AppContext }) {
   const r = useResource<SetupState>("/onboarding", ctx.refresh);
   useEffect(() => {
-    const interval = setInterval(r.reload, 15000);
-    return () => clearInterval(interval);
-  }, [r.reload]);
+    if (r.loading) return;
+    const timer = setTimeout(r.reload, 15000);
+    return () => clearTimeout(timer);
+  }, [r.reload, r.loading]);
   if (r.data?.hidden) return null;
   const completed =
     r.data?.steps.filter((step) => step.status === "complete").length || 0;

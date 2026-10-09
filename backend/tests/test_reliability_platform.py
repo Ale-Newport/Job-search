@@ -418,3 +418,15 @@ def test_orphan_cleanup_requires_exact_private_task_in_path_with_spaces(tmp_path
     monkeypatch.setattr('jobagent.supervisor.os.killpg',lambda pid,sig:killed.append(pid))
     supervisor._cleanup_orphan(row)
     assert killed==([200] if matching else [])
+
+
+def test_checkpoints_keep_job_identity_but_remove_authentication_secrets():
+    from jobagent.security import private_checkpoint
+    source={'current_url':'https://ats.example.test/form?gh_jid=123&code=private-code&state=private-state&access_token=private-token#access_token=fragment-secret','answers':[{'question':'Email','answer':'synthetic@example.test','fact_ids':['verified-fact']}],'last_step':{'url':'https://ats.example.test/next?job=123&sessionid=private-session','headers':{'Authorization':'private-bearer'}}}
+    cleaned=private_checkpoint(source)
+    assert cleaned['current_url']=='https://ats.example.test/form?gh_jid=123'
+    assert cleaned['last_step']['url']=='https://ats.example.test/next?job=123'
+    assert cleaned['last_step']['headers']=='[redacted]'
+    assert cleaned['answers']==source['answers']
+    assert 'private-' not in json.dumps(cleaned)
+    assert 'private-code' in source['current_url']

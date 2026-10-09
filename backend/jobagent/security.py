@@ -102,3 +102,27 @@ async def safe_get(client: httpx.AsyncClient, url: str, **kwargs) -> httpx.Respo
         response.raise_for_status()
         return response
     raise ValueError("Too many redirects")
+
+
+def private_checkpoint(value):
+    """Retain semantic local evidence without OAuth/session secrets in URLs."""
+    from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
+    secret_keys={'password','accesstoken','refreshtoken','idtoken','authorization','cookies','cookie','headers'}
+    url_keys={'url','current_url','frame_url','href','destination'}
+    query_secrets=secret_keys | {'code','state','token','session','sessionid','sso','samlresponse','assertion','signature','apikey','auth','oauth_token'}
+    if isinstance(value,list):
+        return [private_checkpoint(item) for item in value]
+    if not isinstance(value,dict):
+        return value
+    result={}
+    for key,item in value.items():
+        normalized=re.sub(r'[^a-z0-9]','',str(key).casefold())
+        if normalized in secret_keys:
+            result[key]='[redacted]'
+        elif key in url_keys and isinstance(item,str) and item.startswith(('https://','http://')):
+            parsed=urlsplit(item)
+            query=[(k,v) for k,v in parse_qsl(parsed.query,keep_blank_values=True) if re.sub(r'[^a-z0-9]','',k.casefold()) not in query_secrets and not re.search(r'token|signature',k,re.I)]
+            result[key]=urlunsplit((parsed.scheme,parsed.netloc.rsplit('@',1)[-1],parsed.path,urlencode(query),''))
+        else:
+            result[key]=private_checkpoint(item)
+    return result

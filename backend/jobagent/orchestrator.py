@@ -11,6 +11,7 @@ from urllib.parse import urlparse
 from uuid import uuid4
 
 from .db import decode_row, now
+from .security import private_checkpoint
 
 
 def settings_for(db):
@@ -80,7 +81,7 @@ class Orchestrator:
         if getattr(self.browser, '_active_application_id', None) == run['application_id']:
             self.browser._invalidate_approvals()
         self.db.execute('UPDATE automation_runs SET status=?,checkpoint=?,error=?,updated_at=? WHERE id=?',
-                        (state, json.dumps(checkpoint), error[:1000], now(), run_id))
+                        (state, json.dumps(private_checkpoint(checkpoint)), error[:1000], now(), run_id))
         self._event(run['application_id'], 'ERROR', error[:1000])
         self.human_task(run['application_id'], 'SUBMISSION_UNCONFIRMED' if uncertain else 'AUTOMATION_ERROR', error[:1000])
         return state
@@ -167,7 +168,7 @@ class Orchestrator:
                 step.get("operation", "OBSERVE"),
                 str(step.get("target", "")),
                 step.get("confidence"),
-                json.dumps({k: step.get(k) for k in ('operation', 'target', 'confidence', 'label', 'url', 'executed', 'form_state', 'document_version_id', 'upload_evidence')}),
+                json.dumps(private_checkpoint({k: step.get(k) for k in ('operation', 'target', 'confidence', 'label', 'url', 'executed', 'form_state', 'document_version_id', 'upload_evidence')})),
                 now(),
             ),
         )
@@ -191,7 +192,7 @@ class Orchestrator:
         })
         self.db.execute(
             "UPDATE automation_runs SET checkpoint=?,updated_at=? WHERE id=?",
-            (json.dumps(checkpoint), now(), self.active_run),
+            (json.dumps(private_checkpoint(checkpoint)), now(), self.active_run),
         )
 
     def pause(self):
@@ -623,7 +624,7 @@ class Orchestrator:
             'message': 'Suggested answer — confirm or edit it.' if suggested and suggested['state'] == 'suggested' and answer else '',
         }, handle)
         result['browser_question'] = True
-        self.db.execute("UPDATE automation_runs SET status='browser_question',checkpoint=?,updated_at=? WHERE id=?", (json.dumps(result), now(), run_id))
+        self.db.execute("UPDATE automation_runs SET status='browser_question',checkpoint=?,updated_at=? WHERE id=?", (json.dumps(private_checkpoint(result)), now(), run_id))
 
     def persist_result(self, run_id, application_id, result):
         for omitted in result.get('omitted', []):
@@ -671,7 +672,7 @@ class Orchestrator:
                             (now(), application_id))
         self.db.execute(
             "UPDATE automation_runs SET status=?,checkpoint=?,error=?,updated_at=? WHERE id=?",
-            (result.get("status", "human_required"), json.dumps(result), result.get('error'), now(), run_id),
+            (result.get("status", "human_required"), json.dumps(private_checkpoint(result)), result.get('error'), now(), run_id),
         )
         confirmed = result.get("status") == "confirmed"
         self._event(

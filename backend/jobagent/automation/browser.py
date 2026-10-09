@@ -24,6 +24,10 @@ from .types import Decision, HumanRequired, InvalidDecision, Operation, Paused, 
 OBSERVATION_SCRIPT = Path(__file__).with_name("observation.js").read_text()
 PROGRESS = re.compile(r"^(?:next|continue|save and continue|review|proceed)(?:\s|$)", re.I)
 SUBMIT = re.compile(r"\b(?:submit|send application|apply(?: now)?|finish application|complete application|confirm application)\b", re.I)
+APPLICATION_ENTRY = re.compile(
+    r"^(?:apply(?: now| manually| for (?:this |the )?(?:job|role|position))?|"
+    r"(?:start|begin)(?: (?:your|an|the))? application)$", re.I,
+)
 CONFIRMATION = re.compile(
     r"(?:thank you for (?:applying|your application)|application (?:has been |was )?"
     r"(?:received|submitted|successfully submitted)|(?:we have|we've) received your application|"
@@ -55,16 +59,37 @@ def is_submit(element: dict) -> bool:
 
 
 def is_application_entry(element: dict, snapshot: dict) -> bool:
-    """An observed application URL on a listing may be opened with a GET.
+    """Recognise entry navigation before candidate fields or a final review.
 
-    Never click a button that could execute submission code, even if it looks
-    like a navigation link. A page with candidate inputs is never an entry page.
+    Links are opened by their observed GET destination, without their click
+    handler. A button may open the form only outside a form, with no candidate
+    inputs present. Explicit submit controls never qualify for this exception.
     """
-    return bool(element.get('tag') == 'a' and 'OPEN_TAB' in element.get('operations', [])
-                and re.fullmatch(r'apply(?: now| for (?:this |the )?(?:job|role|position))?', element.get('label', '').strip(), re.I)
-                and urlparse(element.get('href') or '').scheme in {'http', 'https'}
-                and not any(any(op in e['operations'] for op in ('TYPE_TEXT', 'SELECT', 'CHECK', 'UPLOAD'))
-                            for e in snapshot['elements']))
+    if (snapshot.get('application_started') or snapshot.get('blocked')
+            or confirmation_evidence(snapshot) or element.get('form_id', 'page') != 'page'
+            or element.get('navigation_parent_id')
+            or not APPLICATION_ENTRY.fullmatch(element.get('label', '').strip())
+            or any(any(op in e.get('operations', []) for op in ('TYPE_TEXT', 'SELECT', 'CHECK', 'UPLOAD'))
+                   for e in snapshot.get('elements', []))):
+        return False
+    if element.get('tag') == 'a':
+        return ('OPEN_TAB' in element.get('operations', [])
+                and urlparse(element.get('href') or '').scheme in {'http', 'https'})
+    return (element.get('tag') == 'button' and 'CLICK' in element.get('operations', [])
+            and element.get('explicit_type') != 'submit')
+
+
+def application_entry_target(snapshot: dict) -> dict | None:
+    entries = [e for e in snapshot.get('elements', []) if is_application_entry(e, snapshot)]
+    # Workday's method chooser must open the blank form rather than reuse a
+    # previous application or invoke an unapproved resume/LinkedIn import.
+    manual = [e for e in entries if e.get('label', '').strip().casefold() == 'apply manually']
+    entries = manual or entries
+    if len(entries) == 1:
+        return entries[0]
+    if entries and all(e.get('tag') == 'a' and e.get('href') == entries[0].get('href') for e in entries):
+        return entries[0]  # Repeated header/footer links to the same entry page.
+    return None
 
 
 def confirmation_evidence(snapshot: dict) -> list[dict]:
@@ -292,9 +317,9 @@ class BrowserSession:
             if not any(any(op in e['operations'] for op in ('TYPE_TEXT', 'SELECT', 'CHECK', 'UPLOAD')) for e in snapshot['elements']):
                 loading = loading or re.search(r'^\s*Loading[.\s]*$', snapshot['text'], re.I | re.M)
             ready = bool(snapshot['elements'] and snapshot['text'].strip())
-            if urlparse(snapshot['url']).path.rstrip('/').endswith(('/application', '/apply')):
+            if re.search(r'/(?:application|apply)(?:/|$)', urlparse(snapshot['url']).path, re.I):
                 ready = any(any(op in e['operations'] for op in ('TYPE_TEXT', 'SELECT', 'CHECK', 'UPLOAD'))
-                            for e in snapshot['elements']) or bool(confirmation_evidence(snapshot))
+                            for e in snapshot['elements']) or bool(confirmation_evidence(snapshot)) or bool(application_entry_target(snapshot))
             if snapshot["blocked"] or time.monotonic() >= deadline or (not loading and ready and time.monotonic() >= earliest):
                 return snapshot
             await asyncio.sleep(.25)
@@ -377,7 +402,8 @@ class BrowserSession:
             element = next((e for e in observed["elements"] if e["index"] == decision.target), None)
             if decision.target is not None and (not element or op not in element["operations"]):
                 raise InvalidDecision("The target was not observed supporting this operation.")
-            entry_navigation = element and op == Operation.OPEN_TAB and is_application_entry(element, observed)
+            entry_navigation = (element and is_application_entry(element, observed)
+                                and op == (Operation.OPEN_TAB if element.get('tag') == 'a' else Operation.CLICK))
             if element and is_submit(element) and not allow_submit and not entry_navigation:
                 raise HumanRequired("Final submission requires a separate policy check and approval.")
             self._check_pause()

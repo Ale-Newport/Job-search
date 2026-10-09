@@ -1165,11 +1165,13 @@ function SectionApproval({
   close: () => void;
 }) {
   const checkpoint = a.runs?.at(-1)?.checkpoint,
-    section = checkpoint?.section;
+    section = checkpoint?.section,
+    entry = section?.kind === "start_application",
+    navigation = entry || section?.kind === "continue";
   return (
     <Modal
       wide
-      title={`Review section · ${section?.title || "Application"}`}
+      title={entry ? "Review application entry" : `Review section · ${section?.title || "Application"}`}
       onClose={close}
     >
       <p className="panel-copy">
@@ -1177,7 +1179,9 @@ function SectionApproval({
       </p>
       <p className="panel-copy">Destination: {section?.destination}</p>
       <p className="panel-copy">
-        {section?.kind === "continue"
+        {entry
+          ? "Approve opening the employer's application form. Meridian will inspect the form before filling it."
+          : section?.kind === "continue"
           ? "Approve moving to the next step with the current form values. The next section will require another review."
           : "Approve these exact values and attachments for this section. Unknown answers are left for you to resolve."}
       </p>
@@ -1189,7 +1193,7 @@ function SectionApproval({
             <small>
               {field.operation === "UPLOAD"
                 ? "Selected document"
-                : field.operation === "CLICK" && section.kind === "continue"
+                : navigation && ["CLICK", "OPEN_TAB"].includes(field.operation)
                   ? "Navigation only"
                   : "Verified profile answer"}
             </small>
@@ -1219,7 +1223,9 @@ function SectionApproval({
             if (result) close();
           }}
         >
-          {section?.kind === "continue"
+          {entry
+            ? "Approve & open application"
+            : section?.kind === "continue"
             ? "Approve & continue"
             : "Approve & fill section"}
         </Button>

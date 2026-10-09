@@ -639,6 +639,73 @@ async def test_apply_entry_opens_observed_href_without_clicking_submission_code(
         await browser.execute(Decision(Operation.OPEN_TAB,target['index']),snapshot)
 
 
+@pytest.mark.parametrize('view', ['links', 'buttons'])
+async def test_application_entry_and_workday_method_choice_reach_final_review(browser, fixture_server, candidate, view):
+    result = await browser.fill_application(
+        {'id': 'entry-' + view, 'url': fixture_server + '/application_entry.html?view=' + view, 'ats': 'workday'},
+        candidate, [], settings={'assisted_autofill': True, 'skip_optional_unknown': True})
+    assert result['status'] == 'needs_review', result
+    assert result['form_state'] == 'FINAL_REVIEW'
+    assert await browser.page.evaluate('window.submissions') == 0
+    assert await browser.page.evaluate('window.imports') == 0
+    assert any(a['answer'] == 'alex@example.test' for a in result['answers'])
+    # The final Apply button has the same text as the initial entry control and
+    # sits outside a form on a review page with no inputs. It still cannot send.
+    snapshot = browser._snapshots[result['snapshot_id']][0]
+    final = next(e for e in snapshot['elements'] if e['label'] == 'Apply')
+    with pytest.raises(HumanRequired, match='Final submission'):
+        await browser.execute(Decision(Operation.CLICK, final['index']), snapshot)
+    assert await browser.page.evaluate('window.submissions') == 0
+    assert (await browser.submit(result['snapshot_id']))['status'] == 'confirmed'
+    assert await browser.page.evaluate('window.submissions') == 1
+    if view == 'links':
+        assert not await browser.context.pages[0].evaluate('window.entryClicks')
+        assert any('/application_entry.html?view=methods' in p.url for p in browser.context.pages)
+
+
+async def test_application_entry_respects_section_consent(browser, fixture_server):
+    application = {'id': 'entry-consent', 'url': fixture_server + '/application_entry.html?view=buttons'}
+    settings = {'section_consent': True, 'assisted_autofill': True}
+    result = await browser.fill_application(application, [], [], settings=settings)
+    assert result['status'] == 'section_review', result
+    assert result['section']['kind'] == 'start_application'
+    assert result['section']['fields'][0]['answer'] == 'Apply'
+    assert await browser.page.evaluate('window.entryClicks') == 0
+    grant = await browser.authorize_section(application['id'], result['snapshot_id'])
+    result = await browser.fill_application(application, [], [], settings={**settings, '_section_grant': grant})
+    assert result['status'] == 'section_review', result
+    assert result['section']['fields'][0]['answer'] == 'Apply Manually'
+    assert await browser.page.evaluate('window.entryClicks') == 1
+    assert await browser.page.evaluate('window.imports') == 0
+
+
+async def test_nested_application_route_waits_for_delayed_workday_signin(browser, fixture_server):
+    url = fixture_server + '/apply/applyManually'
+    await browser.page.route(url, lambda route: route.fulfill(content_type='text/html', body='''
+        <main><h1>Careers</h1><button>Sign In</button></main>
+        <script>setTimeout(() => document.querySelector('main').innerHTML =
+          '<h1>Create Account/Sign In</h1><label>Email <input type="email"></label>' +
+          '<label>Password <input type="password"></label>', 1700)</script>'''))
+    snapshot = await browser.open(url)
+    assert snapshot['blocked'] and snapshot['login']
+    assert any(e['label'] == 'Email' for e in snapshot['elements'])
+    assert await browser.page.locator('input[type="email"]').input_value() == ''
+
+
+@pytest.mark.parametrize('markup', [
+    '<button type="submit" onclick="window.submissions++">Apply</button>',
+    '<form id="application"></form><button form="application" type="button" onclick="window.submissions++">Apply</button>',
+    '<form><button type="button" onclick="window.submissions++">Apply</button></form>',
+])
+async def test_explicit_or_form_associated_apply_cannot_bypass_submission_gate(browser, markup):
+    await browser.page.set_content('<script>window.submissions=0</script>' + markup)
+    snapshot = await browser.observe()
+    target = next(e for e in snapshot['elements'] if e['label'] == 'Apply')
+    with pytest.raises(HumanRequired, match='Final submission'):
+        await browser.execute(Decision(Operation.CLICK, target['index']), snapshot)
+    assert await browser.page.evaluate('window.submissions') == 0
+
+
 async def test_clipped_upload_uses_only_associated_attach_button(browser, tmp_path):
     await browser.page.set_content('''<style>.visually-hidden{position:absolute;width:1px;height:1px;clip:rect(0,0,0,0)}</style>
     <div><button type="button">Attach</button><label class="visually-hidden" for="resume">Attach</label><input id="resume" class="visually-hidden" type="file"></div>

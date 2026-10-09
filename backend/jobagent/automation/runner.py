@@ -13,7 +13,7 @@ from ..intelligence.formatting import choice as option_for
 from .reasoning import conditional_state, profile_resolution
 from .disclosures import disclosure_resolution, disclosure_clear_operation, disclosure_memory_key, has_disclosure_value, inherit_disclosure_context, personal_disclosure_kind
 from .browser import BrowserSession, confirmation_evidence
-from .browser import PROGRESS, is_submit
+from .browser import PROGRESS, is_submit, application_entry_target
 from .engines import make_engine
 from .job_context import enrich_job_context
 from .consent import action_key, dropdown_open_target, radio_group, resolution_element, section_plan, selected_resolution_matches
@@ -166,6 +166,7 @@ class BrowserManager(BrowserSession):
                         policies['personal_disclosures'] = disclosure_policy['value']
                 self._check_pause()
                 form_seen = form_seen or any(any(op in e['operations'] for op in ('TYPE_TEXT','SELECT','CHECK','UPLOAD')) for e in snapshot['elements'])
+                snapshot['application_started'] = form_seen
                 cookie_text = ' '.join(frame.get('text','') for frame in snapshot.get('frames',[]))
                 if re.search(r'cookies?|privacy preferences', cookie_text, re.I):
                     declines = [e for e in snapshot['elements'] if e.get('role')=='button' and 'CLICK' in e['operations'] and (e['document_id'],e['node_id']) not in dismissed_cookies and re.fullmatch(r'(?:reject|decline)(?: all(?: cookies)?| optional cookies| non-essential cookies)|only necessary(?: cookies)?|necessary cookies only',e.get('label','').strip(),re.I)]
@@ -471,10 +472,9 @@ class BrowserManager(BrowserSession):
                     return self._result("human_required", snapshot, answers=answers, steps=steps, adapter=adapter.name,
                                         questions=[{"question": e, "kind": "validation"} for e in snapshot["errors"]])
                 has_inputs = any(any(op in e['operations'] for op in ('TYPE_TEXT','SELECT','CHECK','UPLOAD')) for e in snapshot['elements'])
-                # A listing's Apply button is not evidence of a completed form.
-                # With no candidate controls or completed workflow, navigate only
-                # an observed GET link or ask for entry/authentication help.
-                entry_only = not has_inputs and (section_consent or settings.get('assisted_autofill') or not form_seen)
+                # Entry and method-choice pages precede any candidate form.
+                # A completed wizard may have a review page with no inputs.
+                entry_only = not has_inputs and not form_seen
                 submit = None if entry_only else adapter.submit_button(snapshot)
                 if submit:
                     self.form_state = 'FINAL_REVIEW'
@@ -482,15 +482,13 @@ class BrowserManager(BrowserSession):
                                                     "mode": mode.upper(), "answers": answers, "steps": steps,
                                                     "sensitive": any(a.get("kind") in {"disability", "ethnicity", "gender", "criminal_record", "demographic", "legal_certification"} for a in answers)}
                     return self._result("needs_review", snapshot, answers=answers, steps=steps, adapter=adapter.name)
-                next_button = adapter.next_button(snapshot)
+                entry = application_entry_target(snapshot) if entry_only else None
+                next_button = dict(entry) if entry else adapter.next_button(snapshot)
+                if entry:
+                    next_button['_decision'] = Decision(Operation.OPEN_TAB if entry['tag'] == 'a' else Operation.CLICK,
+                                                        entry['index'])
                 if next_button is None:
                     next_button = await self._decide_safe_progress(snapshot, settings)
-                if next_button is None and entry_only:
-                    from .browser import is_application_entry
-                    links = [e for e in snapshot['elements'] if is_application_entry(e, snapshot)]
-                    next_button = links[0] if len(links) == 1 else None
-                    if next_button:
-                        next_button['_decision'] = Decision(Operation.OPEN_TAB, next_button['index'])
                 if next_button and page_advances < 30:
                     previous = snapshot["fingerprint"]
                     decision = next_button.pop("_decision", None) or Decision(Operation.CLICK, next_button["index"])
@@ -498,12 +496,14 @@ class BrowserManager(BrowserSession):
                         key = action_key(next_button, decision.operation)
                         if key not in section_grant:
                             return self.section_checkpoint(snapshot, next_button, [key],
-                                [{"question": "Continue in the employer's form", "answer": next_button["label"], "operation": "CLICK"}],
-                                answers, steps, adapter.name, "continue")
+                                [{"question": "Open the employer's application" if entry else "Continue in the employer's form",
+                                  "answer": next_button["label"], "operation": decision.operation.value}],
+                                answers, steps, adapter.name, "start_application" if entry else "continue")
                         section_grant.remove(key)
-                    self.form_state = 'CONTINUE_TO_NEXT_STEP'
+                    self.form_state = 'OPEN_APPLICATION' if entry else 'CONTINUE_TO_NEXT_STEP'
                     await self._record_step(await self.execute(decision, snapshot), steps, snapshot)
-                    self.completed_steps.append({'url': snapshot['url'], 'labels': [adapter.question(e) for e in snapshot['elements'] if e.get('role') not in ('button','link')]})
+                    if not entry:
+                        self.completed_steps.append({'url': snapshot['url'], 'labels': [adapter.question(e) for e in snapshot['elements'] if e.get('role') not in ('button','link')]})
                     page_advances += 1
                     snapshot = await self._wait_for_change(previous)
                     snapshot = await self.wait_until_ready()

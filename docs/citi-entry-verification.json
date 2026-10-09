@@ -1,0 +1,85 @@
+{
+  "date": "2026-10-09",
+  "job": "Junior Software Engineer - Generative AI Platforms",
+  "company": "Citi",
+  "real_form": {
+    "status": "human_required",
+    "url": "https://citi.wd5.myworkdayjobs.com/en-US/2/job/London--United-Kingdom/Junior-Software-Engineer---Generative-AI-Platforms_26989233/apply/applyManually",
+    "entry_actions": [
+      {
+        "operation": "OPEN_TAB",
+        "label": "Apply"
+      },
+      {
+        "operation": "OPEN_TAB",
+        "label": "Apply Manually"
+      }
+    ],
+    "attention": "authentication",
+    "reached_first_of_seven_steps": true,
+    "seconds": 13.35,
+    "candidate_facts_sent": 0,
+    "uploads": 0,
+    "submitted": false
+  },
+  "backend_browser_startup_recovery_tests": {
+    "passed": 96,
+    "seconds": 129.5
+  },
+  "frontend_lint": "passed",
+  "typescript": "passed",
+  "packaged_entry_tests": {
+    "result": "passed",
+    "packaged_sidecar": true,
+    "synthetic_only": true,
+    "forms": [
+      {
+        "view": "links",
+        "state": "FINAL_REVIEW",
+        "attempts": 1,
+        "entry_steps": [
+          "Apply",
+          "Apply Manually"
+        ],
+        "submitted": false
+      },
+      {
+        "view": "buttons",
+        "state": "FINAL_REVIEW",
+        "attempts": 1,
+        "entry_steps": [
+          "Apply",
+          "Apply Manually"
+        ],
+        "submitted": false
+      }
+    ]
+  },
+  "installation": {
+    "result": "passed",
+    "installed_app": "/Applications/Meridian.app",
+    "native_app_relaunched": true,
+    "migration": "0008_reliability",
+    "all_existing_ids_preserved": true,
+    "before_counts": {
+      "jobs": 2092,
+      "applications": 5,
+      "facts": 263,
+      "documents": 1,
+      "email_messages": 52,
+      "sources": 13
+    },
+    "after_counts": {
+      "jobs": 2092,
+      "applications": 5,
+      "facts": 263,
+      "documents": 1,
+      "email_messages": 52,
+      "sources": 13
+    },
+    "binary_hashes_match": true,
+    "deep_strict_signature_verified": true
+  },
+  "recoverable_backup": ".build-cache/install-backups/20261009T195121Z-entry-fix",
+  "native_today_view_observed": true
+}

@@ -1,0 +1,22 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><title>Application entry fixture</title>
+<style>body{font:16px system-ui;padding:32px}a,button,label{display:block;margin:18px}</style>
+<main id="content"></main>
+<script>
+window.submissions=0;window.entryClicks=0;window.imports=0;
+const content=document.querySelector('main');
+const view=new URLSearchParams(location.search).get('view')||'buttons';
+function showForm(){content.innerHTML='<h1>Application details</h1><label>Email <input type="email" name="email" required></label><button type="button" onclick="review()">Continue</button>';}
+function review(){content.innerHTML='<h1>Review your application</h1><p>Check the completed application before sending.</p><button type="button" onclick="window.submissions++;content.innerHTML=\'Application received\'">Apply</button>';}
+function methods(){window.entryClicks++;content.innerHTML='<h1>Start Your Application</h1><button type="button" onclick="window.imports++">Autofill with Resume</button><button type="button" onclick="showForm()">Apply Manually</button><button type="button" onclick="window.imports++">Use My Last Application</button>';}
+if(view==='links'){
+ content.innerHTML='<h1>Junior Software Engineer – Generative AI Platforms</h1><div data-automation-id="jobPostingDescription">This is a public job description. The application form is opened separately using an Apply entry link.</div><a role="button" href="?view=methods" onclick="window.entryClicks++;return false">Apply</a><a role="button" href="?view=methods" onclick="window.entryClicks++;return false">Apply</a>';
+}else if(view==='methods'){
+ content.innerHTML='<h1>Start Your Application</h1><a role="button" href="?view=import">Autofill with Resume</a><a role="button" href="?view=form">Apply Manually</a><a role="button" href="?view=import">Use My Last Application</a>';
+}else if(view==='form'){
+ showForm();
+}else if(view==='import'){
+ window.imports++;content.innerHTML='<h1>Unexpected import</h1>';
+}else{
+ content.innerHTML='<h1>Junior Software Engineer – Generative AI Platforms</h1><button onclick="methods()">Apply</button>';
+}
+</script></html>

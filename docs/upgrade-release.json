@@ -6,23 +6,25 @@
   "deep_strict_signature_verified": true,
   "notarized": false,
   "dmg_checksum_verified": true,
-  "installed_over_existing_copy": false,
+  "installed_over_existing_copy": true,
   "production_database_preserved": true,
   "artifacts": [
     {
       "path": "src-tauri/target/release/bundle/macos/Meridian.app/Contents/MacOS/meridian",
       "bytes": 11715808,
-      "sha256": "e4c96e9bc871405cab414b30e1f5146bf1d0543f5881fdbeac7071dcdaecd073"
+      "sha256": "4bf6f9cb85920cba29f613a177a0bf92d291a6af61b612513dd403d24a24fd2e"
     },
     {
       "path": "src-tauri/target/release/bundle/macos/Meridian.app/Contents/MacOS/meridian-backend",
-      "bytes": 81675552,
-      "sha256": "be6fb3d936e46dc2ce74b9b05636d15bba670af8fff186baf378dad317711935"
+      "bytes": 81676336,
+      "sha256": "2359a2a00ec45e3bef1539e625e81e298c20ab890b9a110114924a6b3c0f253f"
     },
     {
       "path": "src-tauri/target/release/bundle/dmg/Meridian_0.1.0_aarch64.dmg",
-      "bytes": 86958113,
-      "sha256": "130924940259253aaedfaad8acaa0208ab8a2d0a4f70a8fe7ea89fef87060245"
+      "bytes": 86958969,
+      "sha256": "4f9535094f93cce4d50ef1d28dc2fe989fbf5292de49379f1761119121ffaa9f"
     }
-  ]
+  ],
+  "validation": "Citi entry navigation follow-up; see citi-entry-verification.json",
+  "recoverable_backup": ".build-cache/install-backups/20261009T195121Z-entry-fix"
 }

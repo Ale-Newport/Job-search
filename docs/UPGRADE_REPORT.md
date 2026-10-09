@@ -1,6 +1,6 @@
 # Reliability upgrade — implementation and evidence
 
-The core upgrade is implemented in the existing Meridian app. Production data was preserved, a signed macOS bundle was built, and both source and packaged process isolation were exercised. Universal unattended completion is **not established**: the ten real forms still needed human input or unsupported-control handling, and some career pages remain unreadable by the public-source parser.
+The core upgrade is implemented in the existing Meridian app. Production data was preserved, a signed macOS bundle was built, and both source and packaged process isolation were exercised. The subsequent Citi entry-navigation fix was installed with recoverable app/database backups. Universal unattended completion is **not established**: the ten initial real forms still needed human input or unsupported-control handling, and some career pages remain unreadable by the public-source parser.
 
 ## Freeze audit and changes
 
@@ -32,12 +32,20 @@ All ten finished within bounded limits; none was submitted and none reached veri
 - Expanded reliability/provider/document regressions: 26 passed, followed by 54 targeted tracking/recovery tests and 67 browser/reliability regressions.
 - Three concurrent eight-step applications recovered from Chrome termination and SIGSTOP in separate timings. A sibling reloaded/inserted a conditional field and another delayed upload. Health requests stayed under one second, sibling attempts remained isolated, no application was duplicated and no submission receipt was created.
 - UI smoke, complete candidate/application/email workflow, onboarding, recovery/reconnect and synthetic networking handoff passed. TypeScript typecheck, ESLint, Ruff, Rust formatting and six Rust tests passed.
-- PyInstaller sidecar and signed Tauri macOS app builds succeeded. The final DMG checksum was verified. Notarisation was skipped because distribution credentials are not configured. The app was not installed over the existing copy.
+- PyInstaller sidecar and signed Tauri macOS app builds succeeded. The final DMG checksum was verified. Notarisation was skipped because distribution credentials are not configured. The initial upgrade validation left the installation unchanged; the subsequent Citi entry fix was installed with backups.
 - The final signed-bundle test used a QA path containing spaces, generated two documents in child processes, recovered a SIGSTOP browser worker, then recovered the same task after a hard backend crash with that worker stopped. Completed steps survived through attempt three and maximum measured API health latency was **0.0063 seconds**. No submission occurred. See [packaged-worker report](upgrade-packaged-workers.json).
 
 The macOS app passed deep/strict signature verification with the existing local development identity. The DMG passed `hdiutil verify`; exact binary/image hashes are in [the release manifest](upgrade-release.json). This validates the signed sidecar and its workers, not a new end-to-end run of the native desktop window or a live mailbox sync.
 
-The original production database still contains 1,904 jobs, four applications, 263 facts, one document and 52 email messages, with its original 13 sources. Validation ran on copied or synthetic databases. Migration/startup will extend the live schema/watchlist when the updated app is launched; no database was reset.
+At the end of the initial upgrade validation, the production snapshot contained 1,904 jobs, four applications, 263 facts, one document and 52 email messages, with its original 13 sources. Validation ran on copied or synthetic databases. The subsequent installation migrated the live schema and extended the watchlist without resetting storage; all existing IDs were checked for preservation.
+
+## Citi entry-navigation follow-up
+
+The engine now distinguishes a posting's Apply entry, Workday's Apply Manually method choice and the final Apply on a completed review page. It opens observed entry URLs, supports non-submit entry buttons outside forms, collapses duplicate entry links and recognises nested application routes while they hydrate. Section consent labels entry navigation separately. Explicit submit/form-associated controls remain gated, including an input-free final review with the same Apply label.
+
+On Citi's Junior Software Engineer – Generative AI Platforms posting, the real engine followed Apply → Apply Manually and reached Create Account/Sign In, step one of seven, in 13.35 seconds. Empty facts and no documents ensured zero candidate data, uploads or submissions. The next required action is authentication. The full relevant browser/startup/recovery suite passed **96 tests in 129.50 seconds**, including seven new regressions; lint and TypeScript passed. The signed sidecar separately prepared both link and button entry fixtures through final review, one attempt each, without submission.
+
+The updated signed app was installed at `/Applications/Meridian.app` and reopened. Before installation the live database held 2,092 jobs, five applications, 263 facts, one document and 52 messages; all IDs in those tables and the existing sources survived. The previous app and a coherent SQLite backup remain under `.build-cache/install-backups/20261009T195121Z-entry-fix/`. Installed binary hashes match the build, the DMG checksum passed and the native Today view was visually observed. Evidence: [Citi entry verification](citi-entry-verification.json); current artifact hashes: [release manifest](upgrade-release.json).
 
 ## Remaining limits
 

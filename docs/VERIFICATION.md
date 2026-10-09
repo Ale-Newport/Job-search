@@ -1,3 +1,9 @@
+# Entrada Apply y Workday/Citi — 9 de octubre de 2026
+
+Corregida la distinción entre abrir una candidatura y enviarla: enlaces Apply, botones iniciales, Apply Manually, enlaces repetidos y rutas anidadas que cargan después de la cabecera. El Apply final sigue requiriendo aprobación, incluso en una revisión sin campos. El consentimiento por sección muestra la navegación inicial por separado.
+
+La comprobación real de Citi — Junior Software Engineer – Generative AI Platforms avanza por **Apply → Apply Manually → Create Account/Sign In**, primer paso de siete, sin datos personales, adjuntos ni envío. Pasan **96 pruebas** de navegador/arranque/recuperación, lint y TypeScript; el backend firmado alcanza revisión final en dos fixtures locales de entrada. La app corregida se instaló y abrió en `/Applications/Meridian.app`, con backup recuperable de app y SQLite; todos los IDs anteriores se conservaron. Firma, hashes instalados y checksum del DMG verificados. [Evidencia](citi-entry-verification.json).
+
 # Workers, recuperación y límites reales — 9 de octubre de 2026
 
 La actualización añade workers por proceso, cola durable, checkpoints semánticos, recuperación independiente, recibos de envío, sincronización incremental, plazos, discovery diario y contactos/outreach con handoff manual. Se conservan los datos originales; la validación utiliza copias o datos sintéticos. [Informe completo de implementación y límites](UPGRADE_REPORT.md).

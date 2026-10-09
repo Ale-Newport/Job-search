@@ -398,3 +398,23 @@ async def test_document_api_uses_owned_process_and_returns_durable_result(tmp_pa
             assert task['checkpoint']['version']['approved']
             assert Path(task['checkpoint']['version']['path']).is_file()
             assert db.one('SELECT process_id FROM worker_heartbeats WHERE task_id=?',(task_id,))['process_id']!=__import__('os').getpid()
+
+
+@pytest.mark.parametrize('matching',[True,False])
+def test_orphan_cleanup_requires_exact_private_task_in_path_with_spaces(tmp_path,monkeypatch,matching):
+    import subprocess
+    from types import SimpleNamespace
+    path=tmp_path/'Application Support'/'Meridian'
+    db=Database(path/'database/meridian.sqlite3')
+    supervisor=WorkerSupervisor(db,path)
+    task=supervisor.enqueue('mail')
+    db.execute('INSERT INTO worker_heartbeats(worker_id,task_id,process_id,state,heartbeat,last_progress,operation) VALUES(?,?,?,?,?,?,?)',('synthetic-worker',task['task_id'],200,'RUNNING',0,0,'test'))
+    row=db.one('SELECT * FROM automation_tasks WHERE id=?',(task['task_id'],))
+    row['worker_id']='synthetic-worker'
+    suffix=task['task_id'] if matching else 'an-unrelated-task'
+    monkeypatch.setattr(subprocess,'run',lambda *a,**k:SimpleNamespace(stdout=f'1 /private/tmp/meridian-backend --meridian-worker {path} {suffix}\n'))
+    monkeypatch.setattr('jobagent.supervisor.os.getpgid',lambda pid:pid)
+    killed=[]
+    monkeypatch.setattr('jobagent.supervisor.os.killpg',lambda pid,sig:killed.append(pid))
+    supervisor._cleanup_orphan(row)
+    assert killed==([200] if matching else [])

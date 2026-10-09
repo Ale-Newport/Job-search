@@ -77,7 +77,6 @@ class WorkerSupervisor(Orchestrator):
         # macOS has no Linux parent-death signal. After a hard backend crash a
         # stopped child cannot read EOF, so verify its exact private task arguments
         # and orphan parent before touching its persisted PID.
-        import shlex
         import subprocess
         row = self.db.one('SELECT process_id FROM worker_heartbeats WHERE worker_id=?', (task.get('worker_id'),))
         if not row:
@@ -88,8 +87,11 @@ class WorkerSupervisor(Orchestrator):
             pieces = result.stdout.strip().split(None,1)
             if len(pieces)!=2 or int(pieces[0])!=1:
                 return
-            args = shlex.split(pieces[1])
-            if args[-2:]!=[str(self.data_dir),task['id']] or not any(a in ('jobagent.worker','--meridian-worker') for a in args):
+            # ps prints argv without shell quoting; production's Application
+            # Support path contains spaces. Compare its exact suffix instead of
+            # incorrectly splitting that path into several arguments.
+            command = pieces[1]
+            if not command.endswith(' '+str(self.data_dir)+' '+task['id']) or not any(marker in command for marker in (' -m jobagent.worker ',' --meridian-worker ')):
                 return
             if os.getpgid(pid)==pid:
                 os.killpg(pid,signal.SIGKILL)

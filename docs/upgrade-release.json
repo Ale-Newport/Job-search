@@ -1,0 +1,28 @@
+{
+  "date": "2026-10-09",
+  "architecture": "arm64",
+  "macos_minimum": "15",
+  "locally_signed": true,
+  "deep_strict_signature_verified": true,
+  "notarized": false,
+  "dmg_checksum_verified": true,
+  "installed_over_existing_copy": false,
+  "production_database_preserved": true,
+  "artifacts": [
+    {
+      "path": "src-tauri/target/release/bundle/macos/Meridian.app/Contents/MacOS/meridian",
+      "bytes": 11715808,
+      "sha256": "e4c96e9bc871405cab414b30e1f5146bf1d0543f5881fdbeac7071dcdaecd073"
+    },
+    {
+      "path": "src-tauri/target/release/bundle/macos/Meridian.app/Contents/MacOS/meridian-backend",
+      "bytes": 81675552,
+      "sha256": "be6fb3d936e46dc2ce74b9b05636d15bba670af8fff186baf378dad317711935"
+    },
+    {
+      "path": "src-tauri/target/release/bundle/dmg/Meridian_0.1.0_aarch64.dmg",
+      "bytes": 86958113,
+      "sha256": "130924940259253aaedfaad8acaa0208ab8a2d0a4f70a8fe7ea89fef87060245"
+    }
+  ]
+}

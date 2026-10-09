@@ -1,0 +1,2437 @@
+{
+  "cycle": {
+    "items": [
+      {
+        "source_id": "e5a3fba4-384d-45b4-8ba7-4c2b547467c1",
+        "name": "Fifty One Degrees",
+        "jobs_found": 3,
+        "new_jobs": 0,
+        "duplicates": 3,
+        "error": null
+      },
+      {
+        "source_id": "27e26730-df65-4c7a-9d8b-91ca65fd12b9",
+        "name": "Blenheim Chalcot",
+        "jobs_found": 14,
+        "new_jobs": 0,
+        "duplicates": 14,
+        "error": null
+      },
+      {
+        "source_id": "c2c7ccb0-c02f-4497-8cd9-db8321bf7d64",
+        "name": "Shift Technology",
+        "jobs_found": 31,
+        "new_jobs": 0,
+        "duplicates": 31,
+        "error": null
+      },
+      {
+        "source_id": "1d6b01fe-026b-41eb-9c1a-b3f52c0ef54b",
+        "name": "Marshall Wace - Graduate & Associate",
+        "jobs_found": 6,
+        "new_jobs": 0,
+        "duplicates": 6,
+        "error": null
+      },
+      {
+        "source_id": "3e8e4771-6ad1-4570-80e5-abedf79c23b6",
+        "name": "Mytos",
+        "jobs_found": 13,
+        "new_jobs": 0,
+        "duplicates": 13,
+        "error": null
+      },
+      {
+        "source_id": "d1fc8018-b0d6-4109-ad6c-1bd590c2f4ef",
+        "name": "Trainline",
+        "jobs_found": 29,
+        "new_jobs": 0,
+        "duplicates": 29,
+        "error": null
+      },
+      {
+        "source_id": "990fb9c9-13fc-4212-a81c-ca2a9ebdd004",
+        "name": "Relay Technologies",
+        "jobs_found": 29,
+        "new_jobs": 0,
+        "duplicates": 29,
+        "error": null
+      },
+      {
+        "source_id": "cc736dd0-e6de-4533-b2f0-6ca9794ff062",
+        "name": "Modo Energy",
+        "jobs_found": 11,
+        "new_jobs": 0,
+        "duplicates": 11,
+        "error": null
+      },
+      {
+        "source_id": "113dd9da-84a2-479c-b27e-3c1a2dccdb21",
+        "name": "Trackr \u00b7 UK Tech Graduate 2027",
+        "jobs_found": 136,
+        "new_jobs": 0,
+        "duplicates": 136,
+        "error": null
+      },
+      {
+        "source_id": "f5c91760-9e92-44ad-98a2-bd8caa8ce827",
+        "name": "GitHub \u00b7 SpeedyApply International New Grad",
+        "jobs_found": 680,
+        "new_jobs": 0,
+        "duplicates": 680,
+        "error": null
+      },
+      {
+        "source_id": "ae9544b9-28b9-4d3c-956d-6a39ba2b47a6",
+        "name": "GitHub \u00b7 New Grad 2027",
+        "jobs_found": 596,
+        "new_jobs": 0,
+        "duplicates": 596,
+        "error": null
+      },
+      {
+        "source_id": "4357cf24-0911-4fc6-801e-346d4cbc1baf",
+        "name": "LinkedIn alerts",
+        "jobs_found": 0,
+        "new_jobs": 0,
+        "duplicates": 0,
+        "error": null,
+        "state": "EMAIL_DELIVERY"
+      },
+      {
+        "source_id": "bb3567bf-c895-4c10-85f0-c36264aeba57",
+        "name": "Indeed alerts",
+        "jobs_found": 0,
+        "new_jobs": 0,
+        "duplicates": 0,
+        "error": null,
+        "state": "EMAIL_DELIVERY"
+      },
+      {
+        "source_id": "31024c40-2095-46eb-9532-e67a046ee93b",
+        "name": "Monzo careers",
+        "jobs_found": 68,
+        "new_jobs": 0,
+        "duplicates": 68,
+        "error": null
+      },
+      {
+        "source_id": "c95a1ac5-de75-4c77-809a-dd274e0a648b",
+        "name": "Wise careers",
+        "jobs_found": 18,
+        "new_jobs": 0,
+        "duplicates": 18,
+        "error": null
+      },
+      {
+        "source_id": "4b9b2260-b2a0-4574-be26-ad99e1f338b6",
+        "name": "Softwire careers",
+        "jobs_found": 0,
+        "new_jobs": 0,
+        "duplicates": 0,
+        "error": "ValueError: No public structured job postings found; configure an ATS board or add a job URL manually"
+      },
+      {
+        "source_id": "d573643d-01e3-4ad9-9a44-db492d3f6138",
+        "name": "Accenture careers",
+        "jobs_found": 0,
+        "new_jobs": 0,
+        "duplicates": 0,
+        "error": "ValueError: No public structured job postings found; configure an ATS board or add a job URL manually"
+      },
+      {
+        "source_id": "c1b43bd3-647a-4d1c-9046-812dddfe268c",
+        "name": "Revolut careers",
+        "jobs_found": 0,
+        "new_jobs": 0,
+        "duplicates": 0,
+        "error": "HTTP 403: public career source rejected the request"
+      },
+      {
+        "source_id": "d530d60d-9ebb-4cfe-8383-210a272e90de",
+        "name": "LSEG careers",
+        "jobs_found": 0,
+        "new_jobs": 0,
+        "duplicates": 0,
+        "error": "ValueError: No public structured job postings found; configure an ATS board or add a job URL manually"
+      },
+      {
+        "source_id": "c015ab11-cd54-4bce-be8c-8a26e4ec11e5",
+        "name": "JPMorgan Chase careers",
+        "jobs_found": 0,
+        "new_jobs": 0,
+        "duplicates": 0,
+        "error": "ValueError: No public structured job postings found; configure an ATS board or add a job URL manually"
+      },
+      {
+        "source_id": "b0dbc52f-8c26-4161-a4f6-07bc9b5876a7",
+        "name": "Bloomberg careers",
+        "jobs_found": 0,
+        "new_jobs": 0,
+        "duplicates": 0,
+        "error": "HTTP 403: public career source rejected the request"
+      },
+      {
+        "source_id": "59fc1511-becd-4aeb-b807-e9c77ac3d482",
+        "name": "Amazon careers",
+        "jobs_found": 0,
+        "new_jobs": 0,
+        "duplicates": 0,
+        "error": "ValueError: No public structured job postings found; configure an ATS board or add a job URL manually"
+      },
+      {
+        "source_id": "ff665dc3-7704-466e-ac63-716c121da0f5",
+        "name": "Microsoft careers",
+        "jobs_found": 0,
+        "new_jobs": 0,
+        "duplicates": 0,
+        "error": "ValueError: No public structured job postings found; configure an ATS board or add a job URL manually"
+      },
+      {
+        "source_id": "3f30719d-1283-4864-840d-1b1f71997eab",
+        "name": "Google careers",
+        "jobs_found": 0,
+        "new_jobs": 0,
+        "duplicates": 0,
+        "error": "ValueError: No public structured job postings found; configure an ATS board or add a job URL manually"
+      },
+      {
+        "source_id": "3f68a0d4-d1c9-4b02-b4a6-b4dd5c36f49b",
+        "name": "Meta careers",
+        "jobs_found": 0,
+        "new_jobs": 0,
+        "duplicates": 0,
+        "error": "ValueError: No public structured job postings found; configure an ATS board or add a job URL manually"
+      },
+      {
+        "source_id": "7845f4ef-2db5-40a2-8655-7ef30a407a85",
+        "name": "Apple careers",
+        "jobs_found": 0,
+        "new_jobs": 0,
+        "duplicates": 0,
+        "error": "ValueError: No public structured job postings found; configure an ATS board or add a job URL manually"
+      },
+      {
+        "source_id": "e3ec9b12-7aae-4338-8621-de756b337f1e",
+        "name": "NVIDIA careers",
+        "jobs_found": 0,
+        "new_jobs": 0,
+        "duplicates": 0,
+        "error": "ValueError: No public structured job postings found; configure an ATS board or add a job URL manually"
+      },
+      {
+        "source_id": "06a35d28-148d-4918-9098-5764c5ebc7d9",
+        "name": "Netflix careers",
+        "jobs_found": 0,
+        "new_jobs": 0,
+        "duplicates": 0,
+        "error": "ValueError: No public structured job postings found; configure an ATS board or add a job URL manually"
+      },
+      {
+        "source_id": "4f937ced-692c-4726-b780-214a0fbf6c2c",
+        "name": "Palantir careers",
+        "jobs_found": 309,
+        "new_jobs": 0,
+        "duplicates": 309,
+        "error": null
+      },
+      {
+        "source_id": "04fcc51e-3711-49cf-89f6-9f659cbcc508",
+        "name": "Uber careers",
+        "jobs_found": 0,
+        "new_jobs": 0,
+        "duplicates": 0,
+        "error": "ValueError: No public structured job postings found; configure an ATS board or add a job URL manually"
+      },
+      {
+        "source_id": "11e78205-2ef8-4435-8820-586614fe3f56",
+        "name": "Stripe careers",
+        "jobs_found": 6,
+        "new_jobs": 0,
+        "duplicates": 6,
+        "error": null
+      },
+      {
+        "source_id": "209ba32d-670c-4949-a2b2-2142c7a63874",
+        "name": "Cloudflare careers",
+        "jobs_found": 0,
+        "new_jobs": 0,
+        "duplicates": 0,
+        "error": "ValueError: No public structured job postings found; configure an ATS board or add a job URL manually"
+      },
+      {
+        "source_id": "42ecbe1f-71c8-4aec-b09c-c333e9fbcc3c",
+        "name": "Datadog careers",
+        "jobs_found": 0,
+        "new_jobs": 0,
+        "duplicates": 0,
+        "error": "ValueError: No public structured job postings found; configure an ATS board or add a job URL manually"
+      },
+      {
+        "source_id": "b1cd5d61-ec77-42bd-990a-e7f1e41d1a7e",
+        "name": "Snowflake careers",
+        "jobs_found": 0,
+        "new_jobs": 0,
+        "duplicates": 0,
+        "error": "ValueError: No public structured job postings found; configure an ATS board or add a job URL manually"
+      },
+      {
+        "source_id": "f9803d95-edaf-4dde-9a89-963209837a1c",
+        "name": "Databricks careers",
+        "jobs_found": 0,
+        "new_jobs": 0,
+        "duplicates": 0,
+        "error": "ValueError: No public structured job postings found; configure an ATS board or add a job URL manually"
+      },
+      {
+        "source_id": "837b64c7-a170-4f31-8dc9-75f59075438f",
+        "name": "Salesforce careers",
+        "jobs_found": 0,
+        "new_jobs": 0,
+        "duplicates": 0,
+        "error": "ValueError: No public structured job postings found; configure an ATS board or add a job URL manually"
+      },
+      {
+        "source_id": "266b884c-3d1b-45db-a32b-c70b9cc663a8",
+        "name": "Oracle careers",
+        "jobs_found": 0,
+        "new_jobs": 0,
+        "duplicates": 0,
+        "error": "ValueError: No public structured job postings found; configure an ATS board or add a job URL manually"
+      },
+      {
+        "source_id": "ebf9549b-ad23-49fb-b52a-6aecbc8088b9",
+        "name": "IBM careers",
+        "jobs_found": 0,
+        "new_jobs": 0,
+        "duplicates": 0,
+        "error": "ValueError: No public structured job postings found; configure an ATS board or add a job URL manually"
+      },
+      {
+        "source_id": "8236a5f7-c344-4c9a-b877-ad0c7cb43bf6",
+        "name": "Adobe careers",
+        "jobs_found": 0,
+        "new_jobs": 0,
+        "duplicates": 0,
+        "error": "ValueError: No public structured job postings found; configure an ATS board or add a job URL manually"
+      },
+      {
+        "source_id": "f18df404-e44b-41da-8b95-7fb11a587d2f",
+        "name": "Cisco careers",
+        "jobs_found": 0,
+        "new_jobs": 0,
+        "duplicates": 0,
+        "error": "ValueError: No public structured job postings found; configure an ATS board or add a job URL manually"
+      },
+      {
+        "source_id": "ae03032a-e0e8-4c04-a97d-2c7248d64c15",
+        "name": "Dell Technologies careers",
+        "jobs_found": 0,
+        "new_jobs": 0,
+        "duplicates": 0,
+        "error": "HTTP 403: public career source rejected the request"
+      },
+      {
+        "source_id": "ca3ce0c0-4110-4f5e-8dfb-423f2ea6b1f4",
+        "name": "Intel careers",
+        "jobs_found": 0,
+        "new_jobs": 0,
+        "duplicates": 0,
+        "error": "HTTP 403: public career source rejected the request"
+      },
+      {
+        "source_id": "4685b6c7-7a7b-4730-9ec1-c8a846937328",
+        "name": "AMD careers",
+        "jobs_found": 0,
+        "new_jobs": 0,
+        "duplicates": 0,
+        "error": "ValueError: No public structured job postings found; configure an ATS board or add a job URL manually"
+      },
+      {
+        "source_id": "0921a118-0ce3-4131-bc33-b30c4661615a",
+        "name": "Arm careers",
+        "jobs_found": 3,
+        "new_jobs": 0,
+        "duplicates": 3,
+        "error": null
+      },
+      {
+        "source_id": "8a1b1fce-9258-481b-a497-87f01de05bde",
+        "name": "ByteDance careers",
+        "jobs_found": 0,
+        "new_jobs": 0,
+        "duplicates": 0,
+        "error": "ValueError: No public structured job postings found; configure an ATS board or add a job URL manually"
+      },
+      {
+        "source_id": "6cc1845c-91d7-478f-a9a1-9fd65d796422",
+        "name": "TikTok careers",
+        "jobs_found": 0,
+        "new_jobs": 0,
+        "duplicates": 0,
+        "error": "ValueError: No public structured job postings found; configure an ATS board or add a job URL manually"
+      },
+      {
+        "source_id": "4947861a-65d4-48e7-91f2-a4513488d1a7",
+        "name": "Spotify careers",
+        "jobs_found": 0,
+        "new_jobs": 0,
+        "duplicates": 0,
+        "error": "ValueError: No public structured job postings found; configure an ATS board or add a job URL manually"
+      },
+      {
+        "source_id": "991dd888-c638-4acc-880c-b77d009248b8",
+        "name": "Deliveroo careers",
+        "jobs_found": 0,
+        "new_jobs": 0,
+        "duplicates": 0,
+        "error": "ValueError: No public structured job postings found; configure an ATS board or add a job URL manually"
+      },
+      {
+        "source_id": "76683b69-db9d-48d7-b34f-9ad7463a41c3",
+        "name": "Deloitte careers",
+        "jobs_found": 0,
+        "new_jobs": 0,
+        "duplicates": 0,
+        "error": "ValueError: No public structured job postings found; configure an ATS board or add a job URL manually"
+      },
+      {
+        "source_id": "31d00ac0-65c5-49fd-a007-1e4fe0d05acb",
+        "name": "Huawei Technologies careers",
+        "jobs_found": 0,
+        "new_jobs": 0,
+        "duplicates": 0,
+        "error": "ValueError: No public structured job postings found; configure an ATS board or add a job URL manually"
+      },
+      {
+        "source_id": "1000f93d-dd94-4b2c-8e54-ebafec509b08",
+        "name": "UBS careers",
+        "jobs_found": 0,
+        "new_jobs": 0,
+        "duplicates": 0,
+        "error": "HTTP 403: public career source rejected the request"
+      },
+      {
+        "source_id": "050020a3-3cd7-4eb6-8ed0-8e2e9fa6e715",
+        "name": "University College London (UCL) careers",
+        "jobs_found": 0,
+        "new_jobs": 0,
+        "duplicates": 0,
+        "error": "ValueError: No public structured job postings found; configure an ATS board or add a job URL manually"
+      },
+      {
+        "source_id": "4497e4aa-08c2-42c4-958d-6b3689cd53ad",
+        "name": "EY careers",
+        "jobs_found": 0,
+        "new_jobs": 0,
+        "duplicates": 0,
+        "error": "ValueError: No public structured job postings found; configure an ATS board or add a job URL manually"
+      },
+      {
+        "source_id": "2b119543-e3ee-4a3b-b0c8-4fdb67a75cc1",
+        "name": "Citigroup careers",
+        "jobs_found": 0,
+        "new_jobs": 0,
+        "duplicates": 0,
+        "error": "ValueError: No public structured job postings found; configure an ATS board or add a job URL manually"
+      },
+      {
+        "source_id": "ed4c2dd6-045e-4456-897b-d3efe07a2e5d",
+        "name": "HSBC careers",
+        "jobs_found": 0,
+        "new_jobs": 0,
+        "duplicates": 0,
+        "error": "ValueError: No public structured job postings found; configure an ATS board or add a job URL manually"
+      },
+      {
+        "source_id": "bb69a3f6-3647-4541-bcc7-7d62d9d441ff",
+        "name": "Barclays careers",
+        "jobs_found": 10,
+        "new_jobs": 0,
+        "duplicates": 10,
+        "error": null
+      },
+      {
+        "source_id": "e7a34558-e550-4b28-b496-5c52ca57b2c9",
+        "name": "Morgan Stanley careers",
+        "jobs_found": 0,
+        "new_jobs": 0,
+        "duplicates": 0,
+        "error": "ValueError: No public structured job postings found; configure an ATS board or add a job URL manually"
+      },
+      {
+        "source_id": "3105d2c9-a195-423f-a08b-294fd51fe62d",
+        "name": "Deutsche Bank careers",
+        "jobs_found": 0,
+        "new_jobs": 0,
+        "duplicates": 0,
+        "error": "ValueError: No public structured job postings found; configure an ATS board or add a job URL manually"
+      },
+      {
+        "source_id": "46ba1d54-ebb5-4930-a9da-1f90ba78f516",
+        "name": "Goldman Sachs careers",
+        "jobs_found": 0,
+        "new_jobs": 0,
+        "duplicates": 0,
+        "error": "ValueError: No public structured job postings found; configure an ATS board or add a job URL manually"
+      },
+      {
+        "source_id": "6cdbd8e4-635b-4d21-bea3-dae3839927c4",
+        "name": "Bank of America careers",
+        "jobs_found": 0,
+        "new_jobs": 0,
+        "duplicates": 0,
+        "error": "ValueError: No public structured job postings found; configure an ATS board or add a job URL manually"
+      },
+      {
+        "source_id": "a51f3075-6042-4760-9b08-06cc6132f88d",
+        "name": "Santander careers",
+        "jobs_found": 0,
+        "new_jobs": 0,
+        "duplicates": 0,
+        "error": "ValueError: No public structured job postings found; configure an ATS board or add a job URL manually"
+      },
+      {
+        "source_id": "d31cd8e8-700d-45e9-876d-9b0df0dae07c",
+        "name": "NatWest careers",
+        "jobs_found": 0,
+        "new_jobs": 0,
+        "duplicates": 0,
+        "error": "HTTP 403: public career source rejected the request"
+      },
+      {
+        "source_id": "0a656dbc-2d40-4051-ac17-1a3d27af3851",
+        "name": "Lloyds Banking Group careers",
+        "jobs_found": 0,
+        "new_jobs": 0,
+        "duplicates": 0,
+        "error": "ValueError: No public structured job postings found; configure an ATS board or add a job URL manually"
+      },
+      {
+        "source_id": "c4eba117-8dc3-4946-a4c2-7c8262b190fb",
+        "name": "Standard Chartered careers",
+        "jobs_found": 0,
+        "new_jobs": 0,
+        "duplicates": 0,
+        "error": "ValueError: No public structured job postings found; configure an ATS board or add a job URL manually"
+      },
+      {
+        "source_id": "4ef8311b-5fcf-4a9a-bede-580c58f53e20",
+        "name": "BNP Paribas careers",
+        "jobs_found": 0,
+        "new_jobs": 0,
+        "duplicates": 0,
+        "error": "HTTP 403: public career source rejected the request"
+      },
+      {
+        "source_id": "f768a6d8-067e-4a92-b94c-1efde5ee21d2",
+        "name": "Soci\u00e9t\u00e9 G\u00e9n\u00e9rale careers",
+        "jobs_found": 0,
+        "new_jobs": 0,
+        "duplicates": 0,
+        "error": "ValueError: No public structured job postings found; configure an ATS board or add a job URL manually"
+      },
+      {
+        "source_id": "35bec221-7557-4628-ac65-85d4665a908c",
+        "name": "BlackRock careers",
+        "jobs_found": 0,
+        "new_jobs": 0,
+        "duplicates": 0,
+        "error": "ValueError: No public structured job postings found; configure an ATS board or add a job URL manually"
+      },
+      {
+        "source_id": "8eaf7d1b-f109-4ffa-aabe-57c4c09a91a6",
+        "name": "Blackstone careers",
+        "jobs_found": 0,
+        "new_jobs": 0,
+        "duplicates": 0,
+        "error": "ValueError: No public structured job postings found; configure an ATS board or add a job URL manually"
+      },
+      {
+        "source_id": "fa5112d4-2f74-41d8-a362-92a2ac759300",
+        "name": "Jane Street careers",
+        "jobs_found": 0,
+        "new_jobs": 0,
+        "duplicates": 0,
+        "error": "ValueError: No public structured job postings found; configure an ATS board or add a job URL manually"
+      },
+      {
+        "source_id": "63c75209-1842-439c-b432-b6f2b7b09a0a",
+        "name": "Citadel careers",
+        "jobs_found": 0,
+        "new_jobs": 0,
+        "duplicates": 0,
+        "error": "HTTP 403: public career source rejected the request"
+      },
+      {
+        "source_id": "a4dd4d7d-0177-4297-becf-73c8d6e9a4a0",
+        "name": "Citadel Securities careers",
+        "jobs_found": 0,
+        "new_jobs": 0,
+        "duplicates": 0,
+        "error": "HTTP 403: public career source rejected the request"
+      },
+      {
+        "source_id": "ea475931-9e7f-4d5a-90c8-6b0511d72560",
+        "name": "Two Sigma careers",
+        "jobs_found": 0,
+        "new_jobs": 0,
+        "duplicates": 0,
+        "error": "ValueError: No public structured job postings found; configure an ATS board or add a job URL manually"
+      },
+      {
+        "source_id": "8bc0b5ca-505b-48ae-889d-bc6ff3da5db8",
+        "name": "Millennium careers",
+        "jobs_found": 0,
+        "new_jobs": 0,
+        "duplicates": 0,
+        "error": "ValueError: No public structured job postings found; configure an ATS board or add a job URL manually"
+      },
+      {
+        "source_id": "784b8a01-9ffe-4378-831c-d086be37cd28",
+        "name": "Point72 careers",
+        "jobs_found": 220,
+        "new_jobs": 0,
+        "duplicates": 220,
+        "error": null
+      },
+      {
+        "source_id": "f180bebb-b781-4d48-ba67-76ff53932403",
+        "name": "Man Group careers",
+        "jobs_found": 56,
+        "new_jobs": 0,
+        "duplicates": 56,
+        "error": null
+      },
+      {
+        "source_id": "7b69718b-a8cb-421f-ae38-3e36394737e1",
+        "name": "American Express careers",
+        "jobs_found": 0,
+        "new_jobs": 0,
+        "duplicates": 0,
+        "error": "ValueError: No public structured job postings found; configure an ATS board or add a job URL manually"
+      },
+      {
+        "source_id": "21534f0d-414c-46b5-a53f-178e6517c592",
+        "name": "Mastercard careers",
+        "jobs_found": 0,
+        "new_jobs": 0,
+        "duplicates": 0,
+        "error": "ValueError: No public structured job postings found; configure an ATS board or add a job URL manually"
+      },
+      {
+        "source_id": "8800f98a-4e23-4d7d-a699-65834db52fbe",
+        "name": "Visa careers",
+        "jobs_found": 0,
+        "new_jobs": 0,
+        "duplicates": 0,
+        "error": "ValueError: No public structured job postings found; configure an ATS board or add a job URL manually"
+      },
+      {
+        "source_id": "da14b0dd-28a2-4544-9712-c8aa070f2f19",
+        "name": "Capital One careers",
+        "jobs_found": 0,
+        "new_jobs": 0,
+        "duplicates": 0,
+        "error": "ValueError: No public structured job postings found; configure an ATS board or add a job URL manually"
+      },
+      {
+        "source_id": "49d821e7-2970-4d28-9d7b-03a093c03ed6",
+        "name": "Klarna careers",
+        "jobs_found": 0,
+        "new_jobs": 0,
+        "duplicates": 0,
+        "error": "ValueError: No public structured job postings found; configure an ATS board or add a job URL manually"
+      },
+      {
+        "source_id": "c8098410-0cdc-4df7-a4ae-206dcd266c41",
+        "name": "Checkout.com careers",
+        "jobs_found": 0,
+        "new_jobs": 0,
+        "duplicates": 0,
+        "error": "ValueError: No public structured job postings found; configure an ATS board or add a job URL manually"
+      },
+      {
+        "source_id": "e36c1636-2c6f-4068-8275-613e36cd1b50",
+        "name": "Starling Bank careers",
+        "jobs_found": 0,
+        "new_jobs": 0,
+        "duplicates": 0,
+        "error": "ValueError: No public structured job postings found; configure an ATS board or add a job URL manually"
+      },
+      {
+        "source_id": "a2fbb357-bc96-4de8-a3bf-1713356743e3",
+        "name": "Zopa careers",
+        "jobs_found": 0,
+        "new_jobs": 0,
+        "duplicates": 0,
+        "error": "HTTP 503: public career source rejected the request"
+      },
+      {
+        "source_id": "5eed2493-70ba-4ae8-b80b-8a59dd56ba7e",
+        "name": "Adyen careers",
+        "jobs_found": 0,
+        "new_jobs": 0,
+        "duplicates": 0,
+        "error": "ValueError: No public structured job postings found; configure an ATS board or add a job URL manually"
+      },
+      {
+        "source_id": "530994e6-82a9-41d5-8dbe-7278e8f795fd",
+        "name": "Monzo public board",
+        "jobs_found": 68,
+        "new_jobs": 0,
+        "duplicates": 68,
+        "error": null
+      },
+      {
+        "source_id": "80831e8f-5e69-44b0-810b-54829d5b065e",
+        "name": "Accenture public board",
+        "jobs_found": 40,
+        "new_jobs": 40,
+        "duplicates": 0,
+        "error": null
+      },
+      {
+        "source_id": "084e452a-6373-4b1d-9ff5-b4b1031a227d",
+        "name": "LSEG public board",
+        "jobs_found": 40,
+        "new_jobs": 40,
+        "duplicates": 0,
+        "error": null
+      },
+      {
+        "source_id": "5ee334f1-6072-4651-a747-8bf6c1b103aa",
+        "name": "NVIDIA public board",
+        "jobs_found": 40,
+        "new_jobs": 40,
+        "duplicates": 0,
+        "error": null
+      },
+      {
+        "source_id": "83701bd8-9eca-414e-b233-dee6432ffb91",
+        "name": "Palantir public board",
+        "jobs_found": 309,
+        "new_jobs": 0,
+        "duplicates": 309,
+        "error": null
+      },
+      {
+        "source_id": "aac829b3-298f-4405-99de-afe6ccc37984",
+        "name": "Adobe public board",
+        "jobs_found": 40,
+        "new_jobs": 40,
+        "duplicates": 0,
+        "error": null
+      },
+      {
+        "source_id": "4a43a136-0c77-4af0-9c79-1f5fa78730cc",
+        "name": "Intel public board",
+        "jobs_found": 40,
+        "new_jobs": 40,
+        "duplicates": 0,
+        "error": null
+      },
+      {
+        "source_id": "6d4fe929-3285-41f0-95d2-123c72564a8b",
+        "name": "Barclays public board",
+        "jobs_found": 100,
+        "new_jobs": 100,
+        "duplicates": 0,
+        "error": null
+      },
+      {
+        "source_id": "0b641a88-bb2c-4a32-a230-1fd7e0fab221",
+        "name": "Barclays public board",
+        "jobs_found": 100,
+        "new_jobs": 100,
+        "duplicates": 0,
+        "error": null
+      },
+      {
+        "source_id": "f2be4590-e00c-46f9-b1ef-d0d6b908b23f",
+        "name": "Lloyds Banking Group public board",
+        "jobs_found": 34,
+        "new_jobs": 34,
+        "duplicates": 0,
+        "error": null
+      },
+      {
+        "source_id": "1aeb6c15-a7cd-4ab7-8167-dd3bd3f3b8b2",
+        "name": "BlackRock public board",
+        "jobs_found": 100,
+        "new_jobs": 100,
+        "duplicates": 0,
+        "error": null
+      },
+      {
+        "source_id": "20ad726f-8222-4e29-9a5b-db8521911515",
+        "name": "Blackstone public board",
+        "jobs_found": 31,
+        "new_jobs": 31,
+        "duplicates": 0,
+        "error": null
+      },
+      {
+        "source_id": "b461bdb8-bd95-41b7-b41c-3ded5a2990e5",
+        "name": "Point72 public board",
+        "jobs_found": 220,
+        "new_jobs": 0,
+        "duplicates": 220,
+        "error": null
+      },
+      {
+        "source_id": "ff189764-413c-44e2-bd6e-65768556ddc9",
+        "name": "Man Group public board",
+        "jobs_found": 56,
+        "new_jobs": 0,
+        "duplicates": 56,
+        "error": null
+      },
+      {
+        "source_id": "b131aa92-8d49-4554-8abe-197ef662bbf3",
+        "name": "Mastercard public board",
+        "jobs_found": 40,
+        "new_jobs": 40,
+        "duplicates": 0,
+        "error": null
+      },
+      {
+        "source_id": "5396060b-dc99-4469-b3da-9f4bbc5a2659",
+        "name": "Visa public board",
+        "jobs_found": 40,
+        "new_jobs": 40,
+        "duplicates": 0,
+        "error": null
+      },
+      {
+        "source_id": "1cddc459-864f-4a49-8ccb-22a4305d5fba",
+        "name": "Capital One public board",
+        "jobs_found": 100,
+        "new_jobs": 100,
+        "duplicates": 0,
+        "error": null
+      },
+      {
+        "source_id": "9de8d529-6cb3-4e46-acce-003574e5ccdf",
+        "name": "Capital One public board",
+        "jobs_found": 100,
+        "new_jobs": 100,
+        "duplicates": 0,
+        "error": null
+      },
+      {
+        "source_id": "5d96908f-8f9c-49f8-8d13-1aba554ffb8a",
+        "name": "Checkout.com public board",
+        "jobs_found": 163,
+        "new_jobs": 158,
+        "duplicates": 5,
+        "error": null
+      }
+    ],
+    "total": 103,
+    "jobs_found": 3899,
+    "new_jobs": 1003
+  },
+  "companies": {
+    "items": [
+      {
+        "company_id": "44998161-1f37-479d-a30f-e07dc03937cf",
+        "company": "Accenture",
+        "careers_url": "https://www.accenture.com/gb-en/careers",
+        "sources": [
+          {
+            "id": "d573643d-01e3-4ad9-9a44-db492d3f6138",
+            "name": "Accenture careers",
+            "url": "https://www.accenture.com/gb-en/careers",
+            "enabled": 1,
+            "last_checked": "2026-10-09T18:51:21.751512+00:00",
+            "last_error": "ValueError: No public structured job postings found; configure an ATS board or add a job URL manually",
+            "jobs_found": 0
+          },
+          {
+            "id": "80831e8f-5e69-44b0-810b-54829d5b065e",
+            "name": "Accenture public board",
+            "url": "https://accenture.wd103.myworkdayjobs.com/accenturecareers",
+            "enabled": 1,
+            "last_checked": "2026-10-09T18:52:33.838659+00:00",
+            "last_error": null,
+            "jobs_found": 40
+          }
+        ],
+        "health": "CONFIGURED",
+        "reason": null
+      },
+      {
+        "company_id": "e2db7a93-880e-4e19-ac61-c8d930d473ba",
+        "company": "Adobe",
+        "careers_url": "https://careers.adobe.com/",
+        "sources": [
+          {
+            "id": "8236a5f7-c344-4c9a-b877-ad0c7cb43bf6",
+            "name": "Adobe careers",
+            "url": "https://careers.adobe.com/",
+            "enabled": 1,
+            "last_checked": "2026-10-09T18:51:44.740089+00:00",
+            "last_error": "ValueError: No public structured job postings found; configure an ATS board or add a job URL manually",
+            "jobs_found": 0
+          },
+          {
+            "id": "aac829b3-298f-4405-99de-afe6ccc37984",
+            "name": "Adobe public board",
+            "url": "https://adobe.wd5.myworkdayjobs.com/external_experienced",
+            "enabled": 1,
+            "last_checked": "2026-10-09T18:52:39.179126+00:00",
+            "last_error": null,
+            "jobs_found": 40
+          }
+        ],
+        "health": "CONFIGURED",
+        "reason": null
+      },
+      {
+        "company_id": "9f1960bd-81ba-4679-9394-443b708113e4",
+        "company": "Adyen",
+        "careers_url": "https://careers.adyen.com/",
+        "sources": [
+          {
+            "id": "5eed2493-70ba-4ae8-b80b-8a59dd56ba7e",
+            "name": "Adyen careers",
+            "url": "https://careers.adyen.com/",
+            "enabled": 1,
+            "last_checked": "2026-10-09T18:52:28.675366+00:00",
+            "last_error": "ValueError: No public structured job postings found; configure an ATS board or add a job URL manually",
+            "jobs_found": 0
+          }
+        ],
+        "health": "FAILED",
+        "reason": null
+      },
+      {
+        "company_id": "e72940b0-b7c8-4c01-9e44-92689efc1847",
+        "company": "Amazon",
+        "careers_url": "https://www.amazon.jobs/",
+        "sources": [
+          {
+            "id": "59fc1511-becd-4aeb-b807-e9c77ac3d482",
+            "name": "Amazon careers",
+            "url": "https://www.amazon.jobs/",
+            "enabled": 1,
+            "last_checked": "2026-10-09T18:51:24.747611+00:00",
+            "last_error": "ValueError: No public structured job postings found; configure an ATS board or add a job URL manually",
+            "jobs_found": 0
+          }
+        ],
+        "health": "FAILED",
+        "reason": null
+      },
+      {
+        "company_id": "438b8200-afed-488f-88bc-56ad8ae7caf1",
+        "company": "AMD",
+        "careers_url": "https://careers.amd.com/",
+        "sources": [
+          {
+            "id": "4685b6c7-7a7b-4730-9ec1-c8a846937328",
+            "name": "AMD careers",
+            "url": "https://careers.amd.com/",
+            "enabled": 1,
+            "last_checked": "2026-10-09T18:51:45.880295+00:00",
+            "last_error": "ValueError: No public structured job postings found; configure an ATS board or add a job URL manually",
+            "jobs_found": 0
+          }
+        ],
+        "health": "FAILED",
+        "reason": null
+      },
+      {
+        "company_id": "5934cc74-8561-4416-a06e-4152ef032b82",
+        "company": "American Express",
+        "careers_url": "https://www.americanexpress.com/en-us/careers/",
+        "sources": [
+          {
+            "id": "7b69718b-a8cb-421f-ae38-3e36394737e1",
+            "name": "American Express careers",
+            "url": "https://www.americanexpress.com/en-us/careers/",
+            "enabled": 1,
+            "last_checked": "2026-10-09T18:52:41.251526+00:00",
+            "last_error": "ValueError: No public structured job postings found; configure an ATS board or add a job URL manually",
+            "jobs_found": 0
+          }
+        ],
+        "health": "FAILED",
+        "reason": null
+      },
+      {
+        "company_id": "40e8e789-e35a-4bd3-9236-07e7c11c3cc2",
+        "company": "Apple",
+        "careers_url": "https://jobs.apple.com/en-gb/search",
+        "sources": [
+          {
+            "id": "7845f4ef-2db5-40a2-8655-7ef30a407a85",
+            "name": "Apple careers",
+            "url": "https://jobs.apple.com/en-gb/search",
+            "enabled": 1,
+            "last_checked": "2026-10-09T18:51:30.671836+00:00",
+            "last_error": "ValueError: No public structured job postings found; configure an ATS board or add a job URL manually",
+            "jobs_found": 0
+          }
+        ],
+        "health": "FAILED",
+        "reason": null
+      },
+      {
+        "company_id": "b8298b12-1d72-454f-b0f4-440d34b156f6",
+        "company": "Arm",
+        "careers_url": "https://careers.arm.com/",
+        "sources": [
+          {
+            "id": "0921a118-0ce3-4131-bc33-b30c4661615a",
+            "name": "Arm careers",
+            "url": "https://careers.arm.com/",
+            "enabled": 1,
+            "last_checked": "2026-10-09T18:51:46.478138+00:00",
+            "last_error": null,
+            "jobs_found": 3
+          }
+        ],
+        "health": "CONFIGURED",
+        "reason": null
+      },
+      {
+        "company_id": "da255ffa-cdb4-4636-a6e5-627f531a86ca",
+        "company": "Bank of America",
+        "careers_url": "https://careers.bankofamerica.com/",
+        "sources": [
+          {
+            "id": "6cdbd8e4-635b-4d21-bea3-dae3839927c4",
+            "name": "Bank of America careers",
+            "url": "https://careers.bankofamerica.com/",
+            "enabled": 1,
+            "last_checked": "2026-10-09T18:52:06.727299+00:00",
+            "last_error": "ValueError: No public structured job postings found; configure an ATS board or add a job URL manually",
+            "jobs_found": 0
+          }
+        ],
+        "health": "FAILED",
+        "reason": null
+      },
+      {
+        "company_id": "a2426bf7-8f92-4d46-b6e3-637139612f7d",
+        "company": "Barclays",
+        "careers_url": "https://search.jobs.barclays/",
+        "sources": [
+          {
+            "id": "bb69a3f6-3647-4541-bcc7-7d62d9d441ff",
+            "name": "Barclays careers",
+            "url": "https://search.jobs.barclays/",
+            "enabled": 1,
+            "last_checked": "2026-10-09T18:52:02.559649+00:00",
+            "last_error": null,
+            "jobs_found": 10
+          },
+          {
+            "id": "6d4fe929-3285-41f0-95d2-123c72564a8b",
+            "name": "Barclays public board",
+            "url": "https://barclays.wd3.myworkdayjobs.com/External_Career_Site_Barclays",
+            "enabled": 1,
+            "last_checked": "2026-10-09T18:52:42.935475+00:00",
+            "last_error": null,
+            "jobs_found": 100
+          },
+          {
+            "id": "0b641a88-bb2c-4a32-a230-1fd7e0fab221",
+            "name": "Barclays public board",
+            "url": "https://barclays.wd3.myworkdayjobs.com/external_career_site_barclays",
+            "enabled": 1,
+            "last_checked": "2026-10-09T18:52:50.404307+00:00",
+            "last_error": null,
+            "jobs_found": 100
+          }
+        ],
+        "health": "CONFIGURED",
+        "reason": null
+      },
+      {
+        "company_id": "031f932a-dec5-418f-9b46-edc97dc0f13a",
+        "company": "BlackRock",
+        "careers_url": "https://careers.blackrock.com/",
+        "sources": [
+          {
+            "id": "35bec221-7557-4628-ac65-85d4665a908c",
+            "name": "BlackRock careers",
+            "url": "https://careers.blackrock.com/",
+            "enabled": 1,
+            "last_checked": "2026-10-09T18:52:08.556114+00:00",
+            "last_error": "ValueError: No public structured job postings found; configure an ATS board or add a job URL manually",
+            "jobs_found": 0
+          },
+          {
+            "id": "1aeb6c15-a7cd-4ab7-8167-dd3bd3f3b8b2",
+            "name": "BlackRock public board",
+            "url": "https://blackrock.wd1.myworkdayjobs.com/blackrock_professional",
+            "enabled": 1,
+            "last_checked": "2026-10-09T18:52:56.551932+00:00",
+            "last_error": null,
+            "jobs_found": 100
+          }
+        ],
+        "health": "CONFIGURED",
+        "reason": null
+      },
+      {
+        "company_id": "66f49b52-bca4-4013-acf5-c355a638cf5c",
+        "company": "Blackstone",
+        "careers_url": "https://www.blackstone.com/careers/",
+        "sources": [
+          {
+            "id": "8eaf7d1b-f109-4ffa-aabe-57c4c09a91a6",
+            "name": "Blackstone careers",
+            "url": "https://www.blackstone.com/careers/",
+            "enabled": 1,
+            "last_checked": "2026-10-09T18:52:09.936813+00:00",
+            "last_error": "ValueError: No public structured job postings found; configure an ATS board or add a job URL manually",
+            "jobs_found": 0
+          },
+          {
+            "id": "20ad726f-8222-4e29-9a5b-db8521911515",
+            "name": "Blackstone public board",
+            "url": "https://blackstone.wd1.myworkdayjobs.com/blackstone_campus_careers",
+            "enabled": 1,
+            "last_checked": "2026-10-09T18:52:47.464740+00:00",
+            "last_error": null,
+            "jobs_found": 31
+          }
+        ],
+        "health": "CONFIGURED",
+        "reason": null
+      },
+      {
+        "company_id": "683999cf-6232-4a00-9558-4e8ab042df18",
+        "company": "Blenheim Chalcot",
+        "careers_url": "https://job-boards.greenhouse.io/blenheimchalcot",
+        "sources": [
+          {
+            "id": "27e26730-df65-4c7a-9d8b-91ca65fd12b9",
+            "name": "Blenheim Chalcot",
+            "url": "https://job-boards.greenhouse.io/blenheimchalcot",
+            "enabled": 1,
+            "last_checked": "2026-10-09T18:51:04.846774+00:00",
+            "last_error": null,
+            "jobs_found": 14
+          }
+        ],
+        "health": "CONFIGURED",
+        "reason": null
+      },
+      {
+        "company_id": "ac28b9d6-0c9b-468a-a756-788e5ff11987",
+        "company": "Bloomberg",
+        "careers_url": "https://www.bloomberg.com/company/careers/",
+        "sources": [
+          {
+            "id": "b0dbc52f-8c26-4161-a4f6-07bc9b5876a7",
+            "name": "Bloomberg careers",
+            "url": "https://www.bloomberg.com/company/careers/",
+            "enabled": 1,
+            "last_checked": "2026-10-09T18:51:24.019740+00:00",
+            "last_error": "HTTP 403: public career source rejected the request",
+            "jobs_found": 0
+          }
+        ],
+        "health": "FAILED",
+        "reason": null
+      },
+      {
+        "company_id": "1449a69f-c224-4ac9-9a85-b65d0ae65989",
+        "company": "BNP Paribas",
+        "careers_url": "https://group.bnpparibas/en/careers",
+        "sources": [
+          {
+            "id": "4ef8311b-5fcf-4a9a-bede-580c58f53e20",
+            "name": "BNP Paribas careers",
+            "url": "https://group.bnpparibas/en/careers",
+            "enabled": 1,
+            "last_checked": "2026-10-09T18:52:07.449318+00:00",
+            "last_error": "HTTP 403: public career source rejected the request",
+            "jobs_found": 0
+          }
+        ],
+        "health": "FAILED",
+        "reason": null
+      },
+      {
+        "company_id": "c529b85e-7209-42a8-a24c-d28903d9efba",
+        "company": "ByteDance",
+        "careers_url": "https://jobs.bytedance.com/en/",
+        "sources": [
+          {
+            "id": "8a1b1fce-9258-481b-a497-87f01de05bde",
+            "name": "ByteDance careers",
+            "url": "https://jobs.bytedance.com/en/",
+            "enabled": 1,
+            "last_checked": "2026-10-09T18:51:50.305948+00:00",
+            "last_error": "ValueError: No public structured job postings found; configure an ATS board or add a job URL manually",
+            "jobs_found": 0
+          }
+        ],
+        "health": "FAILED",
+        "reason": null
+      },
+      {
+        "company_id": "87cd3d22-1a27-4687-9dfd-ac2240e1d4b7",
+        "company": "Capital One",
+        "careers_url": "https://www.capitalonecareers.com/",
+        "sources": [
+          {
+            "id": "da14b0dd-28a2-4544-9712-c8aa070f2f19",
+            "name": "Capital One careers",
+            "url": "https://www.capitalonecareers.com/",
+            "enabled": 1,
+            "last_checked": "2026-10-09T18:52:26.245935+00:00",
+            "last_error": "ValueError: No public structured job postings found; configure an ATS board or add a job URL manually",
+            "jobs_found": 0
+          },
+          {
+            "id": "1cddc459-864f-4a49-8ccb-22a4305d5fba",
+            "name": "Capital One public board",
+            "url": "https://capitalone.wd12.myworkdayjobs.com/Capital_One",
+            "enabled": 1,
+            "last_checked": "2026-10-09T18:53:13.964962+00:00",
+            "last_error": null,
+            "jobs_found": 100
+          },
+          {
+            "id": "9de8d529-6cb3-4e46-acce-003574e5ccdf",
+            "name": "Capital One public board",
+            "url": "https://capitalone.wd12.myworkdayjobs.com/capital_one",
+            "enabled": 1,
+            "last_checked": "2026-10-09T18:53:14.835205+00:00",
+            "last_error": null,
+            "jobs_found": 100
+          }
+        ],
+        "health": "CONFIGURED",
+        "reason": null
+      },
+      {
+        "company_id": "693dd73e-2eef-4ed8-9dd7-b4f4cd535f50",
+        "company": "Checkout.com",
+        "careers_url": "https://www.checkout.com/careers",
+        "sources": [
+          {
+            "id": "c8098410-0cdc-4df7-a4ae-206dcd266c41",
+            "name": "Checkout.com careers",
+            "url": "https://www.checkout.com/careers",
+            "enabled": 1,
+            "last_checked": "2026-10-09T18:52:27.717139+00:00",
+            "last_error": "ValueError: No public structured job postings found; configure an ATS board or add a job URL manually",
+            "jobs_found": 0
+          },
+          {
+            "id": "5d96908f-8f9c-49f8-8d13-1aba554ffb8a",
+            "name": "Checkout.com public board",
+            "url": "https://jobs.ashbyhq.com/checkout.com",
+            "enabled": 1,
+            "last_checked": "2026-10-09T18:53:18.146532+00:00",
+            "last_error": null,
+            "jobs_found": 163
+          }
+        ],
+        "health": "CONFIGURED",
+        "reason": null
+      },
+      {
+        "company_id": "ac29628b-90f2-431d-afce-6c4e862941b9",
+        "company": "Cisco",
+        "careers_url": "https://jobs.cisco.com/",
+        "sources": [
+          {
+            "id": "f18df404-e44b-41da-8b95-7fb11a587d2f",
+            "name": "Cisco careers",
+            "url": "https://jobs.cisco.com/",
+            "enabled": 1,
+            "last_checked": "2026-10-09T18:51:42.836121+00:00",
+            "last_error": "ValueError: No public structured job postings found; configure an ATS board or add a job URL manually",
+            "jobs_found": 0
+          }
+        ],
+        "health": "FAILED",
+        "reason": null
+      },
+      {
+        "company_id": "03f383c7-b3b1-4608-84c0-aaf0c9ecc8f2",
+        "company": "Citadel",
+        "careers_url": "https://www.citadel.com/careers/",
+        "sources": [
+          {
+            "id": "63c75209-1842-439c-b432-b6f2b7b09a0a",
+            "name": "Citadel careers",
+            "url": "https://www.citadel.com/careers/",
+            "enabled": 1,
+            "last_checked": "2026-10-09T18:52:10.761989+00:00",
+            "last_error": "HTTP 403: public career source rejected the request",
+            "jobs_found": 0
+          }
+        ],
+        "health": "FAILED",
+        "reason": null
+      },
+      {
+        "company_id": "5453ba96-4258-4552-8d0f-9608bdee43c2",
+        "company": "Citadel Securities",
+        "careers_url": "https://www.citadelsecurities.com/careers/",
+        "sources": [
+          {
+            "id": "a4dd4d7d-0177-4297-becf-73c8d6e9a4a0",
+            "name": "Citadel Securities careers",
+            "url": "https://www.citadelsecurities.com/careers/",
+            "enabled": 1,
+            "last_checked": "2026-10-09T18:52:10.985182+00:00",
+            "last_error": "HTTP 403: public career source rejected the request",
+            "jobs_found": 0
+          }
+        ],
+        "health": "FAILED",
+        "reason": null
+      },
+      {
+        "company_id": "c853aec5-683f-4ebd-aab7-10773675ba65",
+        "company": "Citigroup",
+        "careers_url": "https://jobs.citi.com/",
+        "sources": [
+          {
+            "id": "2b119543-e3ee-4a3b-b0c8-4fdb67a75cc1",
+            "name": "Citigroup careers",
+            "url": "https://jobs.citi.com/",
+            "enabled": 1,
+            "last_checked": "2026-10-09T18:51:53.094348+00:00",
+            "last_error": "ValueError: No public structured job postings found; configure an ATS board or add a job URL manually",
+            "jobs_found": 0
+          }
+        ],
+        "health": "FAILED",
+        "reason": null
+      },
+      {
+        "company_id": "1086febb-46fb-4362-8e18-10c0e70f6fb9",
+        "company": "Cloudflare",
+        "careers_url": "https://www.cloudflare.com/careers/jobs/",
+        "sources": [
+          {
+            "id": "209ba32d-670c-4949-a2b2-2142c7a63874",
+            "name": "Cloudflare careers",
+            "url": "https://www.cloudflare.com/careers/jobs/",
+            "enabled": 1,
+            "last_checked": "2026-10-09T18:51:34.945091+00:00",
+            "last_error": "ValueError: No public structured job postings found; configure an ATS board or add a job URL manually",
+            "jobs_found": 0
+          }
+        ],
+        "health": "FAILED",
+        "reason": null
+      },
+      {
+        "company_id": "06863663-b39e-4b96-acc8-ff65e68bfd0b",
+        "company": "Databricks",
+        "careers_url": "https://www.databricks.com/company/careers/open-positions",
+        "sources": [
+          {
+            "id": "f9803d95-edaf-4dde-9a89-963209837a1c",
+            "name": "Databricks careers",
+            "url": "https://www.databricks.com/company/careers/open-positions",
+            "enabled": 1,
+            "last_checked": "2026-10-09T18:51:37.948819+00:00",
+            "last_error": "ValueError: No public structured job postings found; configure an ATS board or add a job URL manually",
+            "jobs_found": 0
+          }
+        ],
+        "health": "FAILED",
+        "reason": null
+      },
+      {
+        "company_id": "9664fce2-5faa-411b-95fe-9e87094c482a",
+        "company": "Datadog",
+        "careers_url": "https://careers.datadoghq.com/",
+        "sources": [
+          {
+            "id": "42ecbe1f-71c8-4aec-b09c-c333e9fbcc3c",
+            "name": "Datadog careers",
+            "url": "https://careers.datadoghq.com/",
+            "enabled": 1,
+            "last_checked": "2026-10-09T18:51:35.228346+00:00",
+            "last_error": "ValueError: No public structured job postings found; configure an ATS board or add a job URL manually",
+            "jobs_found": 0
+          }
+        ],
+        "health": "FAILED",
+        "reason": null
+      },
+      {
+        "company_id": "914c2842-3992-4c70-916a-5da781f5df21",
+        "company": "Deliveroo",
+        "careers_url": "https://careers.deliveroo.co.uk/",
+        "sources": [
+          {
+            "id": "991dd888-c638-4acc-880c-b77d009248b8",
+            "name": "Deliveroo careers",
+            "url": "https://careers.deliveroo.co.uk/",
+            "enabled": 1,
+            "last_checked": "2026-10-09T18:51:47.942002+00:00",
+            "last_error": "ValueError: No public structured job postings found; configure an ATS board or add a job URL manually",
+            "jobs_found": 0
+          }
+        ],
+        "health": "FAILED",
+        "reason": null
+      },
+      {
+        "company_id": "42be0c92-3356-46de-9e9e-849d26b59173",
+        "company": "Dell Technologies",
+        "careers_url": "https://jobs.dell.com/",
+        "sources": [
+          {
+            "id": "ae03032a-e0e8-4c04-a97d-2c7248d64c15",
+            "name": "Dell Technologies careers",
+            "url": "https://jobs.dell.com/",
+            "enabled": 1,
+            "last_checked": "2026-10-09T18:51:43.105718+00:00",
+            "last_error": "HTTP 403: public career source rejected the request",
+            "jobs_found": 0
+          }
+        ],
+        "health": "FAILED",
+        "reason": null
+      },
+      {
+        "company_id": "ae5bc789-590a-4087-a4ca-cbab3f539b60",
+        "company": "Deloitte",
+        "careers_url": "https://www.deloitte.com/global/en/careers.html",
+        "sources": [
+          {
+            "id": "76683b69-db9d-48d7-b34f-9ad7463a41c3",
+            "name": "Deloitte careers",
+            "url": "https://www.deloitte.com/global/en/careers.html",
+            "enabled": 1,
+            "last_checked": "2026-10-09T18:51:52.227206+00:00",
+            "last_error": "ValueError: No public structured job postings found; configure an ATS board or add a job URL manually",
+            "jobs_found": 0
+          }
+        ],
+        "health": "FAILED",
+        "reason": null
+      },
+      {
+        "company_id": "d6443f69-541d-4802-8a51-f0736529c344",
+        "company": "Deutsche Bank",
+        "careers_url": "https://careers.db.com/",
+        "sources": [
+          {
+            "id": "3105d2c9-a195-423f-a08b-294fd51fe62d",
+            "name": "Deutsche Bank careers",
+            "url": "https://careers.db.com/",
+            "enabled": 1,
+            "last_checked": "2026-10-09T18:51:58.963140+00:00",
+            "last_error": "ValueError: No public structured job postings found; configure an ATS board or add a job URL manually",
+            "jobs_found": 0
+          }
+        ],
+        "health": "FAILED",
+        "reason": null
+      },
+      {
+        "company_id": "038ec42d-7e2f-4ae9-b803-3afc8ee2c8b5",
+        "company": "EY",
+        "careers_url": "https://careers.ey.com/",
+        "sources": [
+          {
+            "id": "4497e4aa-08c2-42c4-958d-6b3689cd53ad",
+            "name": "EY careers",
+            "url": "https://careers.ey.com/",
+            "enabled": 1,
+            "last_checked": "2026-10-09T18:51:53.013486+00:00",
+            "last_error": "ValueError: No public structured job postings found; configure an ATS board or add a job URL manually",
+            "jobs_found": 0
+          }
+        ],
+        "health": "FAILED",
+        "reason": null
+      },
+      {
+        "company_id": "e218c73b-891e-473f-bb9f-438093d23d45",
+        "company": "Fifty One Degrees",
+        "careers_url": "https://jobs.ashbyhq.com/51d",
+        "sources": [
+          {
+            "id": "e5a3fba4-384d-45b4-8ba7-4c2b547467c1",
+            "name": "Fifty One Degrees",
+            "url": "https://jobs.ashbyhq.com/51d",
+            "enabled": 1,
+            "last_checked": "2026-10-09T18:51:03.746005+00:00",
+            "last_error": null,
+            "jobs_found": 3
+          }
+        ],
+        "health": "CONFIGURED",
+        "reason": null
+      },
+      {
+        "company_id": "1b5a759b-fd69-4119-a2ca-b2169c7d3893",
+        "company": "Goldman Sachs",
+        "careers_url": "https://www.goldmansachs.com/careers",
+        "sources": [
+          {
+            "id": "46ba1d54-ebb5-4930-a9da-1f90ba78f516",
+            "name": "Goldman Sachs careers",
+            "url": "https://www.goldmansachs.com/careers",
+            "enabled": 1,
+            "last_checked": "2026-10-09T18:52:04.489428+00:00",
+            "last_error": "ValueError: No public structured job postings found; configure an ATS board or add a job URL manually",
+            "jobs_found": 0
+          }
+        ],
+        "health": "FAILED",
+        "reason": null
+      },
+      {
+        "company_id": "68226d45-5e7d-4405-bf27-6539ab90add6",
+        "company": "Google",
+        "careers_url": "https://www.google.com/about/careers/applications/",
+        "sources": [
+          {
+            "id": "3f30719d-1283-4864-840d-1b1f71997eab",
+            "name": "Google careers",
+            "url": "https://www.google.com/about/careers/applications/",
+            "enabled": 1,
+            "last_checked": "2026-10-09T18:51:26.999406+00:00",
+            "last_error": "ValueError: No public structured job postings found; configure an ATS board or add a job URL manually",
+            "jobs_found": 0
+          }
+        ],
+        "health": "FAILED",
+        "reason": null
+      },
+      {
+        "company_id": "f20cd8d2-7b4a-4284-9293-3dc11bb0678b",
+        "company": "HSBC",
+        "careers_url": "https://www.hsbc.com/careers",
+        "sources": [
+          {
+            "id": "ed4c2dd6-045e-4456-897b-d3efe07a2e5d",
+            "name": "HSBC careers",
+            "url": "https://www.hsbc.com/careers",
+            "enabled": 1,
+            "last_checked": "2026-10-09T18:52:08.196993+00:00",
+            "last_error": "ValueError: No public structured job postings found; configure an ATS board or add a job URL manually",
+            "jobs_found": 0
+          }
+        ],
+        "health": "FAILED",
+        "reason": null
+      },
+      {
+        "company_id": "a4158f26-1301-4a85-8b24-4fb141196446",
+        "company": "Huawei Technologies",
+        "careers_url": "https://career.huawei.com/",
+        "sources": [
+          {
+            "id": "31d00ac0-65c5-49fd-a007-1e4fe0d05acb",
+            "name": "Huawei Technologies careers",
+            "url": "https://career.huawei.com/",
+            "enabled": 1,
+            "last_checked": "2026-10-09T18:51:52.028893+00:00",
+            "last_error": "ValueError: No public structured job postings found; configure an ATS board or add a job URL manually",
+            "jobs_found": 0
+          }
+        ],
+        "health": "FAILED",
+        "reason": null
+      },
+      {
+        "company_id": "95dabe92-14b7-4a24-9855-13e45fe92aeb",
+        "company": "IBM",
+        "careers_url": "https://www.ibm.com/careers/",
+        "sources": [
+          {
+            "id": "ebf9549b-ad23-49fb-b52a-6aecbc8088b9",
+            "name": "IBM careers",
+            "url": "https://www.ibm.com/careers/",
+            "enabled": 1,
+            "last_checked": "2026-10-09T18:51:41.734617+00:00",
+            "last_error": "ValueError: No public structured job postings found; configure an ATS board or add a job URL manually",
+            "jobs_found": 0
+          }
+        ],
+        "health": "FAILED",
+        "reason": null
+      },
+      {
+        "company_id": "4c621e9b-fdcf-4cda-8c72-84a78c0e7a01",
+        "company": "Intel",
+        "careers_url": "https://jobs.intel.com/",
+        "sources": [
+          {
+            "id": "ca3ce0c0-4110-4f5e-8dfb-423f2ea6b1f4",
+            "name": "Intel careers",
+            "url": "https://jobs.intel.com/",
+            "enabled": 1,
+            "last_checked": "2026-10-09T18:51:43.852662+00:00",
+            "last_error": "HTTP 403: public career source rejected the request",
+            "jobs_found": 0
+          },
+          {
+            "id": "4a43a136-0c77-4af0-9c79-1f5fa78730cc",
+            "name": "Intel public board",
+            "url": "https://intel.wd1.myworkdayjobs.com/external",
+            "enabled": 1,
+            "last_checked": "2026-10-09T18:52:40.667236+00:00",
+            "last_error": null,
+            "jobs_found": 40
+          }
+        ],
+        "health": "CONFIGURED",
+        "reason": null
+      },
+      {
+        "company_id": "add5f620-e29a-4bf7-bf71-3bc0c75cc2d2",
+        "company": "Jane Street",
+        "careers_url": "https://www.janestreet.com/join-jane-street/open-roles/",
+        "sources": [
+          {
+            "id": "fa5112d4-2f74-41d8-a362-92a2ac759300",
+            "name": "Jane Street careers",
+            "url": "https://www.janestreet.com/join-jane-street/open-roles/",
+            "enabled": 1,
+            "last_checked": "2026-10-09T18:52:10.506060+00:00",
+            "last_error": "ValueError: No public structured job postings found; configure an ATS board or add a job URL manually",
+            "jobs_found": 0
+          }
+        ],
+        "health": "FAILED",
+        "reason": null
+      },
+      {
+        "company_id": "ee3ff85f-116c-436f-ae92-49f8e3194abd",
+        "company": "JPMorgan Chase",
+        "careers_url": "https://www.jpmorganchase.com/careers",
+        "sources": [
+          {
+            "id": "c015ab11-cd54-4bce-be8c-8a26e4ec11e5",
+            "name": "JPMorgan Chase careers",
+            "url": "https://www.jpmorganchase.com/careers",
+            "enabled": 1,
+            "last_checked": "2026-10-09T18:51:27.366726+00:00",
+            "last_error": "ValueError: No public structured job postings found; configure an ATS board or add a job URL manually",
+            "jobs_found": 0
+          }
+        ],
+        "health": "FAILED",
+        "reason": null
+      },
+      {
+        "company_id": "efcf60e0-337c-4d26-9110-705ed34412dd",
+        "company": "Klarna",
+        "careers_url": "https://www.klarna.com/careers/",
+        "sources": [
+          {
+            "id": "49d821e7-2970-4d28-9d7b-03a093c03ed6",
+            "name": "Klarna careers",
+            "url": "https://www.klarna.com/careers/",
+            "enabled": 1,
+            "last_checked": "2026-10-09T18:52:27.384577+00:00",
+            "last_error": "ValueError: No public structured job postings found; configure an ATS board or add a job URL manually",
+            "jobs_found": 0
+          }
+        ],
+        "health": "FAILED",
+        "reason": null
+      },
+      {
+        "company_id": "86004b1a-aa4d-4eca-a9df-4c4c5f0fb41c",
+        "company": "Lloyds Banking Group",
+        "careers_url": "https://www.lloydsbankinggroup.com/careers.html",
+        "sources": [
+          {
+            "id": "0a656dbc-2d40-4051-ac17-1a3d27af3851",
+            "name": "Lloyds Banking Group careers",
+            "url": "https://www.lloydsbankinggroup.com/careers.html",
+            "enabled": 1,
+            "last_checked": "2026-10-09T18:52:13.572364+00:00",
+            "last_error": "ValueError: No public structured job postings found; configure an ATS board or add a job URL manually",
+            "jobs_found": 0
+          },
+          {
+            "id": "f2be4590-e00c-46f9-b1ef-d0d6b908b23f",
+            "name": "Lloyds Banking Group public board",
+            "url": "https://lbg.wd3.myworkdayjobs.com/Graduate_careers",
+            "enabled": 1,
+            "last_checked": "2026-10-09T18:52:43.395007+00:00",
+            "last_error": null,
+            "jobs_found": 34
+          }
+        ],
+        "health": "CONFIGURED",
+        "reason": null
+      },
+      {
+        "company_id": "7aa5a85e-483f-4a9a-90c8-ee418fd5f53e",
+        "company": "LSEG",
+        "careers_url": "https://www.lseg.com/en/careers",
+        "sources": [
+          {
+            "id": "d530d60d-9ebb-4cfe-8383-210a272e90de",
+            "name": "LSEG careers",
+            "url": "https://www.lseg.com/en/careers",
+            "enabled": 1,
+            "last_checked": "2026-10-09T18:51:22.886530+00:00",
+            "last_error": "ValueError: No public structured job postings found; configure an ATS board or add a job URL manually",
+            "jobs_found": 0
+          },
+          {
+            "id": "084e452a-6373-4b1d-9ff5-b4b1031a227d",
+            "name": "LSEG public board",
+            "url": "https://lseg.wd3.myworkdayjobs.com/careers",
+            "enabled": 1,
+            "last_checked": "2026-10-09T18:52:35.743840+00:00",
+            "last_error": null,
+            "jobs_found": 40
+          }
+        ],
+        "health": "CONFIGURED",
+        "reason": null
+      },
+      {
+        "company_id": "7536243c-8d8e-4ed4-aeb4-1a5311646960",
+        "company": "Man Group",
+        "careers_url": "https://www.man.com/careers",
+        "sources": [
+          {
+            "id": "f180bebb-b781-4d48-ba67-76ff53932403",
+            "name": "Man Group careers",
+            "url": "https://www.man.com/careers",
+            "enabled": 1,
+            "last_checked": "2026-10-09T18:52:17.940761+00:00",
+            "last_error": null,
+            "jobs_found": 56
+          },
+          {
+            "id": "ff189764-413c-44e2-bd6e-65768556ddc9",
+            "name": "Man Group public board",
+            "url": "https://job-boards.eu.greenhouse.io/mangroup",
+            "enabled": 1,
+            "last_checked": "2026-10-09T18:52:57.743865+00:00",
+            "last_error": null,
+            "jobs_found": 56
+          }
+        ],
+        "health": "CONFIGURED",
+        "reason": null
+      },
+      {
+        "company_id": "6bdda1b8-794a-4437-aff3-65f281794f27",
+        "company": "Marshall Wace",
+        "careers_url": "https://job-boards.greenhouse.io/mw-tech-grad",
+        "sources": [
+          {
+            "id": "1d6b01fe-026b-41eb-9c1a-b3f52c0ef54b",
+            "name": "Marshall Wace - Graduate & Associate",
+            "url": "https://job-boards.greenhouse.io/mw-tech-grad",
+            "enabled": 1,
+            "last_checked": "2026-10-09T18:51:04.002290+00:00",
+            "last_error": null,
+            "jobs_found": 6
+          }
+        ],
+        "health": "CONFIGURED",
+        "reason": null
+      },
+      {
+        "company_id": "d2826c72-f209-46c7-a3ba-58326533d0cd",
+        "company": "Mastercard",
+        "careers_url": "https://careers.mastercard.com/",
+        "sources": [
+          {
+            "id": "21534f0d-414c-46b5-a53f-178e6517c592",
+            "name": "Mastercard careers",
+            "url": "https://careers.mastercard.com/",
+            "enabled": 1,
+            "last_checked": "2026-10-09T18:52:25.933432+00:00",
+            "last_error": "ValueError: No public structured job postings found; configure an ATS board or add a job URL manually",
+            "jobs_found": 0
+          },
+          {
+            "id": "b131aa92-8d49-4554-8abe-197ef662bbf3",
+            "name": "Mastercard public board",
+            "url": "https://mastercard.wd1.myworkdayjobs.com/corporatecareers",
+            "enabled": 1,
+            "last_checked": "2026-10-09T18:53:04.733499+00:00",
+            "last_error": null,
+            "jobs_found": 40
+          }
+        ],
+        "health": "CONFIGURED",
+        "reason": null
+      },
+      {
+        "company_id": "56aa6362-e356-422d-91c1-f619fc234e86",
+        "company": "Meta",
+        "careers_url": "https://www.metacareers.com/jobs/",
+        "sources": [
+          {
+            "id": "3f68a0d4-d1c9-4b02-b4a6-b4dd5c36f49b",
+            "name": "Meta careers",
+            "url": "https://www.metacareers.com/jobs/",
+            "enabled": 1,
+            "last_checked": "2026-10-09T18:51:27.858995+00:00",
+            "last_error": "ValueError: No public structured job postings found; configure an ATS board or add a job URL manually",
+            "jobs_found": 0
+          }
+        ],
+        "health": "FAILED",
+        "reason": null
+      },
+      {
+        "company_id": "09cc17a3-14c1-47f4-aca8-896600b97ef8",
+        "company": "Microsoft",
+        "careers_url": "https://careers.microsoft.com/",
+        "sources": [
+          {
+            "id": "ff665dc3-7704-466e-ac63-716c121da0f5",
+            "name": "Microsoft careers",
+            "url": "https://careers.microsoft.com/",
+            "enabled": 1,
+            "last_checked": "2026-10-09T18:51:25.135208+00:00",
+            "last_error": "ValueError: No public structured job postings found; configure an ATS board or add a job URL manually",
+            "jobs_found": 0
+          }
+        ],
+        "health": "FAILED",
+        "reason": null
+      },
+      {
+        "company_id": "235267c1-fde6-4852-8457-68a67014a797",
+        "company": "Millennium",
+        "careers_url": "https://www.mlp.com/careers/",
+        "sources": [
+          {
+            "id": "8bc0b5ca-505b-48ae-889d-bc6ff3da5db8",
+            "name": "Millennium careers",
+            "url": "https://www.mlp.com/careers/",
+            "enabled": 1,
+            "last_checked": "2026-10-09T18:52:13.416066+00:00",
+            "last_error": "ValueError: No public structured job postings found; configure an ATS board or add a job URL manually",
+            "jobs_found": 0
+          }
+        ],
+        "health": "FAILED",
+        "reason": null
+      },
+      {
+        "company_id": "01064344-4eef-4eed-a5cf-9ed76ff14678",
+        "company": "Modo Energy",
+        "careers_url": "https://job-boards.eu.greenhouse.io/modoenergy",
+        "sources": [
+          {
+            "id": "cc736dd0-e6de-4533-b2f0-6ca9794ff062",
+            "name": "Modo Energy",
+            "url": "https://job-boards.eu.greenhouse.io/modoenergy",
+            "enabled": 1,
+            "last_checked": "2026-10-09T18:51:08.921306+00:00",
+            "last_error": null,
+            "jobs_found": 11
+          }
+        ],
+        "health": "CONFIGURED",
+        "reason": null
+      },
+      {
+        "company_id": "0d3f08d9-9be9-4cea-8b1d-a4734a5925a1",
+        "company": "Monzo",
+        "careers_url": "https://monzo.com/careers",
+        "sources": [
+          {
+            "id": "31024c40-2095-46eb-9532-e67a046ee93b",
+            "name": "Monzo careers",
+            "url": "https://monzo.com/careers",
+            "enabled": 1,
+            "last_checked": "2026-10-09T18:51:16.121720+00:00",
+            "last_error": null,
+            "jobs_found": 68
+          },
+          {
+            "id": "530994e6-82a9-41d5-8dbe-7278e8f795fd",
+            "name": "Monzo public board",
+            "url": "https://job-boards.greenhouse.io/monzo",
+            "enabled": 1,
+            "last_checked": "2026-10-09T18:52:33.057225+00:00",
+            "last_error": null,
+            "jobs_found": 68
+          }
+        ],
+        "health": "CONFIGURED",
+        "reason": null
+      },
+      {
+        "company_id": "1eef9df7-aedd-4b93-a43e-a2c6ba4ae1a2",
+        "company": "Morgan Stanley",
+        "careers_url": "https://www.morganstanley.com/people-opportunities",
+        "sources": [
+          {
+            "id": "e7a34558-e550-4b28-b496-5c52ca57b2c9",
+            "name": "Morgan Stanley careers",
+            "url": "https://www.morganstanley.com/people-opportunities",
+            "enabled": 1,
+            "last_checked": "2026-10-09T18:51:58.688036+00:00",
+            "last_error": "ValueError: No public structured job postings found; configure an ATS board or add a job URL manually",
+            "jobs_found": 0
+          }
+        ],
+        "health": "FAILED",
+        "reason": null
+      },
+      {
+        "company_id": "a2477b76-8803-43c5-99af-3cdda83b6584",
+        "company": "Mytos",
+        "careers_url": "https://jobs.lever.co/mytos",
+        "sources": [
+          {
+            "id": "3e8e4771-6ad1-4570-80e5-abedf79c23b6",
+            "name": "Mytos",
+            "url": "https://jobs.lever.co/mytos",
+            "enabled": 1,
+            "last_checked": "2026-10-09T18:51:07.108264+00:00",
+            "last_error": null,
+            "jobs_found": 13
+          }
+        ],
+        "health": "CONFIGURED",
+        "reason": null
+      },
+      {
+        "company_id": "89cbf16c-e9a8-47ef-b5a3-7996e17b157f",
+        "company": "NatWest",
+        "careers_url": "https://jobs.natwestgroup.com/",
+        "sources": [
+          {
+            "id": "d31cd8e8-700d-45e9-876d-9b0df0dae07c",
+            "name": "NatWest careers",
+            "url": "https://jobs.natwestgroup.com/",
+            "enabled": 1,
+            "last_checked": "2026-10-09T18:52:05.803118+00:00",
+            "last_error": "HTTP 403: public career source rejected the request",
+            "jobs_found": 0
+          }
+        ],
+        "health": "FAILED",
+        "reason": null
+      },
+      {
+        "company_id": "57a9dd7a-9e0f-441a-951b-63e095b66046",
+        "company": "Netflix",
+        "careers_url": "https://jobs.netflix.com/",
+        "sources": [
+          {
+            "id": "06a35d28-148d-4918-9098-5764c5ebc7d9",
+            "name": "Netflix careers",
+            "url": "https://jobs.netflix.com/",
+            "enabled": 1,
+            "last_checked": "2026-10-09T18:51:31.041527+00:00",
+            "last_error": "ValueError: No public structured job postings found; configure an ATS board or add a job URL manually",
+            "jobs_found": 0
+          }
+        ],
+        "health": "FAILED",
+        "reason": null
+      },
+      {
+        "company_id": "7c7d4816-d3f0-4316-9560-0d5844b10dd2",
+        "company": "NVIDIA",
+        "careers_url": "https://www.nvidia.com/en-us/about-nvidia/careers/",
+        "sources": [
+          {
+            "id": "e3ec9b12-7aae-4338-8621-de756b337f1e",
+            "name": "NVIDIA careers",
+            "url": "https://www.nvidia.com/en-us/about-nvidia/careers/",
+            "enabled": 1,
+            "last_checked": "2026-10-09T18:51:33.605535+00:00",
+            "last_error": "ValueError: No public structured job postings found; configure an ATS board or add a job URL manually",
+            "jobs_found": 0
+          },
+          {
+            "id": "5ee334f1-6072-4651-a747-8bf6c1b103aa",
+            "name": "NVIDIA public board",
+            "url": "https://nvidia.wd5.myworkdayjobs.com/nvidiaexternalcareersite",
+            "enabled": 1,
+            "last_checked": "2026-10-09T18:52:37.927423+00:00",
+            "last_error": null,
+            "jobs_found": 40
+          }
+        ],
+        "health": "CONFIGURED",
+        "reason": null
+      },
+      {
+        "company_id": "c5f8a2a5-4e18-468a-af6b-3749b743c8a0",
+        "company": "Oracle",
+        "careers_url": "https://www.oracle.com/careers/",
+        "sources": [
+          {
+            "id": "266b884c-3d1b-45db-a32b-c70b9cc663a8",
+            "name": "Oracle careers",
+            "url": "https://www.oracle.com/careers/",
+            "enabled": 1,
+            "last_checked": "2026-10-09T18:51:41.960464+00:00",
+            "last_error": "ValueError: No public structured job postings found; configure an ATS board or add a job URL manually",
+            "jobs_found": 0
+          }
+        ],
+        "health": "FAILED",
+        "reason": null
+      },
+      {
+        "company_id": "419149ff-4103-411d-9ea4-71c568ad0892",
+        "company": "Palantir",
+        "careers_url": "https://www.palantir.com/careers/",
+        "sources": [
+          {
+            "id": "4f937ced-692c-4726-b780-214a0fbf6c2c",
+            "name": "Palantir careers",
+            "url": "https://www.palantir.com/careers/",
+            "enabled": 1,
+            "last_checked": "2026-10-09T18:51:56.149764+00:00",
+            "last_error": null,
+            "jobs_found": 309
+          },
+          {
+            "id": "83701bd8-9eca-414e-b233-dee6432ffb91",
+            "name": "Palantir public board",
+            "url": "https://jobs.lever.co/palantir",
+            "enabled": 1,
+            "last_checked": "2026-10-09T18:53:11.103838+00:00",
+            "last_error": null,
+            "jobs_found": 309
+          }
+        ],
+        "health": "CONFIGURED",
+        "reason": null
+      },
+      {
+        "company_id": "fa54da5a-01c8-4a1b-b125-d9ef0d513d40",
+        "company": "Point72",
+        "careers_url": "https://careers.point72.com/",
+        "sources": [
+          {
+            "id": "784b8a01-9ffe-4378-831c-d086be37cd28",
+            "name": "Point72 careers",
+            "url": "https://careers.point72.com/",
+            "enabled": 1,
+            "last_checked": "2026-10-09T18:52:24.122671+00:00",
+            "last_error": null,
+            "jobs_found": 220
+          },
+          {
+            "id": "b461bdb8-bd95-41b7-b41c-3ded5a2990e5",
+            "name": "Point72 public board",
+            "url": "https://boards.greenhouse.io/point72",
+            "enabled": 1,
+            "last_checked": "2026-10-09T18:53:08.466733+00:00",
+            "last_error": null,
+            "jobs_found": 220
+          }
+        ],
+        "health": "CONFIGURED",
+        "reason": null
+      },
+      {
+        "company_id": "b5b6b419-5554-4b92-9874-fc9ab35c0015",
+        "company": "Relay Technologies",
+        "careers_url": "https://jobs.ashbyhq.com/relay",
+        "sources": [
+          {
+            "id": "990fb9c9-13fc-4212-a81c-ca2a9ebdd004",
+            "name": "Relay Technologies",
+            "url": "https://jobs.ashbyhq.com/relay",
+            "enabled": 1,
+            "last_checked": "2026-10-09T18:51:09.110862+00:00",
+            "last_error": null,
+            "jobs_found": 29
+          }
+        ],
+        "health": "CONFIGURED",
+        "reason": null
+      },
+      {
+        "company_id": "c67fa36b-6f1d-44af-9699-d4427c46ac67",
+        "company": "Revolut",
+        "careers_url": "https://www.revolut.com/careers/",
+        "sources": [
+          {
+            "id": "c1b43bd3-647a-4d1c-9046-812dddfe268c",
+            "name": "Revolut careers",
+            "url": "https://www.revolut.com/careers/",
+            "enabled": 1,
+            "last_checked": "2026-10-09T18:51:21.957996+00:00",
+            "last_error": "HTTP 403: public career source rejected the request",
+            "jobs_found": 0
+          }
+        ],
+        "health": "FAILED",
+        "reason": null
+      },
+      {
+        "company_id": "34cda7e2-5b8a-477f-a169-e390de7a5eb3",
+        "company": "Salesforce",
+        "careers_url": "https://careers.salesforce.com/",
+        "sources": [
+          {
+            "id": "837b64c7-a170-4f31-8dc9-75f59075438f",
+            "name": "Salesforce careers",
+            "url": "https://careers.salesforce.com/",
+            "enabled": 1,
+            "last_checked": "2026-10-09T18:52:25.502673+00:00",
+            "last_error": "ValueError: No public structured job postings found; configure an ATS board or add a job URL manually",
+            "jobs_found": 0
+          }
+        ],
+        "health": "FAILED",
+        "reason": null
+      },
+      {
+        "company_id": "ea51fafb-6cc5-40fd-90ca-a1092d94e24a",
+        "company": "Santander",
+        "careers_url": "https://www.santander.com/en/careers",
+        "sources": [
+          {
+            "id": "a51f3075-6042-4760-9b08-06cc6132f88d",
+            "name": "Santander careers",
+            "url": "https://www.santander.com/en/careers",
+            "enabled": 1,
+            "last_checked": "2026-10-09T18:52:05.685891+00:00",
+            "last_error": "ValueError: No public structured job postings found; configure an ATS board or add a job URL manually",
+            "jobs_found": 0
+          }
+        ],
+        "health": "FAILED",
+        "reason": null
+      },
+      {
+        "company_id": "6d2c0ef2-8994-4861-8982-1f04105f4f60",
+        "company": "Shift Technology",
+        "careers_url": "https://job-boards.greenhouse.io/shifttechnology",
+        "sources": [
+          {
+            "id": "c2c7ccb0-c02f-4497-8cd9-db8321bf7d64",
+            "name": "Shift Technology",
+            "url": "https://job-boards.greenhouse.io/shifttechnology",
+            "enabled": 1,
+            "last_checked": "2026-10-09T18:51:07.218660+00:00",
+            "last_error": null,
+            "jobs_found": 31
+          }
+        ],
+        "health": "CONFIGURED",
+        "reason": null
+      },
+      {
+        "company_id": "e28dede4-21da-4ddb-b5e2-28a65de2bbf9",
+        "company": "Snowflake",
+        "careers_url": "https://careers.snowflake.com/",
+        "sources": [
+          {
+            "id": "b1cd5d61-ec77-42bd-990a-e7f1e41d1a7e",
+            "name": "Snowflake careers",
+            "url": "https://careers.snowflake.com/",
+            "enabled": 1,
+            "last_checked": "2026-10-09T18:51:38.254081+00:00",
+            "last_error": "ValueError: No public structured job postings found; configure an ATS board or add a job URL manually",
+            "jobs_found": 0
+          }
+        ],
+        "health": "FAILED",
+        "reason": null
+      },
+      {
+        "company_id": "196a1325-92ec-45b8-a3a9-9116c73e6d9a",
+        "company": "Soci\u00e9t\u00e9 G\u00e9n\u00e9rale",
+        "careers_url": "https://careers.societegenerale.com/en",
+        "sources": [
+          {
+            "id": "f768a6d8-067e-4a92-b94c-1efde5ee21d2",
+            "name": "Soci\u00e9t\u00e9 G\u00e9n\u00e9rale careers",
+            "url": "https://careers.societegenerale.com/en",
+            "enabled": 1,
+            "last_checked": "2026-10-09T18:52:12.314905+00:00",
+            "last_error": "ValueError: No public structured job postings found; configure an ATS board or add a job URL manually",
+            "jobs_found": 0
+          }
+        ],
+        "health": "FAILED",
+        "reason": null
+      },
+      {
+        "company_id": "7993d34e-57b1-484d-8cd5-a541f0dde840",
+        "company": "Softwire",
+        "careers_url": "https://www.softwire.com/careers/",
+        "sources": [
+          {
+            "id": "4b9b2260-b2a0-4574-be26-ad99e1f338b6",
+            "name": "Softwire careers",
+            "url": "https://www.softwire.com/careers/",
+            "enabled": 1,
+            "last_checked": "2026-10-09T18:51:18.752518+00:00",
+            "last_error": "ValueError: No public structured job postings found; configure an ATS board or add a job URL manually",
+            "jobs_found": 0
+          }
+        ],
+        "health": "FAILED",
+        "reason": null
+      },
+      {
+        "company_id": "f348c760-1bd7-4478-a872-563dd31891ad",
+        "company": "Spotify",
+        "careers_url": "https://www.lifeatspotify.com/jobs",
+        "sources": [
+          {
+            "id": "4947861a-65d4-48e7-91f2-a4513488d1a7",
+            "name": "Spotify careers",
+            "url": "https://www.lifeatspotify.com/jobs",
+            "enabled": 1,
+            "last_checked": "2026-10-09T18:51:47.697537+00:00",
+            "last_error": "ValueError: No public structured job postings found; configure an ATS board or add a job URL manually",
+            "jobs_found": 0
+          }
+        ],
+        "health": "FAILED",
+        "reason": null
+      },
+      {
+        "company_id": "7fdc2f8f-dbdc-4522-8582-c970e28cea20",
+        "company": "Standard Chartered",
+        "careers_url": "https://www.sc.com/en/global-careers/",
+        "sources": [
+          {
+            "id": "c4eba117-8dc3-4946-a4c2-7c8262b190fb",
+            "name": "Standard Chartered careers",
+            "url": "https://www.sc.com/en/global-careers/",
+            "enabled": 1,
+            "last_checked": "2026-10-09T18:52:07.178920+00:00",
+            "last_error": "ValueError: No public structured job postings found; configure an ATS board or add a job URL manually",
+            "jobs_found": 0
+          }
+        ],
+        "health": "FAILED",
+        "reason": null
+      },
+      {
+        "company_id": "5ef03240-484a-4515-bf87-b4e587d5763f",
+        "company": "Starling Bank",
+        "careers_url": "https://www.starlingbank.com/careers/",
+        "sources": [
+          {
+            "id": "e36c1636-2c6f-4068-8275-613e36cd1b50",
+            "name": "Starling Bank careers",
+            "url": "https://www.starlingbank.com/careers/",
+            "enabled": 1,
+            "last_checked": "2026-10-09T18:52:28.222895+00:00",
+            "last_error": "ValueError: No public structured job postings found; configure an ATS board or add a job URL manually",
+            "jobs_found": 0
+          }
+        ],
+        "health": "FAILED",
+        "reason": null
+      },
+      {
+        "company_id": "8d23de69-e594-4227-9a5a-de1603b7b847",
+        "company": "Stripe",
+        "careers_url": "https://stripe.com/jobs/search",
+        "sources": [
+          {
+            "id": "11e78205-2ef8-4435-8820-586614fe3f56",
+            "name": "Stripe careers",
+            "url": "https://stripe.com/jobs/search",
+            "enabled": 1,
+            "last_checked": "2026-10-09T18:51:37.567401+00:00",
+            "last_error": null,
+            "jobs_found": 6
+          }
+        ],
+        "health": "CONFIGURED",
+        "reason": null
+      },
+      {
+        "company_id": "313665f0-b944-4589-ad5a-e2ff3e79ef68",
+        "company": "TikTok",
+        "careers_url": "https://lifeattiktok.com/search",
+        "sources": [
+          {
+            "id": "6cc1845c-91d7-478f-a9a1-9fd65d796422",
+            "name": "TikTok careers",
+            "url": "https://lifeattiktok.com/search",
+            "enabled": 1,
+            "last_checked": "2026-10-09T18:51:47.388016+00:00",
+            "last_error": "ValueError: No public structured job postings found; configure an ATS board or add a job URL manually",
+            "jobs_found": 0
+          }
+        ],
+        "health": "FAILED",
+        "reason": null
+      },
+      {
+        "company_id": "9b565d4f-1a98-48e5-9dda-b3b9c2599054",
+        "company": "Trainline",
+        "careers_url": "https://jobs.ashbyhq.com/trainline",
+        "sources": [
+          {
+            "id": "d1fc8018-b0d6-4109-ad6c-1bd590c2f4ef",
+            "name": "Trainline",
+            "url": "https://jobs.ashbyhq.com/trainline",
+            "enabled": 1,
+            "last_checked": "2026-10-09T18:51:07.927601+00:00",
+            "last_error": null,
+            "jobs_found": 29
+          }
+        ],
+        "health": "CONFIGURED",
+        "reason": null
+      },
+      {
+        "company_id": "ec77dcca-9f77-401a-a713-61c69f3b4ba9",
+        "company": "Two Sigma",
+        "careers_url": "https://careers.twosigma.com/",
+        "sources": [
+          {
+            "id": "ea475931-9e7f-4d5a-90c8-6b0511d72560",
+            "name": "Two Sigma careers",
+            "url": "https://careers.twosigma.com/",
+            "enabled": 1,
+            "last_checked": "2026-10-09T18:52:35.785728+00:00",
+            "last_error": "ValueError: No public structured job postings found; configure an ATS board or add a job URL manually",
+            "jobs_found": 0
+          }
+        ],
+        "health": "FAILED",
+        "reason": null
+      },
+      {
+        "company_id": "429f3061-1fd2-4329-a147-49956f67cfeb",
+        "company": "Uber",
+        "careers_url": "https://www.uber.com/global/en/careers/",
+        "sources": [
+          {
+            "id": "04fcc51e-3711-49cf-89f6-9f659cbcc508",
+            "name": "Uber careers",
+            "url": "https://www.uber.com/global/en/careers/",
+            "enabled": 1,
+            "last_checked": "2026-10-09T18:51:34.542201+00:00",
+            "last_error": "ValueError: No public structured job postings found; configure an ATS board or add a job URL manually",
+            "jobs_found": 0
+          }
+        ],
+        "health": "FAILED",
+        "reason": null
+      },
+      {
+        "company_id": "0214c471-effa-4efd-8744-c941dbc2449f",
+        "company": "UBS",
+        "careers_url": "https://www.ubs.com/global/en/careers.html",
+        "sources": [
+          {
+            "id": "1000f93d-dd94-4b2c-8e54-ebafec509b08",
+            "name": "UBS careers",
+            "url": "https://www.ubs.com/global/en/careers.html",
+            "enabled": 1,
+            "last_checked": "2026-10-09T18:51:52.382586+00:00",
+            "last_error": "HTTP 403: public career source rejected the request",
+            "jobs_found": 0
+          }
+        ],
+        "health": "FAILED",
+        "reason": null
+      },
+      {
+        "company_id": "f102daf2-a3d7-44b1-8442-08a09126768b",
+        "company": "University College London (UCL)",
+        "careers_url": "https://www.ucl.ac.uk/work-at-ucl/search-ucl-jobs",
+        "sources": [
+          {
+            "id": "050020a3-3cd7-4eb6-8ed0-8e2e9fa6e715",
+            "name": "University College London (UCL) careers",
+            "url": "https://www.ucl.ac.uk/work-at-ucl/search-ucl-jobs",
+            "enabled": 1,
+            "last_checked": "2026-10-09T18:51:52.680811+00:00",
+            "last_error": "ValueError: No public structured job postings found; configure an ATS board or add a job URL manually",
+            "jobs_found": 0
+          }
+        ],
+        "health": "FAILED",
+        "reason": null
+      },
+      {
+        "company_id": "f34aa0e8-c689-4a51-9392-e97e0ac0e34b",
+        "company": "Visa",
+        "careers_url": "https://corporate.visa.com/en/careers.html",
+        "sources": [
+          {
+            "id": "8800f98a-4e23-4d7d-a699-65834db52fbe",
+            "name": "Visa careers",
+            "url": "https://corporate.visa.com/en/careers.html",
+            "enabled": 1,
+            "last_checked": "2026-10-09T18:52:28.539111+00:00",
+            "last_error": "ValueError: No public structured job postings found; configure an ATS board or add a job URL manually",
+            "jobs_found": 0
+          },
+          {
+            "id": "5396060b-dc99-4469-b3da-9f4bbc5a2659",
+            "name": "Visa public board",
+            "url": "https://visa.wd5.myworkdayjobs.com/visa",
+            "enabled": 1,
+            "last_checked": "2026-10-09T18:53:03.707490+00:00",
+            "last_error": null,
+            "jobs_found": 40
+          }
+        ],
+        "health": "CONFIGURED",
+        "reason": null
+      },
+      {
+        "company_id": "a6ed9ed1-f890-48ac-ad54-c3e79a13d802",
+        "company": "Wise",
+        "careers_url": "https://wise.jobs/",
+        "sources": [
+          {
+            "id": "c95a1ac5-de75-4c77-809a-dd274e0a648b",
+            "name": "Wise careers",
+            "url": "https://wise.jobs/",
+            "enabled": 1,
+            "last_checked": "2026-10-09T18:51:23.844617+00:00",
+            "last_error": null,
+            "jobs_found": 18
+          }
+        ],
+        "health": "CONFIGURED",
+        "reason": null
+      },
+      {
+        "company_id": "ced1b0b3-ffdc-453b-b52a-10c6d11d97ca",
+        "company": "Zopa",
+        "careers_url": "https://www.zopa.com/careers",
+        "sources": [
+          {
+            "id": "a2fbb357-bc96-4de8-a3bf-1713356743e3",
+            "name": "Zopa careers",
+            "url": "https://www.zopa.com/careers",
+            "enabled": 1,
+            "last_checked": "2026-10-09T18:52:28.352514+00:00",
+            "last_error": "HTTP 503: public career source rejected the request",
+            "jobs_found": 0
+          }
+        ],
+        "health": "FAILED",
+        "reason": null
+      }
+    ],
+    "total": 79,
+    "configured": 79
+  },
+  "before_jobs": 2771,
+  "after_jobs": 3774,
+  "scope": "Private database snapshot; production records untouched"
+}

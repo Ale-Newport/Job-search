@@ -1,0 +1,219 @@
+{
+  "scope": "Explicitly authorised preparation only; no final submission",
+  "forms": [
+    {
+      "company": "Trainline",
+      "title": "Senior Data Scientist",
+      "ats": "ashby",
+      "url": "https://jobs.ashbyhq.com/trainline/2757aa18-5e60-45cf-ac9d-be11dee1afe2/application",
+      "status": "human_required",
+      "form_state": "ANALYSE_CURRENT_STEP",
+      "answers_resolved": 5,
+      "steps_completed": 0,
+      "uploads": 1,
+      "upload_acknowledgements": 1,
+      "question_labels": [
+        "Where are you currently located?"
+      ],
+      "actions": 6,
+      "attention_kinds": [
+        "option"
+      ],
+      "submitted": false,
+      "duration_seconds": 8.78
+    },
+    {
+      "company": "Shift Technology",
+      "title": "Data & AI Engineer Intern (6 months)",
+      "ats": "greenhouse",
+      "url": "https://job-boards.greenhouse.io/shifttechnology/jobs/8014397003",
+      "status": "human_required",
+      "form_state": "ANALYSE_CURRENT_STEP",
+      "answers_resolved": 11,
+      "steps_completed": 0,
+      "uploads": 1,
+      "upload_acknowledgements": 0,
+      "question_labels": [
+        "Gender"
+      ],
+      "actions": 15,
+      "attention_kinds": [
+        "option"
+      ],
+      "submitted": false,
+      "duration_seconds": 11.63
+    },
+    {
+      "company": "Mytos",
+      "title": "Junior/Mid Software Engineer",
+      "ats": "lever",
+      "url": "https://jobs.lever.co/mytos/bbb558c0-d769-4b5f-a3a7-025642c2626d/apply",
+      "status": "human_required",
+      "form_state": "FILL_FIELDS",
+      "answers_resolved": 8,
+      "steps_completed": 0,
+      "uploads": 1,
+      "upload_acknowledgements": 0,
+      "question_labels": [
+        "Current location No location found. Try entering a different locationLoading"
+      ],
+      "actions": 11,
+      "attention_kinds": [
+        "validation"
+      ],
+      "submitted": false,
+      "duration_seconds": 6.59
+    },
+    {
+      "company": "KLA",
+      "title": "Associate Software Engineer",
+      "ats": "workday",
+      "url": "https://kla.wd1.myworkdayjobs.com/en-US/search/job/Chennai-India/Associate-Software-Engineer_2639562",
+      "status": "human_required",
+      "form_state": "ANALYSE_CURRENT_STEP",
+      "answers_resolved": 0,
+      "steps_completed": 1,
+      "uploads": 0,
+      "upload_acknowledgements": 0,
+      "question_labels": [
+        "No unambiguous next step or final Submit was observed. Continue in the browser."
+      ],
+      "actions": 1,
+      "attention_kinds": [
+        "unsupported_widget"
+      ],
+      "submitted": false,
+      "duration_seconds": 25.06
+    },
+    {
+      "company": "Endava",
+      "title": "Junior Software Engineer - C/C++ - Linux",
+      "ats": "smartrecruiters",
+      "url": "https://jobs.smartrecruiters.com/Endava/744000153660909-junior-software-engineer-c-c-linux-?oga=true",
+      "status": "human_required",
+      "form_state": "ANALYSE_CURRENT_STEP",
+      "answers_resolved": 0,
+      "steps_completed": 0,
+      "uploads": 0,
+      "upload_acknowledgements": 0,
+      "question_labels": [
+        "No unambiguous next step or final Submit was observed. Continue in the browser."
+      ],
+      "actions": 0,
+      "attention_kinds": [
+        "unsupported_widget"
+      ],
+      "submitted": false,
+      "duration_seconds": 2.44
+    },
+    {
+      "company": "Grayce",
+      "title": "Graduate Software Engineer - Bridgend",
+      "ats": "workable",
+      "url": "https://apply.workable.com/grayce/j/1789116104",
+      "status": "human_required",
+      "form_state": "FILL_FIELDS",
+      "answers_resolved": 4,
+      "steps_completed": 1,
+      "uploads": 0,
+      "upload_acknowledgements": 0,
+      "question_labels": [
+        "Phone"
+      ],
+      "actions": 8,
+      "attention_kinds": [
+        "validation"
+      ],
+      "submitted": false,
+      "duration_seconds": 8.52
+    },
+    {
+      "company": "DigitalOcean",
+      "title": "Software Engineer I",
+      "ats": "generic",
+      "url": "https://www.digitalocean.com/careers/position/apply?gh_jid=8233113",
+      "status": "human_required",
+      "form_state": "FILL_FIELDS",
+      "answers_resolved": 1,
+      "steps_completed": 0,
+      "uploads": 0,
+      "upload_acknowledgements": 0,
+      "question_labels": [
+        "The frame is covered at the observed control."
+      ],
+      "actions": 1,
+      "attention_kinds": [
+        "stale_state"
+      ],
+      "submitted": false,
+      "duration_seconds": 10.25
+    },
+    {
+      "company": "Relay Technologies",
+      "title": "Staff Data Scientist - Network",
+      "ats": "ashby",
+      "url": "https://jobs.ashbyhq.com/relay/16b8fb16-20a6-4153-b661-e018da9c5241/application",
+      "status": "human_required",
+      "form_state": "ANALYSE_CURRENT_STEP",
+      "answers_resolved": 0,
+      "steps_completed": 0,
+      "uploads": 0,
+      "upload_acknowledgements": 0,
+      "question_labels": [
+        "No unambiguous next step or final Submit was observed. Continue in the browser."
+      ],
+      "actions": 0,
+      "attention_kinds": [
+        "unsupported_widget"
+      ],
+      "submitted": false,
+      "duration_seconds": 21.2
+    },
+    {
+      "company": "Shift Technology",
+      "title": "Graduate Data Scientist",
+      "ats": "greenhouse",
+      "url": "https://job-boards.greenhouse.io/shifttechnology/jobs/5910904003",
+      "status": "human_required",
+      "form_state": "ANALYSE_CURRENT_STEP",
+      "answers_resolved": 11,
+      "steps_completed": 0,
+      "uploads": 1,
+      "upload_acknowledgements": 0,
+      "question_labels": [
+        "Please select your current UK work authorization status*",
+        "GDPR Notice*",
+        "By checking this box, I agree to allow Shift Technology to store and process my data for the purpose of considering my eligibility regarding my current application for employment.*"
+      ],
+      "actions": 15,
+      "attention_kinds": [
+        "legal_certification",
+        "unknown",
+        "work_authorization"
+      ],
+      "submitted": false,
+      "duration_seconds": 7.03
+    },
+    {
+      "company": "Farfetch",
+      "title": "Junior Software Engineer - Full Stack",
+      "ats": "lever",
+      "url": "https://jobs.lever.co/farfetch/6d86bd8d-8ae6-4e06-8156-59c13b1b4fd2",
+      "status": "human_required",
+      "form_state": "ANALYSE_CURRENT_STEP",
+      "answers_resolved": 0,
+      "steps_completed": 0,
+      "uploads": 0,
+      "upload_acknowledgements": 0,
+      "question_labels": [
+        "No unambiguous next step or final Submit was observed. Continue in the browser."
+      ],
+      "actions": 0,
+      "attention_kinds": [
+        "unsupported_widget"
+      ],
+      "submitted": false,
+      "duration_seconds": 3.88
+    }
+  ]
+}

@@ -1,0 +1,12 @@
+{
+  "result": "passed",
+  "packaged_sidecar": true,
+  "document_workers": 2,
+  "browser_worker_deadlock_recovered": true,
+  "backend_hard_restart_recovered": true,
+  "completed_steps_preserved": true,
+  "attempts": 3,
+  "max_health_seconds": 0.0063,
+  "submitted": false,
+  "synthetic_data": true
+}

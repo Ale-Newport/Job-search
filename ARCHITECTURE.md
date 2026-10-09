@@ -14,10 +14,12 @@ flowchart LR
   API --> DB[(SQLite WAL + FTS5)]
   API --> FS[Versioned local documents]
   API --> KC[macOS Keychain]
-  API --> Scheduler[Async scheduler]
-  Scheduler --> Discovery[Public sources / company watchlist]
-  Scheduler --> Mail[Gmail / Graph / IMAP]
-  API --> Browser[Dedicated persistent Chrome profile]
+  API --> Supervisor[Worker supervisor]
+  Scheduler[Async scheduler] --> Supervisor
+  Supervisor --> Discovery[Public-source child process]
+  Supervisor --> Mail[Mailbox child process]
+  Supervisor --> Documents[Document child process]
+  Supervisor --> Browser[Per-application process and profile]
   Browser --> DOM[Indexed DOM and node references]
   DOM --> Policy[Deterministic adapters / semantic fields]
   Policy --> Decision[Laya / Jev confidence gate]
@@ -48,8 +50,20 @@ Read-only Gmail OAuth, Microsoft Graph OAuth and IMAP over TLS use Keychain cred
 
 ## Failure and privacy model
 
-Network errors are surfaced per source/integration and retries use bounded backoff. Background work cannot crash the UI. A run checkpoint records progress, never cookies or authentication headers. On restart, running operations become interrupted human-review items. Facts imported from CVs start unverified; only explicit verification/locking permits automatic use. Sensitive questions require an explicit policy. Text model outputs must cite existing verified fact IDs and remain drafts until reviewed where factual support is uncertain. Local inference is preferred; configured remote providers clearly disclose their data boundary.
+Network errors are surfaced per source/integration and retries use bounded backoff. Child-process failure is isolated from the API and UI. A run checkpoint records progress, never cookies or authentication headers; persisted URLs lose credential parameters and fragments. On restart, recoverable preparation resumes from semantic checkpoints with old approvals invalidated. Pending or uncertain submission requires reconciliation. Facts imported from CVs start unverified; only explicit verification/locking permits automatic use. Sensitive questions require an explicit policy. Text model outputs must cite existing verified fact IDs and remain drafts until reviewed where factual support is uncertain. Local inference is preferred; configured remote providers clearly disclose their data boundary.
 
 ## Verification and packaging
 
-Unit tests cover normalization, matching, dedupe, answers, email classification and gates. Integration tests cover SQLite persistence/migrations, documents, email linking and HTTP authorization. Browser tests use local ATS fixtures only, including uploads, multiple steps, stale nodes and confirmation. Frontend typecheck/lint/build and Rust checks precede an unsigned `.app`/`.dmg`. End-to-end live account verification requires the user's own login/OAuth authorization; a local test is never represented as a real recruitment submission.
+Unit tests cover normalization, matching, dedupe, answers, email classification and gates. Integration tests cover SQLite persistence/migrations, documents, email linking and HTTP authorization. Automated browser tests use local ATS fixtures, including uploads, multiple steps, stale nodes and confirmation. Separately authorised real-form dry runs stop before submission. Frontend typecheck/lint/build and Rust checks precede a locally signed `.app`/`.dmg`. End-to-end live account verification requires the user's own login/OAuth authorization; a local test is never represented as a real recruitment submission.
+
+## October 2026 worker upgrade
+
+The API owns a `WorkerSupervisor`, rather than a shared active browser. SQLite stores task state, account scope, lease, retry budget, checkpoints, heartbeat history, upload evidence and submission receipts. Each application runs in its own OS process and local profile at `browser-profile/applications/<application-id>`. Discovery, mailbox sync, document generation and manual browser sessions use separate child processes. Production PyInstaller dispatches `--meridian-worker`; tests may explicitly select the legacy in-process fixture path.
+
+The supervisor claims tasks transactionally and serialises work within an ATS tenant/account scope. Application concurrency defaults to two and is configurable from one to six. Heartbeats arrive every second; the default missing-heartbeat limit is 30 seconds, preparation-progress limit is 240 seconds, and retry budget is three attempts with bounded exponential backoff. A legitimately parked review is exempt from the progress watchdog. After 15 minutes the browser may be released; Resume restores the same durable task. Memory monitoring includes the owned process group and Chrome helpers, supplemented by the worker's reported peak RSS. Shutdown terminates only owned groups and leaves recoverable task records.
+
+A restart invalidates DOM approvals and recovers preparation from semantic checkpoints: URL, current form state, completed steps, verified answers, selected document IDs/hashes and upload evidence. Browser element indexes are never restored. Submission receipts are written transactionally before clicking. A pending or uncertain receipt blocks replay; confirmation pages, linked email or explicit reconciliation resolve it. A queued preparation is skipped if email/manual tracking already advanced the application.
+
+Public-source scans run with four-way bounded concurrency and a 120-second per-source limit. Daily discovery is queued at 08:00 in the configured timezone with catch-up on the next available scheduler tick; mailbox sync queues independently. Complete Greenhouse/Lever/Ashby boards can establish OPEN/CLOSED by presence/removal. Generic pages and truncated Workday boards cannot establish closure by absence. Workday queries use observed tenant/site URLs and cap results; listing-only descriptions and deadlines remain unknown. Source coverage distinguishes configuration from successful scanning.
+
+Networking adds evidence-backed contacts, job links, grounded drafts, outreach history and follow-ups. The approved manual handoff copies the reviewed text and opens the exact profile. Sending is recorded only after explicit confirmation. Imported received text enters the same conservative recruitment classification pipeline as email.

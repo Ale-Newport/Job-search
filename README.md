@@ -36,6 +36,10 @@ Externally recorded applications use manual tracking and need no CV approval or 
 
 **Pause automation** prevents subsequent browser actions. It cannot undo a network request already sent to a website. **Take control** lets you interact with the visible browser. After an uncertain submission or process interruption, reconcile what actually happened before retrying. Meridian never assumes that clicking Submit means the application succeeded.
 
+Closing Chrome or its application tab invalidates the old review. The supervisor reopens recoverable preparation with a bounded retry budget; it never reuses an approval from the closed form. Exhausted recovery shows the reason and allows **Retry Auto Apply**. **Stop attempt** cancels active work. Isolated preparation is bounded to 220 seconds and individual browser operations have shorter limits; submission verification is bounded to one minute. A restart restores preparation from its persisted checkpoint, while an interrupted submission remains uncertain and requires reconciliation. A form genuinely waiting for your answer or approval remains in review.
+
+If the local service exits, Meridian reconnects and restarts it on the next request, with at most three restart attempts per minute. Slow requests have deadlines, and failed changes are never replayed automatically. Closing or minimizing the window can be reversed by opening Meridian from the Dock.
+
 ## Discovery and ATS support
 
 Public ATS APIs are preferred over scraping. The supported application adapters identify Greenhouse, Lever, Ashby, Workday, SmartRecruiters, Workable, Teamtailor, iCIMS and Taleo and reuse guarded semantic form handling. Adapter identification is not a promise that every employer's custom form can be completed unattended. Unsupported widgets, ambiguous navigation, validation errors, CAPTCHA and MFA stop for human takeover.
@@ -102,13 +106,16 @@ Tests use temporary databases and localhost ATS fixtures. No test submits a real
 
 For `make test-ui`, run an isolated QA backend (`MERIDIAN_TEST=1 MERIDIAN_DATA_DIR="$PWD/.local-data/qa" make backend`) and `make dev-web` in separate terminals first. The UI tests create synthetic local records and must not target production data.
 
-Build output: `src-tauri/target/release/bundle/macos/Meridian.app` and `src-tauri/target/release/bundle/dmg/`. Copy the app into Applications or run it from the build directory. Local builds are ad-hoc signed, not notarized. The embedded Python runtime requires the narrowly scoped `disable-library-validation` entitlement to load its extracted native libraries; hardened runtime otherwise stays enabled. The bundled Homebrew Python requires macOS 15 or newer. For distribution, configure an Apple Developer signing identity and notarization credentials through the documented Tauri process; never commit certificates or credentials. See [Tauri signing documentation](https://v2.tauri.app/distribute/sign/macos/).
+Build output: `src-tauri/target/release/bundle/macos/Meridian.app` and `src-tauri/target/release/bundle/dmg/`. Copy the app into Applications or run it from the build directory. The build script requires a stable configured Apple signing identity to preserve Keychain trust; local builds are not notarized. The embedded Python runtime requires the narrowly scoped `disable-library-validation` entitlement to load its extracted native libraries; hardened runtime otherwise stays enabled. The bundled Homebrew Python requires macOS 15 or newer. For distribution, configure an Apple Developer signing identity and notarization credentials through the documented Tauri process; never commit certificates or credentials. See [Tauri signing documentation](https://v2.tauri.app/distribute/sign/macos/).
+
+For isolated testing of the actual desktop bundle, set `MERIDIAN_DATA_DIR` to an empty QA directory before starting its executable. The desktop and Python service use that same directory. Quit any existing Meridian instance first because the app enforces a single instance. Keep only one installed copy registered with macOS to avoid duplicate application entries; the brand generator writes the macOS ICNS together with the PNG assets.
 
 If the app bundle succeeds but Tauri's Finder styling step fails while making the DMG, run `bash scripts/create_dmg.sh`. It verifies the signed app and produces a headless DMG with the app and Applications shortcut, then verifies the disk image checksum.
 
 ## Troubleshooting
 
 - **Service unavailable:** allow a few seconds for the bundled Python service to start, retry, then inspect `logs/backend.log`. The port/token are regenerated each launch.
+- **Browser closed:** watch the affected task's recovery status. If its retry budget is exhausted, choose Retry Auto Apply. Previous approvals have expired. If submission is uncertain, verify the site/email and reconcile first.
 - **Browser unavailable/profile in use:** close another Meridian browser instance using that profile. Do not point it at your ordinary Chrome profile. Install Chrome or run `.venv/bin/python -m playwright install chromium`.
 - **Form stopped:** inspect the run and human task. Complete CAPTCHA, login, MFA or unsupported controls yourself, then resume. An uncertain submission needs reconciliation first.
 - **No jobs found:** inspect source health and the board identifier. Career websites may change structure or require human access. Public sources need network connectivity.
@@ -130,3 +137,11 @@ See [ARCHITECTURE.md](ARCHITECTURE.md), [SECURITY.md](SECURITY.md), [CONTRIBUTIN
 - [LinkedIn job alerts](https://www.linkedin.com/help/linkedin/answer/a511279/job-alerts-on-linkedin?lang=en) and [Indeed job alerts](https://support.indeed.com/hc/en-ca/articles/204488890-Starting-Stopping-and-Managing-Job-Alerts) require alerts on the respective account. Meridian reads incoming alerts from the connected inbox; it does not subscribe you automatically.
 
 The daily selection excludes ignored, submitted, explicitly closed and not-yet-open offers, and unsaved listings posted more than 90 days ago when no application deadline is supplied. It prioritizes graduate/junior roles without inventing eligibility, location or work rights. All stored opportunities remain accessible in the table. A source link may point to a programme’s employer search page when that is the destination supplied by its publisher.
+
+## Durable workers and networking
+
+Automation now shows independent durable tasks, health/progress, retries and per-task recovery controls. Default application concurrency is two; each application has its own process, profile and semantic checkpoints. Discovery and email sync continue independently. Queued document generation exposes its durable result and keeps the API responsive. Existing saved settings and user data are preserved.
+
+Networking stores verified contacts, explains relevance to a selected job, generates evidence-based drafts and provides an approved LinkedIn clipboard/profile handoff. Confirm the actual manual send to record outreach. Job details include Relevant people; opportunities expose published-deadline and verified-open filters.
+
+Daily discovery runs at the configured local time and catches up when the app is available. The watchlist retains all 72 required employers and existing additional sources. Source health distinguishes an inaccessible or unsupported career page from a successful scan. See [the implementation and validation report](docs/UPGRADE_REPORT.md), [worker architecture](ARCHITECTURE.md), and [test instructions](TESTING.md).

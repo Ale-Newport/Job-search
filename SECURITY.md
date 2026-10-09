@@ -19,3 +19,11 @@ Development mode intentionally uses a fixed local test token. It must be explici
 Report vulnerabilities privately to the repository owner with a minimal reproduction and no live credentials. If a secret was exposed, revoke it at the provider and remove it from Keychain. Deleting the application's data folder removes personal records and browser sessions; remove Keychain entries separately under service `com.meridian.jobagent`.
 
 The packaged PyInstaller sidecar extracts its Python shared libraries at launch. Ad-hoc local signing needs `com.apple.security.cs.disable-library-validation` for these libraries to load; hardened runtime remains enabled. The same entitlement is applied by Tauri to the signed bundle. Distribution builds should review this requirement with a consistent Developer ID signature across the interpreter and native dependencies.
+
+## Worker and outreach boundaries
+
+Worker commands travel over private inherited JSON pipes with a fixed command allowlist. Web pages and model output cannot create worker commands or execute shell code. Each application owns a profile and only explicitly selected, approved immutable documents are uploadable. Required generated documents remain unapproved drafts until reviewed; PDF, DOCX and TXT versions retain evidence and hashes.
+
+Persisted task checkpoints may contain candidate answers and are private local records, not public diagnostics. Routine browser-step diagnostics omit full DOM observations. Checkpoint serialization recursively redacts credential/header/cookie fields and strips authentication parameters and fragments from URLs while retaining job identifiers. Pending submission receipts prevent blind replay after a crash. Restoring a backup is blocked while any child still owns resources, including a parked browser review.
+
+LinkedIn sending has no configured authorised messaging API in this implementation. The application uses an explicit reviewed clipboard/profile handoff and separate manual-send confirmation. It does not scrape private contacts, bypass login/CAPTCHA/MFA, or infer private addresses. Public contact research and user-imported conversations retain their source evidence. Public career entry points are configuration candidates; a configured URL is not advertised as verified availability.

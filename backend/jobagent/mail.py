@@ -13,7 +13,7 @@ from datetime import datetime, timedelta, timezone
 from email import policy
 from email.utils import parsedate_to_datetime
 from typing import Any
-from urllib.parse import urlencode
+from urllib.parse import urlencode, quote, urlparse
 from uuid import uuid4
 
 import httpx
@@ -30,9 +30,15 @@ CATEGORIES = {
             r"(?:selected|proceeding with|moving forward with) other candidates",
             r"not been (?:successful|selected)",
             r"won't be progressing",
+            r"will not be (?:progressing|moving forward|proceeding)",
             r"unable to offer you",
         ],
     ),
+    "POSITION_CANCELLED": ('CLOSED', [r'(?:position|role|vacancy).{0,25}(?:cancelled|canceled|no longer available)']),
+    "APPLICATION_WITHDRAWAL": ('WITHDRAWN', [r'(?:your )?application.{0,20}(?:withdrawn|withdrawal confirmed)']),
+    "INTERVIEW_RESCHEDULED": ('INTERVIEW', [r'interview.{0,40}reschedul', r'reschedul.{0,40}interview']),
+    "NEXT_ROUND_INVITATION": ('FINAL_INTERVIEW', [r'invit.{0,50}final (?:round|interview)']),
+    "APPLICATION_UNDER_REVIEW": ('UNDER_REVIEW', [r'(?:still |currently )?reviewing (?:your )?application', r'application.{0,25}under review']),
     "OFFER": ("OFFER", [r"offer of employment", r"pleased to offer", r"offer letter"]),
     "CODING_TEST": (
         "TECHNICAL_TEST",
@@ -150,6 +156,12 @@ def classify_message(subject: str, body: str, received_at: str | None = None) ->
                 result["deadline_evidence"] = absolute.group(0)
         except (ValueError, OverflowError):
             pass
+    event_types = {'CODING_TEST': 'TECHNICAL_TEST_INVITATION', 'INTERVIEW_REQUEST': 'INTERVIEW_INVITATION', 'RECRUITER_MESSAGE': 'RECRUITER_OUTREACH', 'DOCUMENT_REQUEST': 'ADDITIONAL_INFORMATION_REQUEST'}
+    result['event_type'] = event_types.get(result['category'], result['category'])
+    result['sentiment'] = 'NEGATIVE' if result['category'] in ('REJECTION','POSITION_CANCELLED') else 'NEUTRAL' if result['category'] in ('APPLICATION_CONFIRMATION','APPLICATION_UNDER_REVIEW','APPLICATION_WITHDRAWAL','OTHER') else 'POSITIVE' if result['status'] else 'UNCERTAIN'
+    if re.search(r'newsletter|unsubscribe|marketing preferences|weekly digest', content) and not re.search(r'your (?:application|interview|assessment)|application (?:id|reference)|dear [a-z]+', content):
+        result.update(category='OTHER', event_type='OTHER', status=None, sentiment='NEUTRAL', confidence=1, deadline=None)
+    result['action_required'] = result['event_type'] in ('ASSESSMENT_INVITATION','TECHNICAL_TEST_INVITATION','INTERVIEW_INVITATION','ADDITIONAL_INFORMATION_REQUEST','INTERVIEW_RESCHEDULED')
     result["urls"] = re.findall(r"https?://[^\s<>\"]+", body)[:20]
     result["application_reference"] = next(
         iter(
@@ -173,13 +185,28 @@ def link_candidate(db, message: dict) -> tuple[str | None, float]:
         if len(linked) == 1:
             return linked[0]["application_id"], 0.99
     candidates = db.query(
-        "SELECT a.id,j.company,j.title FROM applications a JOIN jobs j ON a.job_id=j.id ORDER BY a.created_at DESC LIMIT 1000"
+        "SELECT a.id,a.job_id,j.company,j.company_id,j.title,j.identity_key,j.metadata FROM applications a JOIN jobs j ON a.job_id=j.id ORDER BY a.created_at DESC LIMIT 1000"
     )
     text = f"{message['subject']} {message['body']} {message['sender']}".lower()
+    reference = classify_message(message['subject'], message['body'], message.get('received_at')).get('application_reference')
+    if reference:
+        refs = []
+        for candidate in candidates:
+            external = db.query('SELECT external_id FROM job_sources WHERE job_id=?', (candidate['job_id'],))
+            values = [r['external_id'] for r in external if r['external_id']]
+            meta = json.loads(candidate['metadata'] or '{}')
+            values += [meta.get('requisition_id'), meta.get('application_id'), candidate['identity_key'].split(':')[-1]]
+            if reference.casefold() in {str(v).casefold() for v in values if v}:
+                refs.append(candidate['id'])
+        if len(refs) == 1:
+            return refs[0], 0.99
     scores = []
     for candidate in candidates:
-        company = candidate["company"].strip().lower()
-        if len(company) < 3 or not re.search(r"\b" + re.escape(company) + r"\b", text):
+        companies = [candidate['company']]
+        if candidate.get('company_id'):
+            companies += [r['alias'] for r in db.query('SELECT alias FROM company_aliases WHERE company_id=?', (candidate['company_id'],))]
+        companies += {'Citigroup': ['Citi'], 'JPMorgan Chase': ['J.P. Morgan', 'JP Morgan'], 'University College London (UCL)': ['UCL']}.get(candidate['company'], [])
+        if not any(len(company.strip()) >= 3 and re.search(r'\b'+re.escape(company.strip().lower())+r'\b', text) for company in companies):
             continue
         words = [x for x in re.findall(r"\w+", candidate["title"].lower()) if len(x) > 2]
         title_fit = sum(bool(re.search(r"\b" + re.escape(word) + r"\b", text)) for word in words) / max(1, len(words))
@@ -250,7 +277,8 @@ def ingest_message(db, message: dict, provider: str = "import") -> dict:
                 json.dumps(metadata),
             ),
         )
-        if application_id and classification["status"] and classification["confidence"] >= 0.9:
+        later = conn.execute("SELECT id FROM email_messages WHERE application_id=? AND id!=? AND julianday(received_at)>julianday(?) AND classification!='OTHER' LIMIT 1", (application_id, message_id, message.get('received_at', utcnow()))).fetchone() if application_id else None
+        if application_id and classification["status"] and classification["confidence"] >= 0.9 and not later:
             db.event(
                 application_id,
                 classification["status"],
@@ -259,6 +287,7 @@ def ingest_message(db, message: dict, provider: str = "import") -> dict:
                 conn=conn,
             )
             if classification["category"] == "APPLICATION_CONFIRMATION":
+                conn.execute("UPDATE application_submissions SET state='CONFIRMED',evidence=?,updated_at=? WHERE application_id=? AND state IN ('SUBMISSION_PENDING','SUBMISSION_UNCONFIRMED')", (json.dumps({'email_id': message_id}), utcnow(), application_id))
                 conn.execute(
                     "UPDATE automation_runs SET status='confirmed',checkpoint=json_set(checkpoint,'$.email_confirmation',?),updated_at=? WHERE application_id=? AND status IN ('interrupted','unconfirmed')",
                     (message_id, utcnow(), application_id),
@@ -385,6 +414,7 @@ class MailService:
         self.credential_waits: dict[object, str] = {}
         self.sync_provider: str | None = None
         self.messages_read = 0
+        self.cursor_updates = {}
 
     def status(self):
         return {
@@ -404,7 +434,7 @@ class MailService:
         request = object()
         self.credential_waits[request] = name.split(":", 1)[0]
         try:
-            return await asyncio.to_thread(getattr(self.secrets, operation), name, *values)
+            return await asyncio.wait_for(asyncio.to_thread(getattr(self.secrets, operation), name, *values), 30)
         except KeyringError:
             raise MailCredentialError(
                 "macOS Keychain did not allow credential access. Allow Meridian in the Keychain prompt, then try again."
@@ -585,16 +615,34 @@ class MailService:
                 if row and row["last_sync"]:
                     query = f"after:{int(datetime.fromisoformat(row['last_sync']).timestamp()) - 300}"
                 messages, page_token = [], None
+                history = config.get('gmail_history_id')
+                history_cursor = None
                 for _ in range(20):
                     params = {"maxResults": 100, "q": query}
                     if page_token:
                         params["pageToken"] = page_token
-                    response = await client.get(
-                        "https://gmail.googleapis.com/gmail/v1/users/me/messages", params=params
-                    )
+                    if history:
+                        history_params = {'startHistoryId': history, 'historyTypes': 'messageAdded', 'maxResults': 100}
+                        if page_token:
+                            history_params['pageToken'] = page_token
+                        response = await client.get('https://gmail.googleapis.com/gmail/v1/users/me/history', params=history_params)
+                        if response.status_code == 404:
+                            history, page_token = None, None
+                            response = await client.get('https://gmail.googleapis.com/gmail/v1/users/me/messages', params={'maxResults': 100, 'q': query})
+                    else:
+                        if config.get('label_ids'):
+                            params['labelIds'] = config['label_ids']
+                        response = await client.get('https://gmail.googleapis.com/gmail/v1/users/me/messages', params=params)
                     response.raise_for_status()
                     payload = response.json()
-                    for item in payload.get("messages", []):
+                    if payload.get('historyId'):
+                        history_cursor = str(payload['historyId'])
+                    items = [entry['message'] for h in payload.get('history', []) for entry in h.get('messagesAdded', [])] if history else payload.get('messages', [])
+                    seen = set()
+                    for item in items:
+                        if item['id'] in seen:
+                            continue
+                        seen.add(item['id'])
                         if self.db.one(
                             "SELECT id FROM email_messages WHERE provider='gmail' AND external_id=?", (item["id"],)
                         ):
@@ -605,6 +653,10 @@ class MailService:
                         )
                         detail.raise_for_status()
                         record = detail.json()
+                        if config.get('label_ids') and not set(config['label_ids']).intersection(record.get('labelIds', [])):
+                            continue
+                        if record.get('historyId') and not history:
+                            history_cursor = str(max(int(history_cursor or 0), int(record['historyId'])))
                         raw = record["raw"]
                         message = parse_message(base64.urlsafe_b64decode(raw + "=" * (-len(raw) % 4)))
                         message.update(external_id=item["id"])
@@ -613,6 +665,8 @@ class MailService:
                         self.messages_read += 1
                     page_token = payload.get("nextPageToken")
                     if not page_token:
+                        if history_cursor:
+                            self.cursor_updates[provider] = {'gmail_history_id': history_cursor}
                         return messages
                 raise ValueError("Gmail sync exceeded 2000 messages; narrow the mailbox or sync window")
             if provider == "outlook":
@@ -622,21 +676,25 @@ class MailService:
                     if row and row["last_sync"]
                     else (datetime.now(timezone.utc) - timedelta(days=30)).isoformat()
                 )
-                url = "https://graph.microsoft.com/v1.0/me/messages?" + urlencode(
-                    {
-                        "$top": 100,
-                        "$filter": f"receivedDateTime ge {since}",
-                        "$select": "id,subject,from,body,receivedDateTime,conversationId",
-                    }
-                )
+                folder = quote(str(config.get('folder_id') or 'inbox'), safe='')
+                url = config.get('outlook_delta_url') or ('https://graph.microsoft.com/v1.0/me/mailFolders/'+folder+'/messages/delta?' + urlencode({
+                    '$top': 100, '$filter': f'receivedDateTime ge {since}',
+                    '$select': 'id,subject,from,body,receivedDateTime,conversationId'}))
                 messages = []
                 for _ in range(20):
-                    if not url.startswith("https://graph.microsoft.com/"):
-                        raise ValueError("Invalid Microsoft pagination URL")
-                    response = await client.get(url, headers={"Prefer": 'outlook.body-content-type="text"'})
+                    parsed_url = urlparse(url)
+                    if parsed_url.scheme != 'https' or parsed_url.hostname != 'graph.microsoft.com' or parsed_url.username or parsed_url.password or parsed_url.port not in (None,443):
+                        raise ValueError('Invalid Microsoft pagination URL')
+                    response = await client.get(url, headers={'Prefer': 'outlook.body-content-type="text", IdType="ImmutableId"'})
+                    if response.status_code == 410 and config.get('outlook_delta_url'):
+                        config.pop('outlook_delta_url', None)
+                        self.db.execute('UPDATE integrations SET config=? WHERE provider=?', (json.dumps(config), provider))
+                        return await self.fetch(provider)
                     response.raise_for_status()
                     payload = response.json()
                     for item in payload.get("value", []):
+                        if '@removed' in item:
+                            continue
                         messages.append(
                             {
                                 "external_id": item["id"],
@@ -649,6 +707,8 @@ class MailService:
                         )
                     url = payload.get("@odata.nextLink")
                     if not url:
+                        if payload.get('@odata.deltaLink'):
+                            self.cursor_updates[provider] = {'outlook_delta_url': payload['@odata.deltaLink']}
                         return messages
                 raise ValueError("Outlook sync exceeded 2000 messages")
         raise ValueError("Unsupported email provider")
@@ -695,12 +755,18 @@ class MailService:
             )
             for row in integrations:
                 provider = row["provider"]
+                self.cursor_updates.pop(provider, None)
                 self.sync_provider = provider
                 started = utcnow()
                 try:
-                    messages = await self.fetch(provider)
+                    messages = await asyncio.wait_for(self.fetch(provider), 120)
                     for message in messages:
                         results.append(ingest_message(self.db, message, provider))
+                    cursor_update = self.cursor_updates.pop(provider, None)
+                    if cursor_update:
+                        config = self.config(provider)
+                        config.update(cursor_update)
+                        self.db.execute('UPDATE integrations SET config=? WHERE provider=?', (json.dumps(config), provider))
                     if provider == "imap" and messages:
                         config = self.config(provider)
                         generation, uid = messages[-1]["external_id"].rsplit(":", 2)[-2:]

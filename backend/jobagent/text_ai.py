@@ -20,7 +20,7 @@ class TextService:
         self.lock = asyncio.Lock()
 
     async def draft(self, settings: dict, question: str, job: dict, fact_ids: list[str]):
-        async with self.lock:
+        async with asyncio.timeout(100), self.lock:
             return await self._draft(settings, question, job, fact_ids)
 
     def uses_grounded_cover_letter(self, question):
@@ -33,11 +33,11 @@ class TextService:
         """Bounded draft for one observed field, never a verified candidate fact."""
         if settings.get('text_provider', 'none') == 'none':
             return None
-        async with self.lock:
+        async with asyncio.timeout(100), self.lock:
             return await self._draft(settings, question, job, fact_ids, _field=field)
 
     async def test(self, settings: dict):
-        async with self.lock:
+        async with asyncio.timeout(100), self.lock:
             return await self._draft(
                 settings,
                 "Write one short sentence naming the sample candidate. This is only a connection test.",
@@ -167,7 +167,7 @@ class TextService:
         model = settings.get("text_model")
         if not model:
             raise ValueError("Configure a text model name")
-        key = self.secrets.get(f"{provider}:secret") if not local else None
+        key = await asyncio.wait_for(asyncio.to_thread(self.secrets.get, f"{provider}:secret"), 15) if not local else None
         if not local and not key:
             raise ValueError("Store this provider's API key in Keychain first")
         headers = {"Authorization": f"Bearer {key}"} if key else {}

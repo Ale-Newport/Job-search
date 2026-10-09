@@ -32,6 +32,15 @@ class BrowserManager(BrowserSession):
         self.decision_engine = None  # Optional injected engine, useful for integration tests.
         self._section_review = {}
         self._omitted = {}
+        self.form_state = 'OPEN_APPLICATION'
+        self.completed_steps = []
+        self._checkpoint_answers = []
+        self._checkpoint_documents = []
+
+    def _invalidate_approvals(self):
+        super()._invalidate_approvals()
+        self._review.clear()
+        self._section_review.clear()
 
     async def authorize_section(self, application_id, snapshot_id):
         review = self._section_review.get(snapshot_id)
@@ -55,6 +64,7 @@ class BrowserManager(BrowserSession):
                   "evidence": evidence or [], "omitted": list(self._omitted.values()), "snapshot_id": snapshot["id"] if snapshot else None,
                   "current_url": snapshot["url"] if snapshot else self.status()["current_url"],
                   "adapter": adapter, "error": error, "application_id": self._active_application_id,
+                  "form_state": self.form_state, "completed_steps": self.completed_steps, "documents": self._checkpoint_documents,
                   "validation_errors": snapshot.get("errors", []) if snapshot else [],
                   "sensitive": any(a.get("kind") in {"disability", "ethnicity", "gender", "criminal_record",
                                                        "demographic", "legal_certification"} for a in answers or [])}
@@ -67,22 +77,26 @@ class BrowserManager(BrowserSession):
             return await self._fill(application, facts, documents, mode, settings or {})
 
     async def _fill(self, application: dict, facts: list[dict], documents: list[dict], mode: str, settings: dict) -> dict:
-        url = application.get("application_url") or application.get("url")
-        if not url:
-            return self._result("error", None, error="This application has no URL.")
-        adapter = get_adapter(url, application.get("ats"))
         same_application = self._active_application_id == application.get("id")
         self._active_application_id = application.get("id")
         self._review.clear()
         self._section_review.clear()
         self._omitted.clear()
+        url = application.get("application_url") or application.get("url")
+        if not url:
+            return self._result("error", None, error="This application has no URL.")
+        adapter = get_adapter(url, application.get("ats"))
         section_consent = bool(settings.get("section_consent"))
         skip_optional = bool(settings.get("skip_optional_unknown"))
         section_grant = {tuple(key) for key in settings.get("_section_grant", [])}
         if mode.upper() == "MANUAL":
             return self._result("needs_review", None, adapter=adapter.name,
                                 questions=[{"question": "Manual mode: open and complete the prepared application yourself.", "kind": "manual"}])
+        self.form_state = 'IDENTIFY_FORM'
+        self.completed_steps = list(settings.get('_resume_completed_steps', []))
+        self._checkpoint_documents = [{'id': d.get('id'), 'filename': d.get('filename'), 'content_hash': d.get('content_hash')} for d in documents]
         answers: list[dict] = []
+        self._checkpoint_answers = answers
         questions: list[dict] = []
         steps: list[dict] = []
         snapshot = None
@@ -129,13 +143,17 @@ class BrowserManager(BrowserSession):
                 return self._result("human_required", snapshot, adapter=adapter.name,
                                     questions=[{"question": "This source uses manual handoff. Complete the application in the visible browser.",
                                                 "kind": "platform_restriction"}])
-            max_steps = min(100, max(1, int(settings.get("browser_max_steps", 45))))
+            max_steps = min(100, max(1, int(settings.get("browser_max_steps", 100))))
             handled: set[tuple] = set()
             page_advances = 0
             stale_retries = 0
+            form_seen = False
+            dismissed_cookies = set()
+            field_attempts = {}
             pending_dropdown = None
             cleared_disclosures = set()
             while len(steps) < max_steps:
+                self.form_state = 'ANALYSE_CURRENT_STEP'
                 job_context = enrich_job_context(settings.get('_job_context', application), snapshot)
                 settings['_job_context'] = job_context
                 policies['_job_context'] = job_context
@@ -147,6 +165,22 @@ class BrowserManager(BrowserSession):
                     if disclosure_policy:
                         policies['personal_disclosures'] = disclosure_policy['value']
                 self._check_pause()
+                form_seen = form_seen or any(any(op in e['operations'] for op in ('TYPE_TEXT','SELECT','CHECK','UPLOAD')) for e in snapshot['elements'])
+                cookie_text = ' '.join(frame.get('text','') for frame in snapshot.get('frames',[]))
+                if re.search(r'cookies?|privacy preferences', cookie_text, re.I):
+                    declines = [e for e in snapshot['elements'] if e.get('role')=='button' and 'CLICK' in e['operations'] and (e['document_id'],e['node_id']) not in dismissed_cookies and re.fullmatch(r'(?:reject|decline)(?: all(?: cookies)?| optional cookies| non-essential cookies)|only necessary(?: cookies)?|necessary cookies only',e.get('label','').strip(),re.I)]
+                    if len(declines)==1:
+                        try:
+                            await self._record_step(await self.execute(Decision(Operation.CLICK,declines[0]['index']),snapshot),steps,snapshot)
+                            dismissed_cookies.add((declines[0]['document_id'],declines[0]['node_id']))
+                            snapshot = await self.wait_until_ready()
+                            continue
+                        except StaleState:
+                            if stale_retries>=5:
+                                raise
+                            stale_retries+=1
+                            snapshot = await self.wait_until_ready()
+                            continue
                 if snapshot["blocked"]:
                     reason = "Human verification required" if snapshot["challenge"] else "Complete sign-in or multi-factor authentication in the visible browser."
                     return self._result("human_required", snapshot, answers=answers, steps=steps, adapter=adapter.name,
@@ -182,7 +216,7 @@ class BrowserManager(BrowserSession):
                     try:
                         await self._record_step(await self.execute(Decision(Operation.CLICK, choices[0]["index"]), snapshot), steps, snapshot)
                     except StaleState:
-                        if section_consent or not settings.get('assisted_autofill') or stale_retries >= 5:
+                        if section_consent or stale_retries >= 5:
                             raise
                         stale_retries += 1
                         snapshot = await self.observe()
@@ -285,7 +319,11 @@ class BrowserManager(BrowserSession):
                         candidates = self._documents_for(field, documents)
                         if len(candidates) != 1:
                             if element.get("required") or (not skip_optional and not element.get("value")):
-                                questions.append({"question": field or "Select a document to upload", "kind": "document", "target": element["index"]})
+                                generator = settings.get('_generate_required_document')
+                                kind = 'cover_letter' if 'cover' in normalize(field) else 'cv' if re.search(r'resume|\bcv\b', normalize(field)) else None
+                                draft_id = await generator(kind) if generator and kind and not candidates else None
+                                questions.append({"question": field or "Select a document to upload", "kind": "document", "target": element["index"],
+                                                  **({'document_draft_id': draft_id, 'reason': 'A grounded draft is saved in Documents. Review and approve it before attaching.'} if draft_id else {})})
                             continue
                         document = candidates[0]
                         filename = Path((document.get("filename") or document["path"]).replace("\\", "/")).name
@@ -355,6 +393,12 @@ class BrowserManager(BrowserSession):
                         break
                     handled.add(signature)
                 if action:
+                    self.form_state = 'FILL_FIELDS'
+                    target = next(e for e in snapshot['elements'] if e['index']==action.target)
+                    semantic_action = (snapshot['url'], len(self.completed_steps), adapter.question(target), target.get('name'), target.get('type'), action.operation.value, str(value), upload_name)
+                    if field_attempts.get(semantic_action,0)>=3:
+                        return self._result('human_required',snapshot,answers=answers,steps=steps,adapter=adapter.name,
+                                            questions=[{'question':adapter.question(target),'kind':'validation','reason':'The website repeatedly reset or transformed this verified value. Review the control in the browser.'}])
                     if section_consent:
                         target = next(e for e in snapshot["elements"] if e["index"] == action.target)
                         key = action_key(target, action.operation, value, file_path, upload_name)
@@ -372,13 +416,16 @@ class BrowserManager(BrowserSession):
                         # ATSs hydrate and validate asynchronously while fields are filled.
                         # The rejected operation made no write. Re-observe and resolve from
                         # verified facts again; never reuse an old target or section approval.
-                        if section_consent or not settings.get("assisted_autofill") or stale_retries >= 5:
+                        if section_consent or stale_retries >= 5:
                             raise
                         stale_retries += 1
                         handled.clear()
                         pending_dropdown = None
                         snapshot = await self.wait_until_ready()
                         continue
+                    if action.operation == Operation.UPLOAD:
+                        result['document_version_id'] = document.get('id')
+                    field_attempts[semantic_action] = field_attempts.get(semantic_action,0)+1
                     await self._record_step(result, steps, snapshot)
                     cleared = next((e for e in snapshot["elements"] if e["index"] == action.target), None)
                     if cleared and disclosure_resolution(adapter.question(cleared), cleared, policies):
@@ -423,10 +470,14 @@ class BrowserManager(BrowserSession):
                 if snapshot["errors"]:
                     return self._result("human_required", snapshot, answers=answers, steps=steps, adapter=adapter.name,
                                         questions=[{"question": e, "kind": "validation"} for e in snapshot["errors"]])
-                entry_only = (section_consent or settings.get("assisted_autofill")) and not any(
-                    any(op in e["operations"] for op in ("TYPE_TEXT", "SELECT", "CHECK", "UPLOAD")) for e in snapshot["elements"])
+                has_inputs = any(any(op in e['operations'] for op in ('TYPE_TEXT','SELECT','CHECK','UPLOAD')) for e in snapshot['elements'])
+                # A listing's Apply button is not evidence of a completed form.
+                # With no candidate controls or completed workflow, navigate only
+                # an observed GET link or ask for entry/authentication help.
+                entry_only = not has_inputs and (section_consent or settings.get('assisted_autofill') or not form_seen)
                 submit = None if entry_only else adapter.submit_button(snapshot)
                 if submit:
+                    self.form_state = 'FINAL_REVIEW'
                     self._review[snapshot["id"]] = {"application_id": self._active_application_id, "adapter": adapter.name,
                                                     "mode": mode.upper(), "answers": answers, "steps": steps,
                                                     "sensitive": any(a.get("kind") in {"disability", "ethnicity", "gender", "criminal_record", "demographic", "legal_certification"} for a in answers)}
@@ -440,7 +491,7 @@ class BrowserManager(BrowserSession):
                     next_button = links[0] if len(links) == 1 else None
                     if next_button:
                         next_button['_decision'] = Decision(Operation.OPEN_TAB, next_button['index'])
-                if next_button and page_advances < 8:
+                if next_button and page_advances < 30:
                     previous = snapshot["fingerprint"]
                     decision = next_button.pop("_decision", None) or Decision(Operation.CLICK, next_button["index"])
                     if section_consent:
@@ -450,7 +501,9 @@ class BrowserManager(BrowserSession):
                                 [{"question": "Continue in the employer's form", "answer": next_button["label"], "operation": "CLICK"}],
                                 answers, steps, adapter.name, "continue")
                         section_grant.remove(key)
+                    self.form_state = 'CONTINUE_TO_NEXT_STEP'
                     await self._record_step(await self.execute(decision, snapshot), steps, snapshot)
+                    self.completed_steps.append({'url': snapshot['url'], 'labels': [adapter.question(e) for e in snapshot['elements'] if e.get('role') not in ('button','link')]})
                     page_advances += 1
                     snapshot = await self._wait_for_change(previous)
                     snapshot = await self.wait_until_ready()
@@ -463,7 +516,10 @@ class BrowserManager(BrowserSession):
             return self._result("blocked", snapshot, answers=answers, steps=steps, adapter=adapter.name,
                                 error="The bounded browser step budget was reached.")
         except (HumanRequired, StaleState, Paused) as error:
-            return self._result("human_required", snapshot, answers=answers, steps=steps, adapter=adapter.name,
+            # A browser that never opened is a failed preparation, not a form
+            # waiting for candidate input in an invisible review session.
+            status = 'error' if snapshot is None and not isinstance(error, Paused) else 'human_required'
+            return self._result(status, snapshot, answers=answers, steps=steps, adapter=adapter.name,
                                 questions=[{"question": str(error), "kind": error.code}], error=str(error))
         except Exception as error:
             self._last_error = str(error)[:500]
@@ -550,7 +606,9 @@ class BrowserManager(BrowserSession):
         steps.append(step)
         if self.on_step:
             outcome = self.on_step({**step, "application_id": self._active_application_id,
-                                    "snapshot_id": snapshot["id"], "observation": snapshot})
+                                    "snapshot_id": snapshot["id"], "observation": snapshot,
+                                    "form_state": self.form_state, "completed_steps": self.completed_steps,
+                                    "answers": self._checkpoint_answers, "documents": self._checkpoint_documents})
             if inspect.isawaitable(outcome):
                 await outcome
 
@@ -602,4 +660,8 @@ class BrowserManager(BrowserSession):
             return [d for d in valid if d.get("kind") == "cover_letter"]
         if "transcript" in label:
             return [d for d in valid if d.get("kind") == "transcript"]
+        if re.search(r'degree|certificate', label):
+            return [d for d in valid if d.get('kind') in {'degree_certificate', 'certificate'}]
+        if 'portfolio' in label:
+            return [d for d in valid if d.get('kind') == 'portfolio']
         return []  # An arbitrary attachment is not necessarily a CV.

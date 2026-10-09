@@ -21,8 +21,9 @@ class MemorySecrets:
 
 
 @pytest.fixture
-def workspace(tmp_path):
-    app = create_app(tmp_path, token="onboarding-test", secret_store=MemorySecrets(), start_scheduler=False)
+def workspace(tmp_path, monkeypatch):
+    monkeypatch.setenv("MERIDIAN_TEST", "1")
+    app = create_app(tmp_path, worker_isolation=False, token="onboarding-test", secret_store=MemorySecrets(), start_scheduler=False)
     with TestClient(app, headers={"Authorization": "Bearer onboarding-test"}) as client:
         yield app, client
 

@@ -144,17 +144,18 @@ _migration_lock = threading.Lock()
 
 
 class Database:
-    def __init__(self, path: str | Path):
+    def __init__(self, path: str | Path, *, migrate=True):
         self.path = Path(path)
         self.path.parent.mkdir(parents=True, exist_ok=True)
-        with _migration_lock:
-            self._migrate()
+        if migrate:
+            with _migration_lock:
+                self._migrate()
 
     def _connect(self):
-        conn = sqlite3.connect(str(self.path), timeout=30, isolation_level=None)
+        conn = sqlite3.connect(str(self.path), timeout=2, isolation_level=None)
         conn.row_factory = sqlite3.Row
         conn.execute("PRAGMA foreign_keys=ON")
-        conn.execute("PRAGMA busy_timeout=30000")
+        conn.execute("PRAGMA busy_timeout=2000")
         conn.execute("PRAGMA journal_mode=WAL")
         return conn
 
@@ -217,6 +218,10 @@ class Database:
                 "APPLYING": 1,
                 "APPLIED": 2,
                 "CONFIRMED": 3,
+                "UNDER_REVIEW": 3,
+                "SUBMISSION_PENDING": 1,
+                "SUBMISSION_UNCONFIRMED": 1,
+                "CLOSED": 9,
                 "RECRUITER_SCREEN": 4,
                 "ASSESSMENT": 5,
                 "TECHNICAL_TEST": 5,
@@ -228,7 +233,7 @@ class Database:
             }
             current = app["status"]
             progress = origin != "email" or (
-                current not in {"REJECTED", "WITHDRAWN"} and ranks.get(status, 99) >= ranks.get(current, 0)
+                current not in {"REJECTED", "WITHDRAWN", "CLOSED", "OFFER"} and ranks.get(status, 99) >= ranks.get(current, 0)
             )
             stamp = now()
             conn.execute(

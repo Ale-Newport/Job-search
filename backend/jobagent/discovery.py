@@ -165,6 +165,8 @@ def normalize_job(raw: dict, source="manual") -> dict:
         result["remote"] = metadata["work_arrangement"] == "remote"
     elif result["remote"] is True:
         metadata["work_arrangement"] = "remote"
+    from .job_validity import deadline_evidence
+    result.update(deadline_evidence(result))
     return result
 
 
@@ -219,7 +221,7 @@ def ingest_job(db, raw: dict, source_id: str | None = None) -> tuple[dict, bool]
     job = normalize_job(raw)
     stamp = now()
     duplicate = False
-    payload_hash = hashlib.sha256(dumps(job).encode()).hexdigest()
+    payload_hash = hashlib.sha256(dumps({k: v for k, v in job.items() if k != 'deadline_verified_at'}).encode()).hexdigest()
     with db.transaction() as conn:
         existing = conn.execute(
             "SELECT * FROM jobs WHERE canonical_url=? OR identity_key=?", (job["canonical_url"], job["identity_key"])
@@ -292,6 +294,13 @@ def ingest_job(db, raw: dict, source_id: str | None = None) -> tuple[dict, bool]
                 conn.execute("INSERT OR IGNORE INTO skills(id,name) VALUES(?,?)", (uid(), skill))
                 skill_id = conn.execute("SELECT id FROM skills WHERE name=?", (skill,)).fetchone()[0]
                 conn.execute("INSERT OR IGNORE INTO job_skills VALUES(?,?,0)", (job_id, skill_id))
+        from .job_validity import deadline_evidence
+        deadlines = deadline_evidence(job)
+        # A partial aggregator record must not erase a published employer deadline.
+        prior_deadline = conn.execute('SELECT application_deadline FROM jobs WHERE id=?', (job_id,)).fetchone()[0]
+        if deadlines['application_deadline'] or not prior_deadline:
+            conn.execute('UPDATE jobs SET application_deadline=?,deadline_timezone=?,deadline_source=?,deadline_state=?,deadline_verified_at=? WHERE id=?',
+                         (deadlines['application_deadline'], deadlines['deadline_timezone'], deadlines['deadline_source'], deadlines['deadline_state'], deadlines['deadline_verified_at'], job_id))
         metadata = json.loads(conn.execute("SELECT metadata FROM jobs WHERE id=?", (job_id,)).fetchone()[0] or "{}")
         provenance = metadata.get("discovery_sources", [])
         entry = {
@@ -547,7 +556,7 @@ async def discover(source: dict) -> list[dict]:
     parts = [x for x in urlsplit(url).path.split("/") if x]
     board = str(config.get("board") or config.get("company") or (parts[0] if parts else ""))
     if kind in {"greenhouse", "lever", "ashby"}:
-        if not re.fullmatch(r"[A-Za-z0-9_-]{1,120}", board):
+        if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,119}", board):
             raise ValueError("Configure a valid public ATS board identifier")
         if kind == "greenhouse":
             url = f"https://boards-api.greenhouse.io/v1/boards/{quote(board)}/jobs?content=true"
@@ -567,6 +576,38 @@ async def discover(source: dict) -> list[dict]:
             jobs = parse_lever(items, board)
         else:
             jobs = parse_greenhouse(data, board) if kind == "greenhouse" else parse_ashby(data, board)
+    elif kind == 'workday' and (urlsplit(url).hostname or '').endswith('.myworkdayjobs.com'):
+        parsed = urlsplit(url)
+        tenant = parsed.hostname.split('.')[0]
+        site = board
+        if parts and re.fullmatch(r'[a-z]{2}-[A-Z]{2}',parts[0]) and len(parts)>1 and not config.get('board'):
+            site = parts[1]
+        if not re.fullmatch(r'[A-Za-z0-9_-]{1,120}',site):
+            raise ValueError('Invalid public Workday site identifier')
+        endpoint = f'https://{parsed.hostname}/wday/cxs/{tenant}/{site}/jobs'
+        await validate_public_url(endpoint)
+        jobs=[]
+        maximum=min(MAX_JOBS,max(1,int(config.get('max_jobs',100))))
+        async with httpx.AsyncClient(timeout=25,trust_env=False) as client:
+            for offset in range(0,maximum,20):
+                async with client.stream('POST',endpoint,json={'limit':min(20,maximum-offset),'offset':offset,'searchText':'','appliedFacets':{}}) as response:
+                    response.raise_for_status()
+                    content=bytearray()
+                    async for chunk in response.aiter_bytes():
+                        content.extend(chunk)
+                        if len(content)>MAX_BODY:
+                            raise ValueError('Workday board response exceeds the download limit')
+                page=json.loads(content)
+                postings=page.get('jobPostings',[])
+                for posting in postings:
+                    path=posting.get('externalPath')
+                    if not path:
+                        continue
+                    jobs.append({'title':posting['title'],'company':config.get('company_name',tenant),
+                                 'url':f'https://{parsed.hostname}/{site}'+path,'location':posting.get('locationsText',''),
+                                 'ats':'workday','metadata':{'public_board':endpoint,'requisition_ids':posting.get('bulletFields',[]),'description_state':'NOT_PUBLISHED_IN_LISTING'}})
+                if len(postings)<20 or offset+len(postings)>=page.get('total',0):
+                    break
     elif kind == "smartrecruiters":
         if not re.fullmatch(r"[A-Za-z0-9_-]{1,120}", board):
             raise ValueError("Configure a SmartRecruiters company identifier")
@@ -720,12 +761,18 @@ async def discover(source: dict) -> list[dict]:
             if not jobs:
                 soup = BeautifulSoup(text, "html.parser")
                 boards = {}
-                for anchor in soup.find_all("a", href=True):
-                    link = urljoin(final, anchor["href"])
+                references = [node.get('href') or node.get('src') for node in soup.select('a[href],iframe[src]')]
+                # Some server-rendered React pages embed the actual board URL in
+                # JSON instead of an anchor. Read only explicit HTTPS references.
+                references.extend(re.findall(r'https://(?:jobs\.(?:eu\.)?lever\.co|(?:job-)?boards\.(?:eu\.)?greenhouse\.io|job-boards\.greenhouse\.io|jobs\.ashbyhq\.com)/[^\s<>"\x27\\]+', text.replace('\\/', '/')))
+                for reference in references:
+                    link = urljoin(final, reference)
                     ats, _ = ats_identity(link)
                     path = [x for x in urlsplit(link).path.split("/") if x]
                     if ats in {"greenhouse", "lever", "ashby"} and path:
-                        boards[(ats, path[0])] = link
+                        from urllib.parse import parse_qs
+                        slug = parse_qs(urlsplit(link).query).get('for', [path[0]])[0] if ats == 'greenhouse' else path[0]
+                        boards[(ats, slug)] = link
                 for (ats, slug), link in list(boards.items())[:4]:
                     jobs.extend(await discover({"kind": ats, "url": link, "config": {"board": slug}}))
                 if not boards:
@@ -775,53 +822,56 @@ async def run_sources(db, data_dir=None, source_id=None, due_only=False):
 
 
 async def _run_sources(db, data_dir=None, source_id=None, due_only=False):
-    sources = db.query(
-        "SELECT * FROM sources WHERE enabled=1" + (" AND id=?" if source_id else ""), (source_id,) if source_id else ()
-    )
+    sources = db.query("SELECT * FROM sources WHERE enabled=1" + (" AND id=?" if source_id else ""), (source_id,) if source_id else ())
     if source_id and not sources:
-        raise ValueError("Enabled source not found")
-    results = []
-    for source in sources:
-        if json.loads(source["config"] or "{}").get("delivery") == "email":
-            continue
-        if due_only and source["last_checked"]:
+        raise ValueError('Enabled source not found')
+    gate = asyncio.Semaphore(4)
+
+    async def scan(source):
+        if json.loads(source['config'] or '{}').get('delivery') == 'email':
+            return {'source_id': source['id'], 'name': source['name'], 'jobs_found': 0, 'new_jobs': 0,
+                    'duplicates': 0, 'error': None, 'state': 'EMAIL_DELIVERY'}
+        if due_only and source['last_checked']:
             try:
-                elapsed = (datetime.now(timezone.utc) - datetime.fromisoformat(source["last_checked"])).total_seconds()
-                if elapsed < source["poll_minutes"] * 60:
-                    continue
+                if (datetime.now(timezone.utc)-datetime.fromisoformat(source['last_checked'])).total_seconds() < source['poll_minutes']*60:
+                    return None
             except ValueError:
                 pass
-        count = duplicate_count = 0
+        count = duplicates = 0
+        observed_ids = []
         errors = []
-        try:
-            jobs = await discover(decode_row(source))
-            for job in jobs:
-                try:
-                    _, duplicate = await asyncio.to_thread(ingest_job, db, job, source["id"])
-                    count += 1
-                    duplicate_count += int(duplicate)
-                except (ValueError, KeyError, TypeError) as exc:
-                    errors.append(str(exc)[:200])
-            error = "; ".join(errors[:3]) or None
-        except (httpx.HTTPError, ValueError, KeyError, TypeError, OSError, ET.ParseError) as exc:
-            error = f"{type(exc).__name__}: {str(exc)[:400]}"
-        db.execute(
-            "UPDATE sources SET last_checked=?,last_error=?,jobs_found=?,updated_at=? WHERE id=?",
-            (now(), error, count, now(), source["id"]),
-        )
-        results.append(
-            {
-                "source_id": source["id"],
-                "name": source["name"],
-                "jobs_found": count,
-                "new_jobs": count - duplicate_count,
-                "duplicates": duplicate_count,
-                "error": error,
-            }
-        )
-    return {
-        "items": results,
-        "total": len(results),
-        "jobs_found": sum(x["jobs_found"] for x in results),
-        "new_jobs": sum(x["new_jobs"] for x in results),
-    }
+        scan_id = uid()
+        async with gate:
+            await asyncio.to_thread(db.execute, "INSERT INTO source_scans(id,source_id,state,started_at) VALUES(?,?,'RUNNING',?)", (scan_id, source['id'], now()))
+            try:
+                async with asyncio.timeout(120):
+                    jobs = await discover(decode_row(source))
+                    for job in jobs:
+                        try:
+                            persisted, duplicate = await asyncio.to_thread(ingest_job, db, job, source['id'])
+                            observed_ids.append(persisted['id'])
+                            count += 1
+                            duplicates += int(duplicate)
+                        except (ValueError, KeyError, TypeError) as exc:
+                            errors.append(type(exc).__name__)
+                error = '; '.join(errors[:3]) or None
+                if not error and source['kind'] in ('greenhouse','lever','ashby') and len(jobs) < MAX_JOBS:
+                    # Only complete authoritative boards can prove removal by
+                    # absence. A failed, truncated or generic scan never closes jobs.
+                    def reconcile_board():
+                        with db.transaction() as conn:
+                            previous = conn.execute('SELECT DISTINCT job_id FROM job_sources WHERE source_id=?', (source['id'],)).fetchall()
+                            present = set(observed_ids)
+                            for row in previous:
+                                conn.execute('UPDATE jobs SET availability=?,last_verified=? WHERE id=?', ('OPEN' if row['job_id'] in present else 'CLOSED', now(), row['job_id']))
+                    await asyncio.to_thread(reconcile_board)
+            except Exception as exc:
+                error = f'HTTP {exc.response.status_code}: public career source rejected the request' if isinstance(exc, httpx.HTTPStatusError) else f'{type(exc).__name__}: {str(exc)[:300]}' if isinstance(exc, ValueError) else f'{type(exc).__name__}: source scan failed or exceeded 120s; verify the configured career source'
+            await asyncio.to_thread(db.execute, 'UPDATE sources SET last_checked=?,last_error=?,jobs_found=?,updated_at=? WHERE id=?', (now(), error, count, now(), source['id']))
+            await asyncio.to_thread(db.execute, 'UPDATE source_scans SET state=?,finished_at=?,jobs_found=?,new_jobs=?,error=? WHERE id=?', ('FAILED' if error else 'COMPLETED', now(), count, count-duplicates, error, scan_id))
+        return {'source_id': source['id'], 'name': source['name'], 'jobs_found': count, 'new_jobs': count-duplicates,
+                'duplicates': duplicates, 'error': error}
+
+    results = [r for r in await asyncio.gather(*(scan(source) for source in sources)) if r is not None]
+    return {'items': results, 'total': len(results), 'jobs_found': sum(x['jobs_found'] for x in results),
+            'new_jobs': sum(x['new_jobs'] for x in results)}

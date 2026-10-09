@@ -72,7 +72,7 @@ def wait_for_review(client, run_id):
 
 def test_assisted_autofill_permission_persists_but_never_enables_auto_submit(tmp_path, acceptance_server, monkeypatch):
     monkeypatch.setenv("MERIDIAN_TEST", "1")
-    app = create_app(tmp_path, token="autofill", secret_store=AcceptanceSecrets(), start_scheduler=False)
+    app = create_app(tmp_path, worker_isolation=False, token="autofill", secret_store=AcceptanceSecrets(), start_scheduler=False)
     with TestClient(app, headers={"Authorization": "Bearer autofill"}) as client:
         browser = app.state.automation.browser
         client.portal.call(browser.start, True)
@@ -95,7 +95,7 @@ def test_assisted_autofill_permission_persists_but_never_enables_auto_submit(tmp
 
 def test_api_to_browser_approval_email_deadline_and_timeline(tmp_path, acceptance_server, monkeypatch):
     monkeypatch.setenv("MERIDIAN_TEST", "1")
-    app = create_app(tmp_path, token="acceptance-only-token", secret_store=AcceptanceSecrets(), start_scheduler=False)
+    app = create_app(tmp_path, worker_isolation=False, token="acceptance-only-token", secret_store=AcceptanceSecrets(), start_scheduler=False)
     with TestClient(app, headers={"Authorization": "Bearer acceptance-only-token"}) as client:
         # Headless configuration only: the complete real browser engine runs on the
         # same lifespan loop as the orchestrator and does not mock any interaction.
@@ -214,7 +214,7 @@ def test_api_to_browser_approval_email_deadline_and_timeline(tmp_path, acceptanc
 
 def test_guided_application_requires_each_section_navigation_and_final_consent(tmp_path, acceptance_server, monkeypatch):
     monkeypatch.setenv("MERIDIAN_TEST", "1")
-    app = create_app(tmp_path, token="guided", secret_store=AcceptanceSecrets(), start_scheduler=False)
+    app = create_app(tmp_path, worker_isolation=False, token="guided", secret_store=AcceptanceSecrets(), start_scheduler=False)
     with TestClient(app, headers={"Authorization": "Bearer guided"}) as client:
         browser = app.state.automation.browser
         client.portal.call(browser.start, True)

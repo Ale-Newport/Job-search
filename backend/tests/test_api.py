@@ -22,7 +22,7 @@ class MemorySecrets:
 
 @pytest.fixture
 def api(tmp_path):
-    app = create_app(tmp_path, token="test-only-token", secret_store=MemorySecrets(), start_scheduler=False)
+    app = create_app(tmp_path, worker_isolation=False, token="test-only-token", secret_store=MemorySecrets(), start_scheduler=False)
     with TestClient(app, headers={"Authorization": "Bearer test-only-token"}) as client:
         yield client
 
@@ -235,3 +235,50 @@ def test_oauth_denial_requires_valid_state_and_is_single_use(api):
     assert "<script>" not in denied.text
     assert api.get("/api/integrations").json()["items"][0]["last_error"]
     assert state not in api.app.state.mail.pending
+
+
+def test_cancel_endpoint_releases_run_and_allows_explicit_retry(api, monkeypatch):
+    import asyncio
+
+    async def stalled_form(*args, **kwargs):
+        await asyncio.Event().wait()
+
+    monkeypatch.setattr(api.app.state.automation.browser, 'fill_application', stalled_form)
+    job = api.post('/api/jobs', json={
+        'title': 'Recovery fixture', 'company': 'Local fixture', 'url': 'https://example.test/recovery',
+    }).json()
+    application = api.post(f"/api/jobs/{job['id']}/prepare", json={'mode': 'review'}).json()
+    application_id = application['id']
+    assert api.post('/api/automation/resume').status_code == 200
+    started = api.post(f'/api/applications/{application_id}/apply').json()
+    stopped = api.post(f'/api/applications/{application_id}/cancel')
+    assert stopped.status_code == 200, stopped.text
+    assert stopped.json()['status'] == 'error'
+    assert api.get('/api/automation').json()['running'] is False
+    detail = api.get(f'/api/applications/{application_id}').json()
+    assert detail['status'] == 'ERROR'
+    assert detail['runs'][-1]['status'] == 'error'
+    updated = api.patch(f'/api/applications/{application_id}', json={'notes': 'Recovery verified'})
+    assert updated.status_code == 200, updated.text
+    assert updated.json()['notes'] == 'Recovery verified'
+    retried = api.post(f'/api/applications/{application_id}/apply')
+    assert retried.status_code == 200, retried.text
+    assert retried.json()['run_id'] != started['run_id']
+    assert api.post(f'/api/applications/{application_id}/cancel').status_code == 200
+    assert api.post(f'/api/applications/{application_id}/cancel').status_code == 400
+    # A workspace cannot pause another application's browser session.
+    assert api.post(f'/api/applications/{application_id}/takeover').status_code == 400
+
+
+def test_browser_open_holds_application_lock(api, monkeypatch):
+    orchestrator = api.app.state.automation
+
+    async def open_page(url):
+        assert orchestrator.lock.locked()
+        return {'current_url': url}
+
+    monkeypatch.setattr(orchestrator.browser, 'open', open_page)
+    response = api.post('/api/browser/open', json={'url': 'https://example.test/login'})
+    assert response.status_code == 200, response.text
+    assert response.json()['current_url'] == 'https://example.test/login'
+    assert not orchestrator.lock.locked()

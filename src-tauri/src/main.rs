@@ -1,5 +1,8 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod backend_process;
+
+use backend_process::BackendProcess;
 use serde::Serialize;
 #[cfg(unix)]
 use std::os::unix::fs::{MetadataExt, OpenOptionsExt};
@@ -8,7 +11,7 @@ use std::{
     io::{Read, Write},
     net::{TcpListener, TcpStream},
     path::{Path, PathBuf},
-    process::{Child, Command, Stdio},
+    process::{Command, Stdio},
     sync::Mutex,
     time::Duration,
 };
@@ -25,7 +28,7 @@ struct ConnectionInfo {
     token: String,
 }
 struct Backend {
-    child: Mutex<Child>,
+    process: Mutex<BackendProcess>,
     connection: ConnectionInfo,
     port: u16,
     data_root: PathBuf,
@@ -37,22 +40,17 @@ fn show_review_window(app: tauri::AppHandle) -> Result<(), String> {
         .get_webview_window("main")
         .ok_or("Main window unavailable")?;
     window.show().map_err(|error| error.to_string())?;
+    window.unminimize().map_err(|error| error.to_string())?;
     window.set_focus().map_err(|error| error.to_string())
 }
 
 #[tauri::command]
 fn connection_info(backend: tauri::State<'_, Backend>) -> Result<ConnectionInfo, String> {
-    if let Some(status) = backend
-        .child
+    backend
+        .process
         .lock()
         .map_err(|_| "Backend lock failed")?
-        .try_wait()
-        .map_err(|_| "Cannot inspect backend")?
-    {
-        return Err(format!(
-            "The local service exited ({status}). Restart Meridian and inspect its local logs."
-        ));
-    }
+        .ensure_running()?;
     Ok(backend.connection.clone())
 }
 
@@ -198,17 +196,17 @@ fn local_action(backend: &Backend, path: &str) {
 fn main() {
     let app = tauri::Builder::default()
         .plugin(tauri_plugin_single_instance::init(|app, _, _| {
-            if let Some(window) = app.get_webview_window("main") {
-                let _ = window.show();
-                let _ = window.set_focus();
-            }
+            let _ = show_review_window(app.clone());
         }))
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .setup(|app| {
             let root = app.path().app_data_dir()?;
             // Human-readable macOS application support folder, shared with Python.
-            let data_root = root.parent().unwrap_or(&root).join("Meridian");
+            let data_root = std::env::var_os("MERIDIAN_DATA_DIR")
+                .filter(|value| !value.is_empty())
+                .map(PathBuf::from)
+                .unwrap_or_else(|| root.parent().unwrap_or(&root).join("Meridian"));
             std::fs::create_dir_all(data_root.join("logs"))?;
             let port = TcpListener::bind("127.0.0.1:0")?.local_addr()?.port();
             let token = format!(
@@ -234,16 +232,16 @@ fn main() {
                 .create(true)
                 .append(true)
                 .open(data_root.join("logs/backend.log"))?;
-            let child = command
+            command
                 .env("MERIDIAN_API_TOKEN", &token)
                 .env("MERIDIAN_PORT", port.to_string())
                 .env("MERIDIAN_DATA_DIR", &data_root)
                 .stdin(Stdio::null())
                 .stdout(Stdio::null())
-                .stderr(Stdio::from(log))
-                .spawn()?;
+                .stderr(Stdio::from(log));
+            let process = BackendProcess::start(command)?;
             app.manage(Backend {
-                child: Mutex::new(child),
+                process: Mutex::new(process),
                 connection: ConnectionInfo {
                     base_url: format!("http://127.0.0.1:{port}/api"),
                     token,
@@ -268,10 +266,7 @@ fn main() {
                 .menu(&menu)
                 .on_menu_event(|app, event| match event.id.as_ref() {
                     "open" => {
-                        if let Some(window) = app.get_webview_window("main") {
-                            let _ = window.show();
-                            let _ = window.set_focus();
-                        }
+                        let _ = show_review_window(app.clone());
                     }
                     "quit" => app.exit(0),
                     action => {
@@ -303,26 +298,19 @@ fn main() {
         })
         .build(tauri::generate_context!())
         .expect("Could not start Meridian");
-    app.run(|handle, event| {
-        if let tauri::RunEvent::Exit = event {
+    app.run(|handle, event| match event {
+        #[cfg(target_os = "macos")]
+        tauri::RunEvent::Reopen { .. } => {
+            let _ = show_review_window(handle.clone());
+        }
+        tauri::RunEvent::Exit => {
             if let Some(backend) = handle.try_state::<Backend>() {
-                if let Ok(mut child) = backend.child.lock() {
-                    let _ = Command::new("/bin/kill")
-                        .args(["-TERM", &child.id().to_string()])
-                        .status();
-                    for _ in 0..50 {
-                        if child.try_wait().ok().flatten().is_some() {
-                            break;
-                        }
-                        std::thread::sleep(Duration::from_millis(100));
-                    }
-                    if child.try_wait().ok().flatten().is_none() {
-                        let _ = child.kill();
-                    }
-                    let _ = child.wait();
+                if let Ok(mut process) = backend.process.lock() {
+                    process.shutdown();
                 }
             }
         }
+        _ => {}
     });
 }
 

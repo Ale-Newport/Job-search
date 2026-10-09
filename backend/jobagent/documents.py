@@ -33,6 +33,10 @@ SUBMITTED_STATUSES = {
     "APPLYING",
     "APPLIED",
     "CONFIRMED",
+    "UNDER_REVIEW",
+    "SUBMISSION_PENDING",
+    "SUBMISSION_UNCONFIRMED",
+    "CLOSED",
     "RECRUITER_SCREEN",
     "ASSESSMENT",
     "TECHNICAL_TEST",
@@ -454,7 +458,9 @@ def render_pdf(text: str) -> bytes:
     return output.getvalue()
 
 
-def generate_document(db, data_dir, job_id, kind, fact_ids=None, approved=False):
+def generate_document(db, data_dir, job_id, kind, fact_ids=None, approved=False, output_format='pdf'):
+    if output_format not in {'pdf', 'docx', 'txt'}:
+        raise ValueError('Document format must be PDF, DOCX or TXT')
     if kind not in {"cv", "cover_letter"}:
         raise ValueError("Document kind must be cv or cover_letter")
     job = db.one("SELECT * FROM jobs WHERE id=?", (job_id,))
@@ -510,7 +516,19 @@ def generate_document(db, data_dir, job_id, kind, fact_ids=None, approved=False)
         **({"rules_used": narrative["rules"], "role_context": narrative["context"]} if narrative else {}),
     }
     if approved:
-        pdf = render_pdf(text)
+        if output_format == 'pdf':
+            content, mime = render_pdf(text), 'application/pdf'
+        elif output_format == 'docx':
+            from docx import Document
+            from io import BytesIO
+            docx = Document()
+            for paragraph in text.split('\n'):
+                docx.add_paragraph(paragraph)
+            buffer = BytesIO()
+            docx.save(buffer)
+            content, mime = buffer.getvalue(), MIME_TYPES['.docx']
+        else:
+            content, mime = text.encode(), 'text/plain'
         document = existing
         if not document:
             stamp = now()
@@ -528,9 +546,9 @@ def generate_document(db, data_dir, job_id, kind, fact_ids=None, approved=False)
             db,
             Path(data_dir),
             document,
-            pdf,
-            f"{kind}-{job_id[:8]}.pdf",
-            "application/pdf",
+            content,
+            f"{kind}-{job_id[:8]}.{output_format}",
+            mime,
             text,
             response["fact_ids"],
             True,
@@ -553,3 +571,18 @@ def document_path(db, data_dir, version_id: str) -> tuple[Path, dict]:
     if hashlib.sha256(path.read_bytes()).hexdigest() != version["content_hash"]:
         raise ValueError("Document content no longer matches its immutable registered version")
     return path, decode_row(version)
+
+
+def generate_required_draft(db, data_dir, job_id, kind):
+    """Save a required document for review, never approve or upload it implicitly."""
+    existing = db.one('SELECT v.id FROM document_versions v JOIN documents d ON v.document_id=d.id WHERE d.job_id=? AND d.kind=? ORDER BY v.created_at DESC LIMIT 1', (job_id,kind))
+    if existing:
+        return existing['id']
+    proposal = generate_document(db,data_dir,job_id,kind,approved=False)
+    if not proposal['fact_ids']:
+        raise ValueError('Verified candidate evidence is required to generate this document')
+    job = db.one('SELECT title,company FROM jobs WHERE id=?',(job_id,))
+    document = {'id':uid(),'name':f"{job['company']} — {job['title']} ({kind}, draft)",'kind':kind,'job_id':job_id,'created_at':now(),'updated_at':now()}
+    db.execute('INSERT INTO documents VALUES(?,?,?,?,?,?)',tuple(document.values()))
+    version = save_version(db,Path(data_dir),document,render_pdf(proposal['text']),kind+'-draft.pdf','application/pdf',proposal['text'],proposal['fact_ids'],approved=False)
+    return version['id']

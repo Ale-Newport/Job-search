@@ -47,6 +47,11 @@ STATUSES = {
     "WITHDRAWN",
     "GHOSTED",
     "ERROR",
+    "UNDER_REVIEW",
+    "CLOSED",
+    "UNKNOWN",
+    "SUBMISSION_PENDING",
+    "SUBMISSION_UNCONFIRMED",
 }
 DEFAULT_SETTINGS = {
     "app_name": "Meridian",
@@ -75,7 +80,12 @@ DEFAULT_SETTINGS = {
     "email_poll_minutes": 10,
     "email_interval_minutes": 10,
     "discovery_interval_minutes": 120,
-    "scheduler_enabled": False,
+    "scheduler_enabled": True,
+    "application_concurrency": 2,
+    "worker_watchdog_seconds": 30,
+    "worker_progress_seconds": 240,
+    "daily_search_time": "08:00",
+    "discovery_timezone": "Europe/London",
     "tracking_first": True,
     "daily_min_match": 50,
     "suggested_region": "any",
@@ -473,12 +483,19 @@ def document_approve(version_id: str, request: Request):
         document_path(db, request.app.state.data_dir, version_id)
     except ValueError as exc:
         raise HTTPException(422, str(exc)) from exc
-    db.execute("UPDATE document_versions SET approved=1 WHERE id=?", (version_id,))
+    with db.transaction() as conn:
+        conn.execute('UPDATE document_versions SET approved=1 WHERE id=?', (version_id,))
+        document = conn.execute('SELECT d.* FROM documents d JOIN document_versions v ON v.document_id=d.id WHERE v.id=?', (version_id,)).fetchone()
+        if document['job_id'] and document['kind'] in ('cv','cover_letter'):
+            application = conn.execute('SELECT id,status FROM applications WHERE job_id=?', (document['job_id'],)).fetchone()
+            if application and application['status'] not in SUBMITTED_STATUSES:
+                attach_document(db, conn, application['id'], version_id, document['kind'])
     return required(db, "document_versions", version_id)
 
 
 class GeneratePayload(Payload):
     job_id: str
+    output_format: Literal['pdf', 'docx', 'txt'] = 'pdf'
     kind: Literal["cv", "cover_letter"]
     fact_ids: list[str] = Field(default_factory=list, max_length=500)
     approved: bool = False
@@ -486,6 +503,12 @@ class GeneratePayload(Payload):
 
 @router.post("/documents/generate")
 def document_generate(payload: GeneratePayload, request: Request):
+    automation = getattr(request.app.state, 'automation', None)
+    if hasattr(automation, 'enqueue'):
+        required(get_db(request), 'jobs', payload.job_id)
+        import hashlib
+        key = hashlib.sha256(dumps(payload.model_dump()).encode()).hexdigest()
+        return automation.enqueue('document', payload.model_dump(), dedupe_key='document:'+key)
     try:
         return generate_document(get_db(request), request.app.state.data_dir, **payload.model_dump())
     except ValueError as exc:
@@ -527,6 +550,9 @@ def jobs_list(
     source: str | None = None,
     min_match: float = 0,
     profile_id: str | None = None,
+    include_unavailable: bool = False,
+    confirmed_open: bool = False,
+    deadline_days: int | None = Query(None, ge=1, le=365),
     limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0),
 ):
@@ -546,6 +572,13 @@ def jobs_list(
             "EXISTS(SELECT 1 FROM json_each(jobs.match_details,'$.profiles') p WHERE json_extract(p.value,'$.id')=? AND json_extract(p.value,'$.eligible')=1)"
         )
         params.append(profile_id)
+    if not include_unavailable:
+        clauses.append("availability!='CLOSED' AND deadline_state!='EXPIRED' AND (application_deadline IS NULL OR julianday(application_deadline)>=julianday('now')) AND COALESCE(json_extract(metadata,'$.closed'),0)!=1")
+    if confirmed_open:
+        clauses.append("availability='OPEN'")
+    if deadline_days is not None:
+        clauses.append("application_deadline IS NOT NULL AND julianday(application_deadline)<=julianday('now', ?)")
+        params.append(f'+{deadline_days} days')
     settings = get_settings(get_db(request))
     if settings.get("suggested_region") == "europe":
         from .geography import location_evidence, recommendable
@@ -804,6 +837,8 @@ class RunPayload(Payload):
 
 @router.post("/sources/run")
 async def sources_run(payload: RunPayload, request: Request):
+    if hasattr(request.app.state.automation, 'enqueue'):
+        return request.app.state.automation.enqueue('discovery', {'source_id': payload.source_id}, dedupe_key='discovery:manual')
     try:
         return await run_sources(get_db(request), request.app.state.data_dir, payload.source_id)
     except ValueError as exc:
@@ -826,8 +861,11 @@ class CompanyPayload(Payload):
 def sync_company_source(db, company):
     if not company["careers_url"]:
         return
-    source = db.one("SELECT id FROM sources WHERE json_extract(config,'$.company_id')=?", (company["id"],))
-    config = {"company_id": company["id"], "company_name": company["name"]}
+    # Multiple portals may belong to one employer. Updating its preferences must
+    # neither overwrite another portal nor erase ATS/account configuration.
+    source = db.one("SELECT * FROM sources WHERE json_extract(config,'$.company_id')=? AND url=?", (company["id"], company['careers_url']))
+    config = json.loads(source['config']) if source else {}
+    config.update(company_id=company['id'], company_name=company['name'])
     if source:
         db.execute(
             "UPDATE sources SET name=?,url=?,config=?,poll_minutes=?,updated_at=? WHERE id=?",
@@ -1037,7 +1075,10 @@ def applications_list(
 
 
 @router.get("/applications/{application_id}")
-def application_detail(application_id: str, request: Request):
+async def application_detail(application_id: str, request: Request):
+    automation = getattr(request.app.state, "automation", None)
+    if automation is not None:
+        automation.reconcile_browser_state()
     db = get_db(request)
     result = required(db, "applications", application_id)
     result["job"] = required(db, "jobs", result["job_id"])
@@ -1084,7 +1125,7 @@ class ApplicationPatch(Payload):
 
 
 @router.patch("/applications/{application_id}")
-def application_update(application_id: str, payload: ApplicationPatch, request: Request):
+async def application_update(application_id: str, payload: ApplicationPatch, request: Request):
     db = get_db(request)
     existing = required(db, "applications", application_id)
     if existing.get("section_consent") and payload.mode == "auto":
@@ -1096,7 +1137,7 @@ def application_update(application_id: str, payload: ApplicationPatch, request: 
             raise HTTPException(422, "Unknown pipeline status")
         db.event(application_id, status, "Status updated manually", "manual")
     update_row(db, "applications", application_id, values)
-    return application_detail(application_id, request)
+    return await application_detail(application_id, request)
 
 
 class AnswerPayload(Payload):
@@ -1328,6 +1369,19 @@ async def settings_patch(payload: dict, request: Request):
     if len(dumps(payload)) > 100000:
         raise HTTPException(422, "Settings payload is too large")
     for key, value in payload.items():
+        if key in ('application_concurrency', 'worker_watchdog_seconds', 'worker_progress_seconds'):
+            bounds = {'application_concurrency': (1, 6), 'worker_watchdog_seconds': (5, 120), 'worker_progress_seconds': (30, 900)}
+            lo, hi = bounds[key]
+            if isinstance(value, bool) or not isinstance(value, int) or not lo <= value <= hi:
+                raise HTTPException(422, f'{key} must be between {lo} and {hi}')
+        if key == 'daily_search_time' and (not isinstance(value, str) or not re.fullmatch(r'(?:[01]\d|2[0-3]):[0-5]\d', value)):
+            raise HTTPException(422, 'Daily search time must be HH:MM')
+        if key == 'discovery_timezone':
+            from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
+            try:
+                ZoneInfo(value)
+            except (ZoneInfoNotFoundError, TypeError, ValueError):
+                raise HTTPException(422, 'Unknown discovery timezone')
         if not re.fullmatch(r"[a-z][a-z0-9_]{0,79}", key) or re.search(
             r"password|secret|api_key|access_token|refresh_token", key
         ):

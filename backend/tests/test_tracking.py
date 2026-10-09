@@ -24,7 +24,7 @@ class MemorySecrets:
 
 @pytest.fixture
 def api(tmp_path):
-    app = create_app(tmp_path, token="test", secret_store=MemorySecrets(), start_scheduler=False)
+    app = create_app(tmp_path, worker_isolation=False, token="test", secret_store=MemorySecrets(), start_scheduler=False)
     with TestClient(app, headers={"Authorization": "Bearer test"}) as client:
         yield client
 

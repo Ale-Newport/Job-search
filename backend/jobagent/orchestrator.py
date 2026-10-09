@@ -4,6 +4,7 @@ import asyncio
 import copy
 import hashlib
 import json
+import os
 from datetime import datetime, timezone
 from pathlib import Path
 from urllib.parse import urlparse
@@ -19,7 +20,12 @@ def settings_for(db):
 
 
 class Orchestrator:
-    def __init__(self, db, data_dir: Path):
+    preparation_timeout = 180
+    submission_timeout = 60
+    review_states = frozenset({'needs_review', 'ready_for_review', 'human_required', 'browser_question',
+                               'section_review', 'section_approved'})
+
+    def __init__(self, db, data_dir: Path, *, application_scope=None, recover=True):
         from .automation import BrowserManager
 
         self.db, self.data_dir = db, data_dir
@@ -31,18 +37,110 @@ class Orchestrator:
         self.tasks: set[asyncio.Task] = set()
         self.running = False
         self.active_run: str | None = None
+        self._run_tasks: dict[str, asyncio.Task] = {}
         self.browser.on_step = self.on_step
+        self.browser.on_disconnect = self.on_browser_disconnect
         # A previous process cannot attest whether an interrupted submit succeeded.
-        for run in db.query("SELECT * FROM automation_runs WHERE status IN ('running','submitting')"):
-            db.execute(
-                "UPDATE automation_runs SET status='interrupted',error=?,updated_at=? WHERE id=?",
-                ("Interrupted automation detected; review before resuming", now(), run["id"]),
-            )
-            self.human_task(
-                run["application_id"],
-                "INTERRUPTED",
-                "Interrupted automation detected. Check the browser/email before resuming; submission is uncertain.",
-            )
+        for run in (db.query("SELECT * FROM automation_runs WHERE status NOT IN ('confirmed','reconciled','error','blocked','unconfirmed')") if recover else []):
+            if application_scope and run['application_id'] != application_scope:
+                continue
+            checkpoint = json.loads(run['checkpoint'])
+            if run['status'] == 'interrupted':
+                # Older versions marked preparation interruptions as uncertain too.
+                attempted = db.one("SELECT id FROM application_events WHERE application_id=? AND status='APPLYING' AND created_at>=? LIMIT 1",
+                                   (run['application_id'], run['created_at']))
+                if attempted:
+                    continue
+            elif run['status'] not in {'running', 'submitting'} and not (
+                run['status'] in self.review_states and checkpoint.get('snapshot_id')
+            ):
+                continue
+            self._fail_run(run['id'], 'The app restarted and the previous browser session expired. Start Auto Apply again to reopen and inspect the form.')
+        # Older versions recorded failed runs as NEEDS_REVIEW in application
+        # tracking. Correct only the latest failure and keep the original audit.
+        for run in db.query("SELECT r.* FROM automation_runs r JOIN applications a ON a.id=r.application_id "
+                            "WHERE a.status IN ('PREPARING','NEEDS_REVIEW') AND r.status IN ('error','blocked') "
+                            "AND r.id=(SELECT latest.id FROM automation_runs latest WHERE latest.application_id=r.application_id ORDER BY latest.created_at DESC LIMIT 1)"):
+            if application_scope and run['application_id'] != application_scope:
+                continue
+            checkpoint = json.loads(run['checkpoint'])
+            error = run['error'] or checkpoint.get('error') or 'The previous form preparation failed. Start Auto Apply again to retry.'
+            self._event(run['application_id'], 'ERROR', 'Recovered previous preparation failure: ' + str(error)[:900])
+
+    def _fail_run(self, run_id, error):
+        run = self.db.one('SELECT * FROM automation_runs WHERE id=?', (run_id,))
+        if not run or run['status'] in {'confirmed', 'reconciled', 'error', 'blocked', 'unconfirmed'}:
+            return run['status'] if run else 'error'
+        uncertain = run['status'] in {'submitting', 'unconfirmed'}
+        state = 'unconfirmed' if uncertain else 'error'
+        if uncertain:
+            error = 'Submission outcome is uncertain. Check the employer page and confirmation email before retrying. ' + error
+        checkpoint = json.loads(run['checkpoint'])
+        checkpoint.update(status=state, error=error[:1000], snapshot_id=None)
+        if getattr(self.browser, '_active_application_id', None) == run['application_id']:
+            self.browser._invalidate_approvals()
+        self.db.execute('UPDATE automation_runs SET status=?,checkpoint=?,error=?,updated_at=? WHERE id=?',
+                        (state, json.dumps(checkpoint), error[:1000], now(), run_id))
+        self._event(run['application_id'], 'ERROR', error[:1000])
+        self.human_task(run['application_id'], 'SUBMISSION_UNCONFIRMED' if uncertain else 'AUTOMATION_ERROR', error[:1000])
+        return state
+
+    def _event(self, application_id, status, message):
+        from .documents import SUBMITTED_STATUSES
+        # Email/manual tracking can advance while a browser await is in flight.
+        # Keep the audit event without rolling back that newer outcome.
+        with self.db.transaction() as conn:
+            current = conn.execute('SELECT status FROM applications WHERE id=?', (application_id,)).fetchone()
+            self.db.event(application_id, status, message, origin='automation', conn=conn)
+            if current and current['status'] in SUBMITTED_STATUSES - {'APPLYING'} and not (
+                status == 'CONFIRMED' and current['status'] == 'APPLIED'
+            ):
+                conn.execute('UPDATE applications SET status=? WHERE id=?', (current['status'], application_id))
+
+    def on_browser_disconnect(self, reason):
+        application_id = getattr(self.browser, '_active_application_id', None)
+        run = self.db.one('SELECT * FROM automation_runs WHERE id=?', (self.active_run,)) if self.active_run else None
+        if not run and application_id:
+            run = self.db.one('SELECT * FROM automation_runs WHERE application_id=? ORDER BY created_at DESC LIMIT 1', (application_id,))
+        if not run or run['status'] not in self.review_states | {'running', 'submitting'}:
+            return
+        self._fail_run(run['id'], f'{reason} Start Auto Apply again to reopen and inspect the form.')
+        task = self._run_tasks.get(run['id'])
+        if task and not task.done():
+            task.cancel()
+
+    def reconcile_browser_state(self):
+        """Polling also detects a lost idle session when no close event arrived."""
+        if not self.running and not self.lock.locked() and getattr(self.browser, '_active_application_id', None):
+            page = self.browser.page
+            if not page or page.is_closed():
+                self.on_browser_disconnect('The application browser was closed or disconnected.')
+
+    async def cancel(self, application_id):
+        self.application(application_id)
+        run = self.db.one('SELECT * FROM automation_runs WHERE application_id=? ORDER BY created_at DESC LIMIT 1', (application_id,))
+        if not run or run['status'] not in self.review_states | {'running', 'submitting'}:
+            raise ValueError('There is no active form preparation to cancel')
+        if self.active_run and self.active_run != run['id']:
+            raise ValueError('A different application is using the browser')
+        browser_application = getattr(self.browser, '_active_application_id', None)
+        if browser_application and browser_application != application_id:
+            raise ValueError('A different application is using the browser')
+        self.browser.pause()
+        invalidate = getattr(self.browser, '_invalidate_approvals', None)
+        if invalidate:
+            invalidate()
+        state = self._fail_run(run['id'], 'Form preparation was stopped. Start Auto Apply again when you are ready.')
+        task = self._run_tasks.get(run['id'])
+        if task and not task.done():
+            task.cancel()
+            await asyncio.gather(task, return_exceptions=True)
+        try:
+            async with asyncio.timeout(5):
+                await self.prompt.close()
+        except TimeoutError:
+            pass
+        return {'run_id': run['id'], 'status': state}
 
     def human_task(self, application_id, kind, question):
         existing = self.db.one(
@@ -69,15 +167,28 @@ class Orchestrator:
                 step.get("operation", "OBSERVE"),
                 str(step.get("target", "")),
                 step.get("confidence"),
-                json.dumps(step),
+                json.dumps({k: step.get(k) for k in ('operation', 'target', 'confidence', 'label', 'url', 'executed', 'form_state', 'document_version_id', 'upload_evidence')}),
                 now(),
             ),
         )
-        checkpoint = {
+        existing = self.db.one('SELECT checkpoint FROM automation_runs WHERE id=?', (self.active_run,))
+        checkpoint = json.loads(existing['checkpoint']) if existing else {}
+        snapshot = step.get('observation', {})
+        # Keep semantic progress, never browser cookies, tokens or DOM handles.
+        if step.get('document_version_id'):
+            self.db.execute('INSERT INTO document_uploads VALUES(?,?,?,?,?,?,?)',
+                            (str(uuid4()), self.active_run, step['document_version_id'], step.get('label') or '',
+                             'ATTACHED', json.dumps(step.get('upload_evidence') or {}), now()))
+        checkpoint.update({
             "current_url": step.get("observation", {}).get("url"),
-            "last_step": step,
+            "last_step": {k: step.get(k) for k in ('operation', 'label', 'executed', 'url', 'document_version_id', 'upload_evidence')},
             "snapshot_id": step.get("snapshot_id"),
-        }
+            "form_state": step.get('form_state', 'FILL_FIELDS'),
+            "step_identity": hashlib.sha256(json.dumps([snapshot.get('url'), [(e.get('label'), e.get('type')) for e in snapshot.get('elements', [])]], sort_keys=True).encode()).hexdigest(),
+            "answers": step.get('answers', checkpoint.get('answers', [])),
+            "completed_steps": step.get('completed_steps', checkpoint.get('completed_steps', [])),
+            "documents": step.get('documents', checkpoint.get('documents', [])),
+        })
         self.db.execute(
             "UPDATE automation_runs SET checkpoint=?,updated_at=? WHERE id=?",
             (json.dumps(checkpoint), now(), self.active_run),
@@ -86,6 +197,11 @@ class Orchestrator:
     def pause(self):
         self.db.execute("INSERT OR REPLACE INTO settings(key,value) VALUES('automation_paused','true')")
         self.browser.pause()
+        if self.active_run:
+            self._fail_run(self.active_run, 'Automation was paused. Resume automation and start Auto Apply again when you are ready.')
+            task = self._run_tasks.get(self.active_run)
+            if task and not task.done():
+                task.cancel()
         return {"paused": True}
 
     async def resume(self):
@@ -213,27 +329,42 @@ class Orchestrator:
         )
         if uncertain:
             raise ValueError("A previous run has uncertain submission state. Reconcile it manually before any retry.")
-        self.running = True
+        previous_application = getattr(self.browser, '_active_application_id', None)
+        if previous_application and previous_application != application_id:
+            previous = self.db.one('SELECT * FROM automation_runs WHERE application_id=? ORDER BY created_at DESC LIMIT 1', (previous_application,))
+            if previous and previous['status'] in self.review_states and json.loads(previous['checkpoint']).get('snapshot_id'):
+                self._fail_run(previous['id'], 'Another application is now using the browser. Start Auto Apply again to reopen and inspect this form.')
         run_id = str(uuid4())
         self.db.execute(
             "INSERT INTO automation_runs(id,application_id,status,engine,checkpoint,created_at,updated_at) VALUES(?,?,'running',?,'{}',?,?)",
             (run_id, application_id, settings_for(self.db).get("browser_engine", "deterministic"), now(), now()),
         )
+        self.running = True
+        self.active_run = run_id
         task = asyncio.create_task(self._fill(run_id, application, resume, section_grant))
         self.tasks.add(task)
-        task.add_done_callback(self.tasks.discard)
+        self._run_tasks[run_id] = task
+        def finished(task):
+            self.tasks.discard(task)
+            self._run_tasks.pop(run_id, None)
+            if self.active_run == run_id:
+                self.running = False
+                self.active_run = None
+        task.add_done_callback(finished)
         return {"run_id": run_id, "status": "running"}
 
     async def _fill(self, run_id, application, resume, section_grant=None):
         try:
-            async with self.lock:
+            async with self.lock, asyncio.timeout(self.preparation_timeout):
                 await self.prompt.close()
                 self.active_run = run_id
                 if self.paused() and not application.get("section_consent"):
                     raise ValueError("Automation was paused before this run started")
-                if resume or application.get("section_consent"):
+                # Starting a run is explicit permission to continue after a local stop.
+                # The global pause gate above still applies.
+                if resume or application.get("section_consent") or getattr(self.browser, '_paused', False):
                     await self.browser.resume()
-                self.db.event(application["id"], "PREPARING", "Browser form preparation started", origin="automation")
+                self._event(application["id"], "PREPARING", "Browser form preparation started")
                 facts = self.db.query("SELECT * FROM facts WHERE verification_status='verified' OR locked=1")
                 from .application_profile import application_knowledge
                 facts, skipped = application_knowledge(self.db, application, facts)
@@ -251,6 +382,8 @@ class Orchestrator:
                     if not path.is_relative_to((self.data_dir / "documents").resolve()) or not path.is_file():
                         raise ValueError("Selected document is missing or outside the document vault")
                 config = settings_for(self.db)
+                saved_run = self.db.one('SELECT checkpoint FROM automation_runs WHERE id=?', (run_id,))
+                config['_resume_completed_steps'] = json.loads(saved_run['checkpoint']).get('completed_steps',[]) if saved_run else []
                 config["resume_existing"] = resume
                 config["assisted_autofill"] = bool(application.get("section_consent") and application.get("assisted_autofill"))
                 config["section_consent"] = bool(application.get("section_consent") and not config["assisted_autofill"])
@@ -290,9 +423,13 @@ class Orchestrator:
                 from .security import SecretStore
                 from .usage import decision_settings
 
-                config = decision_settings(self.db, config, SecretStore())
+                config = await asyncio.to_thread(decision_settings, self.db, config, SecretStore())
                 from .automation.job_context import prepare_job_context
                 config['_job_context'] = await prepare_job_context(application)
+                async def generate_required(kind):
+                    from .documents import generate_required_draft
+                    return await asyncio.to_thread(generate_required_draft, self.db, self.data_dir, application['job_id'], kind)
+                config['_generate_required_document'] = generate_required
                 if config['assisted_autofill'] and self.text_service:
                     config['_reason_answer'] = self.field_reasoner(config['_job_context'], facts, config)
                 from .intelligence.engine import CandidateEngine
@@ -334,18 +471,17 @@ class Orchestrator:
                         await self._submit(run_id, application, result)
                     except ValueError as exc:
                         self.human_task(application["id"], "AUTO_GATE", str(exc))
+        except asyncio.CancelledError:
+            self._fail_run(run_id, 'Form preparation was interrupted. Start Auto Apply again to reopen and inspect the form.')
+            raise
+        except TimeoutError:
+            self._fail_run(run_id, 'Form preparation exceeded the time limit and was stopped. Start Auto Apply again to retry.')
         except Exception as exc:
-            error = str(exc)[:1000]
-            current = self.db.one("SELECT status FROM automation_runs WHERE id=?", (run_id,))
-            state = "unconfirmed" if current and current["status"] in ("submitting", "unconfirmed") else "error"
-            self.db.execute(
-                "UPDATE automation_runs SET status=?,error=?,updated_at=? WHERE id=?", (state, error, now(), run_id)
-            )
-            self.db.event(application["id"], "ERROR", error, origin="automation")
-            self.human_task(application["id"], "AUTOMATION_ERROR", error)
+            self._fail_run(run_id, str(exc)[:1000] or type(exc).__name__)
         finally:
-            self.running = False
-            self.active_run = None
+            if self.active_run == run_id:
+                self.running = False
+                self.active_run = None
 
     def field_reasoner(self, application, facts, config):
         from .automation.answers import classify_question, SENSITIVE, normalize, option_for
@@ -524,26 +660,35 @@ class Orchestrator:
                 question.get("question", "Human input required"),
             )
         result["review_fingerprint"] = self.fingerprint(application_id)
+        failed = result.get('status') in {'error', 'blocked', 'unconfirmed'}
+        if failed:
+            result['status'] = 'unconfirmed' if result.get('status') == 'unconfirmed' else 'error'
+            result['snapshot_id'] = None
+            result['error'] = result.get('error') or 'Form preparation could not finish. Start Auto Apply again to retry.'
+            self.human_task(application_id, 'SUBMISSION_UNCONFIRMED' if result['status'] == 'unconfirmed' else 'AUTOMATION_ERROR', result['error'])
+        else:
+            self.db.execute("UPDATE human_tasks SET status='resolved',answer='A new preparation completed; inspect its current result',updated_at=? WHERE application_id=? AND kind IN ('AUTOMATION_ERROR','INTERRUPTED') AND status IN ('open','OPEN')",
+                            (now(), application_id))
         self.db.execute(
-            "UPDATE automation_runs SET status=?,checkpoint=?,updated_at=? WHERE id=?",
-            (result.get("status", "human_required"), json.dumps(result), now(), run_id),
+            "UPDATE automation_runs SET status=?,checkpoint=?,error=?,updated_at=? WHERE id=?",
+            (result.get("status", "human_required"), json.dumps(result), result.get('error'), now(), run_id),
         )
         confirmed = result.get("status") == "confirmed"
-        self.db.event(
+        self._event(
             application_id,
-            "CONFIRMED" if confirmed else "NEEDS_REVIEW",
-            "Submission confirmed" if confirmed else "Form preparation paused for review",
-            origin="automation",
+            "CONFIRMED" if confirmed else "ERROR" if failed else "NEEDS_REVIEW",
+            "Submission confirmed" if confirmed else result['error'] if failed else "Form preparation paused for review",
         )
         if confirmed:
             self.db.execute(
                 "UPDATE human_tasks SET status='resolved',answer='Independent submission confirmation observed',updated_at=? WHERE application_id=? AND kind IN ('PREPARATION_REVIEW','AUTO_GATE','SUBMISSION_UNCONFIRMED','INTERRUPTED','AUTOMATION_ERROR')",
                 (now(), application_id),
             )
-        quality = 100 if not result.get("questions") else max(0, 100 - 15 * len(result["questions"]))
+        quality = 0 if failed else 100 if not result.get("questions") else max(0, 100 - 15 * len(result["questions"]))
         self.db.execute("UPDATE applications SET quality_score=? WHERE id=?", (quality, application_id))
 
     async def approve_section(self, application_id, snapshot_id):
+        self.reconcile_browser_state()
         if self.running or self.lock.locked():
             raise ValueError("Browser is busy")
         async with self.lock:
@@ -560,6 +705,7 @@ class Orchestrator:
         return self.launch(application_id, resume=True, section_grant=grant)
 
     async def approve(self, application_id):
+        self.reconcile_browser_state()
         if self.running or self.lock.locked():
             raise ValueError("Browser is busy")
         async with self.lock:
@@ -582,7 +728,17 @@ class Orchestrator:
     async def _submit(self, run_id, application, result):
         if self.paused() and not application.get("section_consent"):
             raise ValueError("Automation is paused")
-        from .documents import document_path
+        from .documents import document_path, SUBMITTED_STATUSES
+
+        current = self.application(application['id'])
+        if current['status'] in SUBMITTED_STATUSES:
+            raise ValueError('This application has advanced or closed. Review its current outcome before any submission.')
+        from .job_validity import eligible, verify_job
+        job = decode_row(self.db.one('SELECT * FROM jobs WHERE id=?', (application['job_id'],)))
+        if not eligible(job):
+            raise ValueError('This job is closed or its published deadline has expired')
+        if not os.environ.get('MERIDIAN_TEST') and await verify_job(self.db, job) != 'OPEN':
+            raise ValueError('Current employer availability could not be verified. Check the position before submitting.')
 
         for document in self.db.query(
             "SELECT document_version_id FROM application_documents WHERE application_id=?", (application["id"],)
@@ -594,39 +750,48 @@ class Orchestrator:
             (application["id"],),
         ):
             raise ValueError("Previous submission evidence exists; duplicate submission blocked")
-        self.db.execute("UPDATE automation_runs SET status='submitting',updated_at=? WHERE id=?", (now(), run_id))
+        identity = hashlib.sha256(json.dumps([application['job_id'], application['url'], self.db.one('SELECT id FROM candidates LIMIT 1')['id']], sort_keys=True).encode()).hexdigest()
+        receipt_id = str(uuid4())
+        with self.db.transaction() as conn:
+            conn.execute('INSERT INTO application_submissions(id,application_id,run_id,identity_key,state,created_at,updated_at) VALUES(?,?,?,?,?,?,?)',
+                         (receipt_id, application['id'], run_id, identity, 'SUBMISSION_PENDING', now(), now()))
+            conn.execute("UPDATE automation_runs SET status='submitting',updated_at=? WHERE id=?", (now(), run_id))
         self.active_run = run_id
-        self.db.event(
-            application["id"], "APPLYING", "Submission approved; attempting one submission", origin="automation"
+        operation_task = asyncio.current_task()
+        owns_task = run_id not in self._run_tasks
+        if owns_task:
+            self._run_tasks[run_id] = operation_task
+        self._event(
+            application["id"], "APPLYING", "Submission approved; attempting one submission"
         )
         try:
-            submitted = await self.browser.submit(result.get("snapshot_id"), settings=settings_for(self.db))
+            async with asyncio.timeout(self.submission_timeout):
+                submitted = await self.browser.submit(result.get("snapshot_id"), settings=settings_for(self.db))
             submitted["evidence_at"] = result.get("evidence_at", now())
             submitted["facts_snapshot"] = result.get("facts_snapshot", [])
-            self.persist_result(run_id, application["id"], submitted)
             if submitted.get("status") != "confirmed":
-                self.db.execute(
-                    "UPDATE automation_runs SET status='unconfirmed',updated_at=? WHERE id=?", (now(), run_id)
-                )
-                self.human_task(
-                    application["id"],
-                    "SUBMISSION_UNCONFIRMED",
-                    "Submission has no independent confirmation. Check the page and email before retrying.",
-                )
+                submitted['status'] = 'unconfirmed'
+                submitted['error'] = submitted.get('error') or 'Submission has no independent confirmation. Check the page and email before retrying.'
+            self.persist_result(run_id, application["id"], submitted)
+            self.db.execute('UPDATE application_submissions SET state=?,evidence=?,updated_at=? WHERE id=?',
+                            ('CONFIRMED' if submitted['status'] == 'confirmed' else 'SUBMISSION_UNCONFIRMED', json.dumps(submitted.get('evidence', [])), now(), receipt_id))
             return submitted
-        except Exception:
-            self.db.execute(
-                "UPDATE automation_runs SET status='unconfirmed',error='Submission uncertain; manual reconciliation required',updated_at=? WHERE id=?",
-                (now(), run_id),
-            )
-            self.human_task(
-                application["id"],
-                "SUBMISSION_UNCONFIRMED",
-                "Submission interrupted. Review the browser/email; do not retry blindly.",
-            )
+        except asyncio.CancelledError:
+            self._fail_run(run_id, 'Submission was interrupted.')
             raise
+        except Exception as error:
+            reason = 'Submission exceeded the time limit.' if isinstance(error, TimeoutError) else 'Submission was interrupted.'
+            self._fail_run(run_id, reason)
+            return json.loads(self.db.one('SELECT checkpoint FROM automation_runs WHERE id=?', (run_id,))['checkpoint'])
+        finally:
+            self.db.execute("UPDATE application_submissions SET state='SUBMISSION_UNCONFIRMED',updated_at=? WHERE id=? AND state='SUBMISSION_PENDING'", (now(), receipt_id))
+            if owns_task:
+                self._run_tasks.pop(run_id, None)
+            if self.active_run == run_id and not self.running:
+                self.active_run = None
 
     def status(self):
+        self.reconcile_browser_state()
         return {
             "paused": self.paused(),
             "running": self.running,
@@ -641,14 +806,21 @@ class Orchestrator:
         }
 
     async def close(self):
-        await self.prompt.close()
+        self.browser.pause()
+        for run_id, task in list(self._run_tasks.items()):
+            if not task.done():
+                self._fail_run(run_id, 'The app closed during form preparation. Start Auto Apply again to reopen and inspect the form.')
+                task.cancel()
+        tasks = set(self._run_tasks.values()) | self.tasks
+        if tasks:
+            await asyncio.gather(*tasks, return_exceptions=True)
+        try:
+            async with asyncio.timeout(5):
+                await self.prompt.close()
+        except TimeoutError:
+            pass
         for task in list(self.prompt.tasks):
             task.cancel()
         if self.prompt.tasks:
             await asyncio.gather(*self.prompt.tasks, return_exceptions=True)
-        self.browser.pause()
-        for task in self.tasks:
-            task.cancel()
-        if self.tasks:
-            await asyncio.gather(*self.tasks, return_exceptions=True)
         await self.browser.close()

@@ -63,7 +63,7 @@ async def notify(title: str, message: str, db=None):
         logger.info("notification_unavailable")
 
 
-def create_app(data_dir: Path | None = None, token: str | None = None, secret_store=None, start_scheduler=True):
+def create_app(data_dir: Path | None = None, token: str | None = None, secret_store=None, start_scheduler=True, worker_isolation=True):
     root = data_dir or data_directory()
     root = Path(root)
     for child in ("database", "documents", "browser-profile", "cache", "logs", "backups", "models"):
@@ -77,7 +77,20 @@ def create_app(data_dir: Path | None = None, token: str | None = None, secret_st
         from .automation.local_runtime import LayaRuntime
         from .automation.text_runtime import OllamaRuntime
 
-        app.state.automation = Orchestrator(app.state.db, root)
+        if worker_isolation:
+            from .supervisor import WorkerSupervisor
+            app.state.automation = WorkerSupervisor(app.state.db, root)
+            from .companies import ensure_watchlist, import_configured_sources
+            await asyncio.to_thread(ensure_watchlist, app.state.db)
+            await asyncio.to_thread(import_configured_sources, app.state.db)
+            if not os.environ.get('MERIDIAN_TEST'):
+                from .career_sources import seed_official_sources, import_observed_boards
+                await asyncio.to_thread(import_observed_boards, app.state.db)
+                await asyncio.to_thread(seed_official_sources, app.state.db)
+            await app.state.automation.start()
+        else:
+            # Explicit dependency-injection mode for existing in-process fixtures.
+            app.state.automation = Orchestrator(app.state.db, root)
         app.state.automation.text_service = app.state.text_ai
         app.state.laya_runtime = LayaRuntime(root)
         app.state.ollama_runtime = OllamaRuntime(root)
@@ -174,9 +187,16 @@ def create_app(data_dir: Path | None = None, token: str | None = None, secret_st
             return JSONResponse({"detail": "Invalid content length"}, status_code=400)
         app.state.active_requests += 1
         try:
-            return await call_next(request)
+            async with asyncio.timeout(120):
+                return await call_next(request)
+        except TimeoutError:
+            return JSONResponse({'detail': 'This operation exceeded 120 seconds. Check its task status before retrying.'}, status_code=504)
         finally:
             app.state.active_requests -= 1
+
+    @app.exception_handler(sqlite3.OperationalError)
+    async def database_unavailable(request, exc):
+        return JSONResponse({'detail': 'Local database is busy. Retry this action shortly.'}, status_code=503)
 
     @app.exception_handler(ValueError)
     async def value_error(request, exc):
@@ -201,6 +221,8 @@ def create_app(data_dir: Path | None = None, token: str | None = None, secret_st
     from .tracking import router as tracking_router
 
     app.include_router(tracking_router, prefix="/api")
+    from .networking import router as networking_router
+    app.include_router(networking_router, prefix='/api')
 
     @app.get("/api/health")
     async def health():
@@ -235,9 +257,14 @@ def create_app(data_dir: Path | None = None, token: str | None = None, secret_st
         status = existing["status"] if existing else "configured"
         previous_config = json.loads(existing["config"]) if existing else {}
         previous_account = previous_config.pop("account_email", None)
+        cursors = {key: previous_config.pop(key) for key in ('gmail_history_id','outlook_delta_url') if key in previous_config}
+        for key in cursors:
+            config.pop(key, None)
         changed = not existing or config != previous_config or bool(payload.get("secret"))
-        if not changed and previous_account:
-            config["account_email"] = previous_account
+        if not changed:
+            config.update(cursors)
+            if previous_account:
+                config["account_email"] = previous_account
         # Changing account or OAuth client invalidates the previous authorization.
         if changed:
             status = "configured"
@@ -302,10 +329,15 @@ def create_app(data_dir: Path | None = None, token: str | None = None, secret_st
 
     @app.get("/api/email/status")
     async def email_status():
+        if hasattr(getattr(app.state, 'automation', None), 'enqueue'):
+            task = app.state.db.one("SELECT * FROM automation_tasks WHERE kind='mail' AND state NOT IN ('COMPLETED','FAILED','CANCELLED') LIMIT 1")
+            return {'syncing': bool(task), 'phase': task['state'].lower() if task else 'idle', 'provider': None, 'messages_read': 0}
         return app.state.mail.status()
 
     @app.post("/api/email/sync")
     async def email_sync():
+        if hasattr(getattr(app.state, 'automation', None), 'enqueue'):
+            return app.state.automation.enqueue('mail')
         result = await app.state.mail.sync()
         if result.get("imported"):
             await notify(
@@ -386,8 +418,6 @@ def create_app(data_dir: Path | None = None, token: str | None = None, secret_st
     async def assisted_apply(job_id: str, payload: dict = Body(...)):
         from .core import prepare_application
 
-        if app.state.automation.running or app.state.automation.lock.locked():
-            raise ValueError("Finish or pause the current browser operation first")
         if payload.get("autofill_approved", False) not in (True, False):
             raise ValueError("Autofill approval must be a boolean")
         application = prepare_application(app.state.db, job_id, "review", payload.get("document_version_id"),
@@ -417,7 +447,15 @@ def create_app(data_dir: Path | None = None, token: str | None = None, secret_st
     @app.post("/api/applications/{application_id}/takeover")
     async def takeover(application_id: str):
         app.state.automation.application(application_id)
+        if hasattr(app.state.automation, 'takeover_application'):
+            return await app.state.automation.takeover_application(application_id)
+        if app.state.automation.browser._active_application_id != application_id:
+            raise ValueError("This application does not own the current browser. Start or resume it first.")
         return await app.state.automation.browser.takeover()
+
+    @app.post("/api/applications/{application_id}/cancel")
+    async def application_cancel(application_id: str):
+        return await app.state.automation.cancel(application_id)
 
     @app.post("/api/applications/{application_id}/resume")
     async def application_resume(application_id: str):
@@ -425,7 +463,13 @@ def create_app(data_dir: Path | None = None, token: str | None = None, secret_st
 
     @app.post("/api/applications/{application_id}/reconcile")
     async def reconcile(application_id: str, payload: dict = Body(...)):
-        if app.state.automation.running:
+        app.state.automation.application(application_id)
+        automation = app.state.automation
+        if hasattr(automation, 'workers'):
+            busy = any(w.task.get('application_id') == application_id and w.state in ('STARTING','RUNNING','WAITING_FOR_PAGE','CHECKPOINTING','RECOVERING') for w in automation.workers.values())
+        else:
+            busy = automation.running or automation.lock.locked()
+        if busy:
             raise ValueError("Wait for the current browser operation to pause")
         status = payload.get("status")
         if status not in ("CONFIRMED", "PREPARING", "WITHDRAWN") or not str(payload.get("evidence", "")).strip():
@@ -439,10 +483,37 @@ def create_app(data_dir: Path | None = None, token: str | None = None, secret_st
             "UPDATE human_tasks SET status='resolved',answer=?,updated_at=? WHERE application_id=? AND kind IN ('SUBMISSION_UNCONFIRMED','INTERRUPTED')",
             (payload["evidence"], now(), application_id),
         )
+        app.state.db.execute("UPDATE application_submissions SET state=?,evidence=?,updated_at=? WHERE application_id=? AND state IN ('SUBMISSION_PENDING','SUBMISSION_UNCONFIRMED')",
+                             ('CONFIRMED' if status=='CONFIRMED' else 'RECONCILED', json.dumps({'manual': payload['evidence']}), now(), application_id))
+        app.state.db.execute("UPDATE automation_tasks SET state='COMPLETED',worker_id=NULL,updated_at=? WHERE application_id=? AND state='WAITING_FOR_USER' AND error IS NOT NULL", (now(), application_id))
         return {"status": status}
+
+    @app.get('/api/discovery/coverage')
+    def discovery_coverage():
+        from .companies import coverage
+        return coverage(app.state.db)
+
+    @app.get('/api/automation/tasks/{task_id}/logs')
+    def task_logs(task_id: str):
+        return {'failures': app.state.db.query('SELECT * FROM worker_failures WHERE task_id=? ORDER BY created_at', (task_id,)),
+                'checkpoints': [decode_row(r) for r in app.state.db.query('SELECT * FROM task_checkpoints WHERE task_id=? ORDER BY created_at DESC LIMIT 20', (task_id,))]}
+
+    @app.get('/api/automation/tasks/{task_id}')
+    def task_detail(task_id: str):
+        task = app.state.db.one('SELECT * FROM automation_tasks WHERE id=?', (task_id,))
+        if not task:
+            raise HTTPException(404, 'Task not found')
+        return decode_row(task)
+
+    @app.post('/api/automation/tasks/{task_id}/{action}')
+    async def task_control(task_id: str, action: str):
+        if not hasattr(app.state.automation, 'control'):
+            raise ValueError('Worker isolation is disabled in this fixture')
+        return await app.state.automation.control(task_id, action)
 
     @app.get("/api/automation/runs/{run_id}")
     async def run_detail(run_id: str):
+        app.state.automation.reconcile_browser_state()
         run = app.state.db.one("SELECT * FROM automation_runs WHERE id=?", (run_id,))
         if not run:
             raise HTTPException(404, "Run not found")
@@ -461,9 +532,15 @@ def create_app(data_dir: Path | None = None, token: str | None = None, secret_st
         parsed = urlparse(url)
         if parsed.scheme not in ("https", "http") or parsed.username or parsed.password:
             raise ValueError("A valid HTTP(S) browser URL is required")
+        if hasattr(getattr(app.state, 'automation', None), 'enqueue'):
+            return app.state.automation.enqueue('browser', {'url': url}, dedupe_key='browser:manual')
         if app.state.automation.running or app.state.automation.lock.locked():
             raise ValueError("Pause the current application before opening another browser page")
-        return await app.state.automation.browser.open(url)
+        async with app.state.automation.lock:
+            app.state.automation.on_browser_disconnect("The browser was opened for a different page.")
+            async with asyncio.timeout(5):
+                await app.state.automation.prompt.close()
+            return await app.state.automation.browser.open(url)
 
     @app.get("/api/browser/status")
     async def browser_status():
@@ -478,9 +555,10 @@ def create_app(data_dir: Path | None = None, token: str | None = None, secret_st
         engine = payload.get("engine", settings.get("browser_engine", "laya"))
         from .usage import decision_settings
 
-        settings = decision_settings(app.state.db, settings | {"browser_engine": engine}, store)
+        settings = await asyncio.wait_for(asyncio.to_thread(decision_settings, app.state.db, settings | {"browser_engine": engine}, store), 30)
+        api_key = await asyncio.wait_for(asyncio.to_thread(store.get, 'jev:secret'), 15) if engine in ('jev','hybrid') else None
         result = await probe_engine(
-            engine=engine, settings=settings, api_key=store.get("jev:secret") if engine in ("jev", "hybrid") else None
+            engine=engine, settings=settings, api_key=api_key
         )
         if engine in ("laya", "hybrid"):
             runtime = await app.state.laya_runtime.status()
@@ -514,9 +592,10 @@ def create_app(data_dir: Path | None = None, token: str | None = None, secret_st
         engine = payload.get("engine", settings.get("browser_engine", "laya"))
         from .usage import decision_settings
 
-        settings = decision_settings(app.state.db, settings | {"browser_engine": engine}, store)
+        settings = await asyncio.wait_for(asyncio.to_thread(decision_settings, app.state.db, settings | {"browser_engine": engine}, store), 30)
+        api_key = await asyncio.wait_for(asyncio.to_thread(store.get, 'jev:secret'), 15) if engine in ('jev','hybrid') else None
         result = await benchmark_engine(
-            engine=engine, settings=settings, api_key=store.get("jev:secret") if engine in ("jev", "hybrid") else None
+            engine=engine, settings=settings, api_key=api_key
         )
         if engine in ("laya", "hybrid"):
             runtime = await app.state.laya_runtime.status()
@@ -620,59 +699,48 @@ def create_app(data_dir: Path | None = None, token: str | None = None, secret_st
 
 
 async def schedule(app):
+    from datetime import datetime
+    from zoneinfo import ZoneInfo
     from .core import get_settings
-    from .discovery import run_sources
     from .notifications import collect_notifications
+    from .tracking import refresh_daily
 
-    last_search, last_mail = 0.0, 0.0
+    last_mail = 0.0
     while True:
         await asyncio.sleep(15)
         if app.state.restoring:
             continue
-        settings = get_settings(app.state.db)
         try:
-            for message in collect_notifications(app.state.db):
+            settings = await asyncio.to_thread(get_settings, app.state.db)
+            for message in await asyncio.to_thread(collect_notifications, app.state.db):
                 await notify(APP_NAME, message, app.state.db)
-        except Exception:
-            logger.warning("notification_scan_failed", exc_info=False)
-        if not settings.get("scheduler_enabled", False):
-            continue
-        current = asyncio.get_running_loop().time()
-        try:
-            if settings.get("tracking_first", True):
-                from datetime import datetime
-                from .tracking import refresh_daily
-
-                daily = settings.get("daily_last_refresh") or {}
-                if daily.get("day") != datetime.now().astimezone().date().isoformat() and current - last_search >= 60:
-                    last_search = current
-                    await refresh_daily(app.state.db, app.state.data_dir)
-            elif (
-                not settings.get("automation_paused", True)
-                and current - last_search >= max(15, int(settings.get("discovery_interval_minutes", 120))) * 60
-            ):
-                last_search = current
-                await run_sources(app.state.db, app.state.data_dir, due_only=True)
-                from .rules import run_rules
-
-                await run_rules(app.state.db, app.state.data_dir, app.state.automation)
-            if (
-                current - last_mail
-                >= max(5, int(settings.get("email_interval_minutes", settings.get("email_poll_minutes", 10)))) * 60
-            ):
+            if not settings.get('scheduler_enabled', True):
+                continue
+            local = datetime.now(ZoneInfo(settings.get('discovery_timezone', 'Europe/London')))
+            day = local.date().isoformat()
+            search_time = settings.get('daily_search_time', '08:00')
+            overdue = (settings.get('daily_last_refresh') or {}).get('day') != day
+            if overdue and local.strftime('%H:%M') >= search_time:
+                if hasattr(getattr(app.state, 'automation', None), 'enqueue'):
+                    key = f'discovery:{day}'
+                    previous = await asyncio.to_thread(app.state.db.one, 'SELECT state FROM automation_tasks WHERE dedupe_key=? ORDER BY created_at DESC LIMIT 1', (key,))
+                    if not previous:
+                        app.state.automation.enqueue('discovery', dedupe_key=key)
+                else:
+                    task = getattr(app.state, 'daily_refresh_task', None)
+                    if task is None or task.done():
+                        app.state.daily_refresh_task = asyncio.create_task(refresh_daily(app.state.db, app.state.data_dir))
+            current = asyncio.get_running_loop().time()
+            if current-last_mail >= max(5, int(settings.get('email_interval_minutes', 10)))*60:
                 last_mail = current
-                task = getattr(app.state, "mail_sync_task", None)
-                if task is None or task.done():
-
-                    async def sync_mail():
-                        try:
-                            await app.state.mail.sync()
-                        except Exception:
-                            logger.warning("scheduled_mail_failed", exc_info=False)
-
-                    app.state.mail_sync_task = asyncio.create_task(sync_mail())
+                if hasattr(getattr(app.state, 'automation', None), 'enqueue'):
+                    app.state.automation.enqueue('mail')
+                else:
+                    task = getattr(app.state, 'mail_sync_task', None)
+                    if task is None or task.done():
+                        app.state.mail_sync_task = asyncio.create_task(app.state.mail.sync())
         except Exception:
-            logger.warning("scheduler_task_failed", exc_info=False)
+            logger.warning('scheduler_task_failed', exc_info=False)
 
 
 def run():

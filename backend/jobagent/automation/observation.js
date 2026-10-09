@@ -173,6 +173,7 @@
       toggle_proxy_id: toggle ? identity(toggle) : null,
       clear_proxy_id: role === 'combobox' && clearProxy && visible(clearProxy) ? identity(clearProxy) : null,
       form_id: node.closest('form') ? identity(node.closest('form')) : 'page',
+      accept: node.getAttribute('accept') || '',
       max_length: node.maxLength > 0 ? node.maxLength : null, step: node.getAttribute('step'), min: node.getAttribute('min'), max: node.getAttribute('max'),
       field_path: fieldFor(node)?.getAttribute('data-field-path') || '',
       expanded: node.getAttribute('aria-expanded') === 'true',

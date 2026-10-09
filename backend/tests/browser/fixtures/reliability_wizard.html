@@ -1,0 +1,43 @@
+<!doctype html><html><head><meta charset="utf-8"><title>Local ATS reliability fixture</title></head><body>
+<main><h1>Graduate Software Engineer application</h1><h2 id="heading"></h2><form id="form"></form><div id="confirmation"></div></main>
+<script>
+const params = new URLSearchParams(location.search), identity = params.get('identity') || 'fixture';
+const titles = ['Personal information','Resume and cover letter','Work experience','Education','Skills','Work authorisation','Additional questions','Review'];
+let step = +(sessionStorage.getItem(identity+':step') || 0);
+const stored = JSON.parse(sessionStorage.getItem(identity+':values') || '{}');
+function save() { sessionStorage.setItem(identity+':values',JSON.stringify(stored)); }
+function render() {
+ document.getElementById('heading').textContent = `${titles[step]} · Step ${step+1} of ${titles.length}`;
+ const form = document.getElementById('form');
+ form.innerHTML = step === 1 ? '<label>CV<input type="file" name="resume" accept=".pdf,.txt" required></label><label>Cover letter<input type="file" name="cover" accept=".pdf,.txt" required></label>' :
+ '<label>Email<input type="email" name="email" required></label>';
+ const button = document.createElement('button'); button.type='button'; button.textContent=step===7?'Submit application':'Save and continue';
+ button.addEventListener('click', () => {
+  if (!form.checkValidity()) { form.reportValidity(); return; }
+  if (step === 7) { sessionStorage.setItem(identity+':submissions', (+sessionStorage.getItem(identity+':submissions')||0)+1); form.innerHTML=''; document.getElementById('confirmation').textContent='Your application has been received'; return; }
+  step++; sessionStorage.setItem(identity+':step', step);
+  if (params.get('navigate')==='yes') location.reload(); else render();
+ }); form.append(button);
+ const input=form.querySelector('[name=email]');
+ if(input) {
+  input.value=stored[step]||'';
+  input.addEventListener('input', () => {
+   stored[step]=input.value; save();
+   if(step===2 && params.get('reload')==='yes' && !sessionStorage.getItem(identity+':reloaded')) {
+    sessionStorage.setItem(identity+':reloaded','yes'); location.reload();
+   }
+   if(step===4 && params.get('conditional')==='yes' && !form.querySelector('[name=name]')) {
+    const field=document.createElement('label');field.innerHTML='Full name<input name="name" required>';form.insertBefore(field,button);
+   }
+  });
+ }
+ form.querySelectorAll('[type=file]').forEach(input => input.addEventListener('change', () => {
+  const old=input.parentElement.querySelector('[role=progressbar]');old?.remove();
+  if(params.get('slow')==='yes') {
+   const progress=document.createElement('span');progress.setAttribute('role','progressbar');progress.textContent='Uploading';input.parentElement.append(progress);
+   setTimeout(()=>progress.remove(),3000);
+  }
+ }));
+}
+render();
+</script></body></html>

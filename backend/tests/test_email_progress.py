@@ -24,7 +24,7 @@ async def test_keychain_wait_keeps_api_responsive_and_reports_truthful_progress(
             return json.dumps({"access_token": "private-test-token", "expires_at": 9999999999})
 
     vault = WaitingVault()
-    app = create_app(tmp_path, token="test-token", secret_store=vault, start_scheduler=False)
+    app = create_app(tmp_path, worker_isolation=False, token="test-token", secret_store=vault, start_scheduler=False)
     app.state.db.execute(
         "INSERT INTO integrations(id,provider,config,status) VALUES('g','gmail',?,'connected')",
         (json.dumps({"client_id": "desktop", "account_email": "candidate@example.test"}),),
@@ -80,7 +80,7 @@ async def test_keychain_denial_preserves_connection_and_gives_recovery_action(tm
         def get(self, name):
             raise KeyringError("private system error")
 
-    app = create_app(tmp_path, token="test-token", secret_store=DeniedVault(), start_scheduler=False)
+    app = create_app(tmp_path, worker_isolation=False, token="test-token", secret_store=DeniedVault(), start_scheduler=False)
     app.state.db.execute("INSERT INTO integrations(id,provider,config,status) VALUES('g','gmail','{}','connected')")
     result = await app.state.mail.sync()
     assert result["imported"] == 0

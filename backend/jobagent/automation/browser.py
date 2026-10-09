@@ -4,8 +4,10 @@ from __future__ import annotations
 
 import asyncio
 from collections import OrderedDict
+from functools import wraps
 import hashlib
 import json
+import logging
 import mimetypes
 import os
 from pathlib import Path
@@ -14,6 +16,7 @@ import re
 import time
 from urllib.parse import urlparse
 import uuid
+import weakref
 
 from .types import Decision, HumanRequired, InvalidDecision, Operation, Paused, StaleState
 
@@ -26,6 +29,7 @@ CONFIRMATION = re.compile(
     r"(?:received|submitted|successfully submitted)|(?:we have|we've) received your application|"
     r"successfully (?:submitted|sent) your application)", re.I,
 )
+LOGGER = logging.getLogger(__name__)
 
 
 def safe_url(url: str) -> str:
@@ -74,6 +78,19 @@ def confirmation_evidence(snapshot: dict) -> list[dict]:
     return evidence
 
 
+def bounded(seconds):
+    def decorate(method):
+        @wraps(method)
+        async def wrapped(*args, **kwargs):
+            try:
+                async with asyncio.timeout(seconds):
+                    return await method(*args, **kwargs)
+            except TimeoutError as exc:
+                raise HumanRequired(f'{method.__name__} exceeded its {seconds}s operation limit. Inspect or retry this task.') from exc
+        return wrapped
+    return decorate
+
+
 class BrowserSession:
     def __init__(self, profile_path: str | Path):
         self.profile_path = Path(profile_path)
@@ -88,45 +105,146 @@ class BrowserSession:
         self._channel: str | None = None
         self._last_error: str | None = None
         self._action_lock = asyncio.Lock()
+        self._lifecycle_lock = asyncio.Lock()
+        self._configured = False
+        self._watched_pages = weakref.WeakSet()
+        self._disconnect_notified = False
+        self.on_disconnect = None
 
-    async def start(self, headless: bool = False, channel: str | None = "auto") -> dict:
-        if self.context:
-            return self.status()
+    def _invalidate_approvals(self) -> None:
+        self._snapshots.clear()
+
+    def _notify_disconnect(self, reason: str) -> None:
+        if self._disconnect_notified:
+            return
+        self._last_error = reason
+        self._disconnect_notified = True
+        if self.on_disconnect:
+            try:
+                self.on_disconnect(reason)
+            except Exception:
+                LOGGER.exception("Could not record application browser disconnection")
+
+    def _context_lost(self, context, reason: str) -> None:
+        # Late events from a retired browser must never invalidate its replacement.
+        if context is not self.context:
+            return
+        self.context = self.page = None
+        self._invalidate_approvals()
+        self._notify_disconnect(reason)
+
+    def _page_lost(self, page, reason: str) -> None:
+        if page is not self.page:
+            return
+        self.page = None
+        self._invalidate_approvals()
+        self._notify_disconnect(reason)
+
+    def _set_page(self, page) -> None:
+        self.page = page
+        self._disconnect_notified = False
+        if page not in self._watched_pages:
+            self._watched_pages.add(page)
+            page.on("close", lambda *_: self._page_lost(
+                page, "The application tab was closed. Retry Auto Apply to reopen the form."))
+            page.on("crash", lambda *_: self._page_lost(
+                page, "The application tab crashed. Retry Auto Apply to reopen the form."))
+
+    def _context_running(self) -> bool:
+        if self.context is None:
+            return False
+        browser = self.context.browser
+        return browser is None or browser.is_connected()
+
+    async def _release(self, context, driver) -> None:
+        # Detach handles before calling this: both close and stop emit events.
+        # Driver cleanup must still happen if the browser already died or hangs.
+        try:
+            if context:
+                try:
+                    await asyncio.wait_for(context.close(), timeout=5)
+                except Exception:
+                    pass
+        finally:
+            if driver:
+                try:
+                    await asyncio.wait_for(driver.stop(), timeout=5)
+                except Exception:
+                    pass
+
+    @bounded(50)
+    async def start(self, headless: bool | None = None, channel: str | None = "auto") -> dict:
+        async with self._lifecycle_lock:
+            return await self._start(headless, channel)
+
+    async def _start(self, headless: bool | None, channel: str | None) -> dict:
+        if self._context_running():
+            if self.page and not self.page.is_closed():
+                return self.status()
+            # Closing one tab need not close a persistent browser context.
+            # Reopen only on an explicit start/open; never resume an old approval.
+            self._invalidate_approvals()
+            try:
+                self._set_page(await asyncio.wait_for(self.context.new_page(), timeout=15))
+                self._last_error = None
+                return self.status()
+            except Exception:
+                pass  # A simultaneous browser exit requires a fresh context.
+        context, driver = self.context, self._playwright
+        self.context = self.page = self._playwright = None
+        self._invalidate_approvals()
+        await self._release(context, driver)
         try:
             from playwright.async_api import async_playwright
         except ImportError as error:
             raise HumanRequired("Playwright is unavailable. Install the browser extra and Chromium.") from error
         self.profile_path.mkdir(parents=True, exist_ok=True)
         self.profile_path.chmod(0o700)
-        self._headless = headless
-        self._channel = "chrome" if channel == "auto" and system_chrome_available() else None if channel == "auto" else channel
+        self._headless = self._headless if headless is None else headless
+        if channel != "auto" or not self._configured:
+            self._channel = "chrome" if channel == "auto" and system_chrome_available() else None if channel == "auto" else channel
+        self._configured = True
         if platform.system() == "Darwin":
             # Frozen Playwright otherwise defaults to Chromium inside _MEIPASS,
             # where the heavyweight browser is intentionally not bundled.
             os.environ.setdefault("PLAYWRIGHT_BROWSERS_PATH", str(Path.home() / "Library/Caches/ms-playwright"))
         try:
-            self._playwright = await async_playwright().start()
-            self.context = await self._playwright.chromium.launch_persistent_context(
-                user_data_dir=str(self.profile_path), headless=headless, channel=self._channel,
-                viewport={"width": 1280, "height": 900}, accept_downloads=False, chromium_sandbox=True,
-            )
-        except Exception as error:
-            if self._playwright:
-                await self._playwright.stop()
-            self._playwright = None
+            async with asyncio.timeout(35):
+                self._playwright = await async_playwright().start()
+                self.context = await self._playwright.chromium.launch_persistent_context(
+                    user_data_dir=str(self.profile_path), headless=self._headless, channel=self._channel,
+                    viewport={"width": 1280, "height": 900}, accept_downloads=False, chromium_sandbox=True,
+                    timeout=30000,
+                )
+                context = self.context
+                context.on("close", lambda *_: self._context_lost(
+                    context, "The application browser was closed. Retry Auto Apply to reopen the form."))
+                if context.browser:
+                    context.browser.on("disconnected", lambda *_: self._context_lost(
+                        context, "The application browser disconnected. Retry Auto Apply to reopen the form."))
+                context.set_default_timeout(6000)
+                self._set_page(context.pages[0] if context.pages else await context.new_page())
+                if not self._context_running() or self.page.is_closed():
+                    raise RuntimeError("The application browser closed while starting.")
+        except BaseException as error:
+            context, driver = self.context, self._playwright
+            self.context = self.page = self._playwright = None
+            self._invalidate_approvals()
+            await self._release(context, driver)
+            if not isinstance(error, Exception):
+                raise
             self._last_error = (str(error).splitlines() or [type(error).__name__])[0][:220]
             raise HumanRequired("The application browser could not start. Install Google Chrome or Chromium "
                                 "(`python -m playwright install chromium`), and close any other Meridian process "
                                 f"using this profile. Details: {self._last_error}") from error
         self._last_error = None
-        self.context.set_default_timeout(6000)
-        self.page = self.context.pages[0] if self.context.pages else await self.context.new_page()
         return self.status()
 
     def status(self) -> dict:
-        return {"running": self.context is not None, "paused": self._paused, "takeover": self._takeover,
+        running = self._context_running()
+        return {"running": running, "paused": self._paused, "takeover": self._takeover,
                 "headless": self._headless, "channel": self._channel,
-                "current_url": self.page.url if self.page and not self.page.is_closed() else None,
+                "current_url": self.page.url if running and self.page and not self.page.is_closed() else None,
                 "profile_path": str(self.profile_path), "last_error": self._last_error}
 
     def pause(self) -> dict:
@@ -136,14 +254,15 @@ class BrowserSession:
     async def resume(self) -> dict:
         self._paused = False
         self._takeover = False
-        self._snapshots.clear()  # Human edits always invalidate old approvals.
+        self._invalidate_approvals()  # Human edits always invalidate old approvals.
         return self.status()
 
+    @bounded(10)
     async def takeover(self) -> dict:
         self._paused = True
         self._takeover = True
-        self._snapshots.clear()
-        if self.page:
+        self._invalidate_approvals()
+        if self.page and not self.page.is_closed():
             await self.page.bring_to_front()
         return self.status()
 
@@ -151,14 +270,17 @@ class BrowserSession:
         if self._paused:
             raise Paused("Automation is paused. Resume it after completing the requested manual action.")
 
+    @bounded(55)
     async def open(self, url: str) -> dict:
         safe_url(url)
         self._check_pause()
         await self.start()
+        self._check_pause()
         await self.page.goto(url, wait_until="domcontentloaded", timeout=45000)
-        self._snapshots.clear()
+        self._invalidate_approvals()
         return await self.wait_until_ready()
 
+    @bounded(25)
     async def wait_until_ready(self) -> dict:
         """Allow an ATS's asynchronous application form to finish loading."""
         deadline = time.monotonic() + 20
@@ -177,13 +299,15 @@ class BrowserSession:
                 return snapshot
             await asyncio.sleep(.25)
 
+    @bounded(10)
     async def observe(self) -> dict:
-        if not self.page or self.page.is_closed():
-            raise HumanRequired("Open an application in the browser first.")
+        page = self.page
+        if not self._context_running() or not page or page.is_closed():
+            raise HumanRequired("The application browser is unavailable. Retry Auto Apply to reopen the form.")
         frames = []
         refs = {}
         elements = []
-        for position, frame in enumerate(self.page.frames):
+        for position, frame in enumerate(page.frames):
             # An invisible reCAPTCHA badge is not an interactive challenge or an application frame.
             # A visible challenge uses a separate bframe, which is still inspected and blocked.
             if re.search(r"/recaptcha/(?:api2|enterprise)/anchor\?", frame.url) and re.search(r"[?&]size=invisible(?:&|$)", frame.url):
@@ -206,7 +330,7 @@ class BrowserSession:
         fingerprint = hashlib.sha256(json.dumps(semantic, sort_keys=True, ensure_ascii=False).encode()).hexdigest()
         snapshot_id = str(uuid.uuid4())
         snapshot = {"id": snapshot_id, "snapshot_id": snapshot_id, "fingerprint": fingerprint,
-                    "url": self.page.url, "title": await self.page.title(), "frames": frames,
+                    "url": page.url, "title": await page.title(), "frames": frames,
                     "elements": elements, "observed_at": time.time(),
                     "text": "\n".join(f.get("text", "") for f in frames)[:24000],
                     "blocked": any(f.get("challenge") or f.get("mfa") or f.get("login") for f in frames),
@@ -235,6 +359,7 @@ class BrowserSession:
                                 "Complete the sign-in or multi-factor verification in the browser.")
         return old
 
+    @bounded(30)
     async def execute(self, decision: Decision | dict, snapshot: str | dict, *, value: str | None = None,
                       file_path: str | Path | None = None, allow_submit: bool = False,
                       minimum_confidence: float = 0.85, upload_name: str | None = None,
@@ -245,6 +370,7 @@ class BrowserSession:
             raise HumanRequired("Decision confidence is below the configured threshold.")
         snapshot_id = snapshot if isinstance(snapshot, str) else snapshot["id"]
         async with self._action_lock:
+            upload_evidence = None
             self._check_pause()
             observed, refs = await self._validate_snapshot(snapshot_id)
             op = decision.operation
@@ -336,14 +462,29 @@ class BrowserSession:
                         raise StaleState(f"The observed control is {valid}; no action was performed.")
                     toggle_click_node = node if valid == "native" else visible_node
                     if frame.parent_frame:
-                        iframe = await frame.frame_element()
-                        outer_valid = await iframe.evaluate("""node => {
+                        point = await visible_node.evaluate('''node => {
                             const r=node.getBoundingClientRect();
-                            const top=document.elementFromPoint(r.x+r.width/2,r.y+r.height/2);
-                            return top === node || node.contains(top);
-                        }""")
-                        if not outer_valid:
-                            raise StaleState("The frame is covered by another element.")
+                            return {x:r.x+r.width/2,y:r.y+r.height/2};
+                        }''')
+                        ancestor = frame
+                        while ancestor.parent_frame:
+                            iframe = await ancestor.frame_element()
+                            try:
+                                # Test the target's actual hit point through every
+                                # ancestor. A tall iframe's centre may be offscreen
+                                # even when the candidate control is visible.
+                                point = await iframe.evaluate('''(node, point) => {
+                                    const r=node.getBoundingClientRect();
+                                    const x=r.x+(node.clientLeft+point.x)*r.width/node.offsetWidth;
+                                    const y=r.y+(node.clientTop+point.y)*r.height/node.offsetHeight;
+                                    const top=document.elementFromPoint(x,y);
+                                    return {x,y,valid:top===node || node.contains(top)};
+                                }''', point)
+                                if not point['valid']:
+                                    raise StaleState('The frame is covered at the observed control.')
+                            finally:
+                                await iframe.dispose()
+                            ancestor = ancestor.parent_frame
                     self._check_pause()
                     if op == Operation.TYPE_TEXT:
                         if value is None or not isinstance(value, str) or len(value) > 20000:
@@ -414,21 +555,36 @@ class BrowserSession:
                         mime = upload_mime or mimetypes.guess_type(name)[0] or "application/octet-stream"
                         if not re.fullmatch(r"[a-zA-Z0-9.+-]+/[a-zA-Z0-9.+-]+", mime):
                             raise InvalidDecision("The selected document has an invalid MIME type.")
+                        from .uploads import validate_upload, verify_upload
+                        validate_upload(path, name, mime, element.get('accept') or '')
                         content = await asyncio.to_thread(path.read_bytes)
                         if len(content) > 50 * 1024 * 1024:
                             raise InvalidDecision("Application documents must be at most 50 MB.")
                         self._check_pause()
                         await node.set_input_files({"name": name, "mimeType": mime, "buffer": content})
+                        deadline = time.monotonic()+20
+                        while True:
+                            try:
+                                upload_evidence = await verify_upload(node, name)
+                            except Exception as exc:
+                                if isinstance(exc, InvalidDecision):
+                                    raise
+                                raise StaleState('The form reloaded during upload. Reinspect the attachment before continuing.') from exc
+                            if not upload_evidence['busy'] and (upload_evidence['selected'] or upload_evidence['acknowledged']):
+                                break
+                            if time.monotonic() >= deadline:
+                                raise HumanRequired('Upload did not finish within 20s. Inspect this attachment before retrying.')
+                            await asyncio.sleep(.2)
                     elif op == Operation.OPEN_TAB:
                         url = safe_url(element.get("href", ""))
-                        self.page = await self.context.new_page()
+                        self._set_page(await self.context.new_page())
                         await self.page.goto(url, wait_until="domcontentloaded")
                     else:
                         pages_before = set(self.context.pages)
                         await node.click()
                         new_pages = [p for p in self.context.pages if p not in pages_before]
                         if new_pages:
-                            self.page = new_pages[-1]
+                            self._set_page(new_pages[-1])
                             await self.page.wait_for_load_state("domcontentloaded")
                 finally:
                     if proxy_handle:
@@ -444,19 +600,19 @@ class BrowserSession:
                 if len(self.context.pages) <= 1:
                     raise HumanRequired("The only application tab will remain open for review.")
                 old_page = self.page
-                self.page = next(p for p in self.context.pages if p is not old_page)
+                self._set_page(next(p for p in self.context.pages if p is not old_page))
                 await old_page.close()
             else:
                 raise InvalidDecision("Unsupported operation.")
             await asyncio.sleep(0.05)
             return {"operation": str(op), "target": decision.target, "label": element["label"] if element else None,
                     "confidence": decision.confidence, "executed": True, "url": self.page.url,
-                    "decision_metadata": decision.metadata}
+                    "decision_metadata": decision.metadata, "upload_evidence": upload_evidence}
 
+    @bounded(15)
     async def close(self) -> None:
-        if self.context:
-            await self.context.close()
-        if self._playwright:
-            await self._playwright.stop()
-        self.page = self.context = self._playwright = None
-        self._snapshots.clear()
+        async with self._lifecycle_lock:
+            context, driver = self.context, self._playwright
+            self.page = self.context = self._playwright = None
+            self._invalidate_approvals()
+            await self._release(context, driver)

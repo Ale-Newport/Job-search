@@ -652,3 +652,94 @@ async def test_clipped_upload_uses_only_associated_attach_button(browser, tmp_pa
     await browser.execute(Decision(Operation.UPLOAD,target['index']),snapshot,file_path=path)
     assert await browser.page.locator('#resume').evaluate('n=>n.files.length') == 1
     assert await browser.page.locator('#cover_letter').evaluate('n=>n.files.length') == 0
+
+
+@pytest.mark.parametrize("next_application_id", ["restart", "another-job"])
+async def test_auto_apply_reopens_closed_browser_with_fresh_review(browser, fixture_server, candidate, next_application_id):
+    application = {"id": "restart", "url": fixture_server + "/generic.html"}
+    first = await browser.fill_application(application, candidate, [])
+    assert first["status"] == "needs_review", first
+    assert await browser.page.evaluate("window.submissions") == 0
+    notices = []
+    browser.on_disconnect = notices.append
+    old_context = browser.context
+    await old_context.close()
+    assert browser.status()["running"] is False
+    assert browser.status()["current_url"] is None
+    assert len(notices) == 1
+    assert not browser._snapshots
+    assert (await browser.submit(first["snapshot_id"]))["status"] == "human_required"
+    assert browser.context is None  # Submitting an obsolete review cannot reopen Chrome.
+    second = await browser.fill_application({**application, "id": next_application_id}, candidate, [])
+    assert second["status"] == "needs_review", second
+    assert second["snapshot_id"] != first["snapshot_id"]
+    assert browser.context is not old_context
+    assert browser.status()["running"] is True
+    assert browser.status()["headless"] is True
+    assert await browser.page.get_by_label("Email", exact=True).input_value() == "alex@example.test"
+    assert await browser.page.evaluate("window.submissions") == 0
+    assert (await browser.submit(first["snapshot_id"]))["status"] == "human_required"
+    assert await browser.page.evaluate("window.submissions") == 0
+
+
+async def test_auto_apply_reopens_active_tab_without_reusing_unrelated_tab(browser, fixture_server, candidate):
+    application = {"id": "tab-restart", "url": fixture_server + "/generic.html"}
+    first = await browser.fill_application(application, candidate, [])
+    assert first["status"] == "needs_review", first
+    context = browser.context
+    unrelated_page = await context.new_page()
+    await unrelated_page.set_content("<h1>Unrelated tab</h1>")
+    await browser.page.close()
+    assert browser.page is None
+    assert not browser._snapshots
+    result = await browser.fill_application(application, candidate, [])
+    assert result["status"] == "needs_review", result
+    assert browser.context is context
+    assert browser.page is not unrelated_page
+    assert await unrelated_page.locator("h1").inner_text() == "Unrelated tab"
+    assert await browser.page.get_by_label("Email", exact=True).input_value() == "alex@example.test"
+    assert await browser.page.evaluate("window.submissions") == 0
+
+
+async def test_browser_closed_while_filling_never_returns_ready_review(browser, fixture_server, candidate):
+    notices = []
+    browser.on_disconnect = notices.append
+    async def close_after_first_step(step):
+        await browser.context.close()
+    browser.on_step = close_after_first_step
+    application = {"id": "interrupted", "url": fixture_server + "/generic.html"}
+    result = await browser.fill_application(application, candidate, [])
+    assert result["status"] in {"human_required", "error"}, result
+    assert result.get("error")
+    assert not browser._snapshots
+    assert not browser._review
+    assert len(notices) == 1
+    browser.on_step = None
+    retry = await browser.fill_application(application, candidate, [])
+    assert retry["status"] == "needs_review", retry
+    assert await browser.page.evaluate("window.submissions") == 0
+
+
+async def test_browser_relaunch_preserves_manual_pause_gate(browser, fixture_server, candidate):
+    application = {"id": "paused-restart", "url": fixture_server + "/generic.html"}
+    result = await browser.fill_application(application, candidate, [])
+    assert result["status"] == "needs_review", result
+    await browser.takeover()
+    await browser.context.close()
+    blocked = await browser.fill_application(application, candidate, [])
+    assert blocked["status"] == "human_required", blocked
+    assert browser.status()["paused"] is True
+    assert browser.status()["takeover"] is True
+    assert browser.context is None
+    await browser.resume()
+    retry = await browser.fill_application(application, candidate, [])
+    assert retry["status"] == "needs_review", retry
+    assert await browser.page.evaluate("window.submissions") == 0
+
+
+@pytest.mark.asyncio
+async def test_tall_iframe_checks_control_hit_point(browser, fixture_server):
+    result=await browser.fill_application({'id':'tall-frame','url':fixture_server+'/tall_iframe.html'},[fact('email','frame@example.test',category='contact')],[])
+    assert result['status']=='needs_review',result.get('questions')
+    frame=next(f for f in browser.page.frames if f.url.endswith('tall_iframe_child.html'))
+    assert await frame.locator('input').input_value()=='frame@example.test'

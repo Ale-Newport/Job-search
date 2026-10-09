@@ -126,7 +126,7 @@ def tracker_rows(db):
             and j["tracking_status"] not in {"REJECTED", "WITHDRAWN", "OFFER", "GHOSTED"}
             else None
             if j["submitted"]
-            else j["metadata"].get("application_deadline")
+            else j.get('application_deadline') or j["metadata"].get("application_deadline")
         )
         j["deadline_kind"] = "Recruitment task" if j["submitted"] else "Apply before"
         result.append(j)
@@ -140,19 +140,40 @@ def tracker(
     scope: Literal["all", "saved", "applied", "pending", "ignored"] = "all",
     status: str = "",
     source: str = "",
+    confirmed_open: bool = False,
+    deadline_days: int | None = Query(None, ge=1, le=365),
     limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0),
 ):
+    from .job_validity import eligible
     rows = tracker_rows(get_db(request))
+    def within_deadline(job):
+        if deadline_days is None:
+            return True
+        value = job.get('application_deadline')
+        if not value:
+            return False
+        try:
+            from dateutil.parser import isoparse
+            from zoneinfo import ZoneInfo
+            deadline = isoparse(value)
+            if deadline.tzinfo is None:
+                deadline = deadline.replace(tzinfo=ZoneInfo(job.get('deadline_timezone') or 'Europe/London'))
+            seconds = (deadline-datetime.now(timezone.utc)).total_seconds()
+            return 0 <= seconds <= deadline_days*86400
+        except (ValueError, TypeError):
+            return False
     filtered = [
         j
         for j in rows
         if (not q or q.casefold() in f"{j['title']} {j['company']} {j['location']}".casefold())
         and (not status or j["tracking_status"] == status)
         and (not source or j["source"] == source)
+        and (not confirmed_open or j['availability']=='OPEN')
+        and within_deadline(j)
         and (scope != "saved" or j["status"] == "SHORTLISTED" and not j["submitted"])
         and (scope != "applied" or j["submitted"])
-        and (scope != "pending" or not j["submitted"] and j["status"] != "IGNORED")
+        and (scope != "pending" or not j["submitted"] and j["status"] != "IGNORED" and eligible(j))
         and (scope != "ignored" or j["status"] == "IGNORED")
         and (scope == "ignored" or j["status"] != "IGNORED")
     ]
@@ -176,10 +197,11 @@ def daily_data(db):
             j["found_today"] = datetime.fromisoformat(j["created_at"]).astimezone().date().isoformat() == today
         except (ValueError, TypeError):
             j["found_today"] = False
+    from .job_validity import eligible
     pending = [
         j
         for j in rows
-        if not j["submitted"]
+        if eligible(j) and not j["submitted"]
         and j["status"] != "IGNORED"
         and not j["metadata"].get("closed")
         and (
@@ -247,7 +269,10 @@ def daily_data(db):
 
 @router.get("/daily")
 def daily(request: Request):
-    return daily_data(get_db(request))
+    result = daily_data(get_db(request))
+    if hasattr(request.app.state.automation, 'enqueue'):
+        result['refreshing'] = bool(get_db(request).one("SELECT id FROM automation_tasks WHERE kind='discovery' AND state NOT IN ('COMPLETED','FAILED','CANCELLED')"))
+    return result
 
 
 async def refresh_daily(db, data_dir):
@@ -268,6 +293,8 @@ async def refresh_daily(db, data_dir):
 @router.post("/daily/refresh")
 async def daily_refresh(request: Request):
     app = request.app
+    if hasattr(app.state.automation, 'enqueue'):
+        return app.state.automation.enqueue('discovery', dedupe_key='discovery:manual')
     task = getattr(app.state, "daily_refresh_task", None)
     if task and not task.done():
         return {"status": "already_running"}

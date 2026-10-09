@@ -358,7 +358,7 @@ def test_typed_cover_letter_endpoint_does_not_start_unneeded_model(tmp_path, mon
             return None
 
     monkeypatch.delenv("MERIDIAN_TEST", raising=False)
-    app = create_app(tmp_path, token="narrative-test", secret_store=NoSecrets(), start_scheduler=False)
+    app = create_app(tmp_path, worker_isolation=False, token="narrative-test", secret_store=NoSecrets(), start_scheduler=False)
     db = app.state.db
     project = entity(db, "project", "API Project")
     fact = ingest_fact(db, project, "story", "I built a Java API.", source="test", evidence={}, verified=True)

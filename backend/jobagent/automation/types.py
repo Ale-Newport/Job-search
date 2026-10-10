@@ -41,6 +41,10 @@ class StaleState(AutomationError):
     code = "stale_state"
 
 
+class UserEdit(StaleState):
+    code = "user_edit"
+
+
 class HumanRequired(AutomationError):
     code = "human_required"
 

@@ -417,6 +417,7 @@ def application_knowledge(db, application, facts):
                         "profile_aliases": [normalize(spec["key"]), normalize(spec["label"]), *spec["aliases"]],
                         "profile_explicit": True,
                         "answer_priority": 1,
+                        'manual_correction': f.get('notes', '').startswith('Edited directly in browser:'),
                     }
                 )
     skipped = []
@@ -430,6 +431,10 @@ def application_knowledge(db, application, facts):
             continue
         if row["action"] == "skip":
             skipped.append(normalize(row["question"]))
+            if row.get('notes', '').startswith('Edited directly in browser:'):
+                base.append({**row, 'id': row['fact_id'], 'key': row['question'],
+                             'profile_explicit': True, 'manual_correction': True,
+                             'answer_priority': 3 if row['application_id'] == application['id'] else 2})
         else:
             base.append(
                 {
@@ -438,12 +443,13 @@ def application_knowledge(db, application, facts):
                     "key": row["question"],
                     "profile_explicit": True,
                     "answer_priority": 3 if row["application_id"] == application["id"] else 2,
+                    'manual_correction': row.get('notes', '').startswith('Edited directly in browser:'),
                 }
             )
     return base, skipped
 
 
-def remember_answer(db, application, question, answer, *, reusable=False, skip=False, element=None):
+def remember_answer(db, application, question, answer, *, reusable=False, skip=False, element=None, direct_edit=False):
     from .core import invalidate_fact_evidence
     from .automation.answers import classify_question
     from .automation.disclosures import disclosure_memory_key
@@ -464,8 +470,8 @@ def remember_answer(db, application, question, answer, *, reusable=False, skip=F
             old = dict(conn.execute("SELECT * FROM facts WHERE id=?", (fact_id,)).fetchone())
             invalidate_fact_evidence(db, conn, old)
             conn.execute(
-                "UPDATE facts SET value=?,verification_status='verified',locked=0,updated_at=? WHERE id=?",
-                (answer, now(), fact_id),
+                "UPDATE facts SET value=?,verification_status='verified',locked=0,notes=?,updated_at=? WHERE id=?",
+                (answer, ('Edited directly in browser: ' if direct_edit else 'Confirmed in the browser for ') + application['company'], now(), fact_id),
             )
         else:
             candidate = conn.execute("SELECT id FROM candidates LIMIT 1").fetchone()["id"]
@@ -480,7 +486,7 @@ def remember_answer(db, application, question, answer, *, reusable=False, skip=F
                     "browser_answer:" + identifier,
                     "verified",
                     0,
-                    "Confirmed in the browser for " + application["company"],
+                    ('Edited directly in browser: ' if direct_edit else 'Confirmed in the browser for ') + application["company"],
                     now(),
                     now(),
                 ),
@@ -503,8 +509,16 @@ def remember_answer(db, application, question, answer, *, reusable=False, skip=F
             "UPDATE human_tasks SET status='resolved',answer=?,updated_at=? WHERE application_id=? AND question=?",
             (answer or "Left blank by user", now(), application["id"], question),
         )
-    if reusable and spec and not skip:
-        write_profile(db, spec["key"], answer, True, "Confirmed in browser: " + application["company"])
+    if reusable and spec and (not skip or direct_edit):
+        try:
+            write_profile(db, spec["key"], answer, True,
+                          ('Edited directly in browser: ' if direct_edit else 'Confirmed in browser: ') + application["company"])
+        except ValueError:
+            if not direct_edit:
+                raise
+            # Employer formats can differ from Profile's number/date editor.
+            # The exact browser correction is already saved and remains the
+            # authoritative scoped answer; do not lose it during promotion.
         # The answer and its reusable profile fact are one user confirmation.
         # A later profile edit may supersede this memory, but its own promotion
         # must not immediately hide the exact response just given in the form.

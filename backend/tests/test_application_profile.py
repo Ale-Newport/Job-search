@@ -158,3 +158,56 @@ def test_cleared_override_blocks_old_cv_and_summaries_follow_verified_sources(db
     assert next(f for f in profile(db)["fields"] if f["key"] == "project_summary")["value"] == "Built a Python tool."
     db.execute("UPDATE facts SET verification_status='rejected' WHERE key='project'")
     assert not next(f for f in profile(db)["fields"] if f["key"] == "project_summary")["value"]
+
+
+def test_direct_browser_corrections_override_old_facts_and_remember_clears(db):
+    first = application(db)
+    second = application(db, 'Another employer')
+    write_profile(db, 'phone', '0123456789', True)
+    write_profile(db, 'location', 'London, UK', True)
+    remember_answer(db, first, 'Current location', 'Manchester (UK)', reusable=True, direct_edit=True)
+    facts, _ = knowledge(db, second)
+    correction = resolve_answer('Where are you currently located?', facts)
+    assert correction['answer'] == 'Manchester (UK)'
+    assert correction['source'] == 'user_edit'
+    remember_answer(db, first, 'Phone', '', reusable=True, skip=True, direct_edit=True)
+    facts, _ = knowledge(db, second)
+    cleared = resolve_answer('Phone number', facts)
+    assert cleared['answer'] is None and cleared['leave_blank'] and cleared['verified']
+    assert not any(f['key'] == 'phone' and f['value'] == '0123456789' for f in facts)
+
+
+def test_direct_edit_disclosures_still_respect_application_scope(db):
+    first = application(db)
+    second = application(db, 'Another employer')
+    question = 'I certify all answers are accurate'
+    remember_answer(db, first, question, 'Yes', reusable=True, direct_edit=True)
+    assert resolve_answer(question, knowledge(db, first)[0])['answer'] == 'Yes'
+    assert resolve_answer(question, knowledge(db, second)[0])['answer'] is None
+
+
+def test_browser_edit_updates_parked_checkpoint_and_expires_approval(db, tmp_path):
+    import json
+    from jobagent.orchestrator import Orchestrator
+    from jobagent.db import now
+    app = application(db)
+    coordinator = Orchestrator(db, tmp_path, recover=False)
+    coordinator.browser._active_application_id = app['id']
+    old = {'snapshot_id': 'old-review', 'review_fingerprint': 'old-facts',
+           'answers': [{'question': 'Phone', 'answer': 'old phone', 'verified': True}]}
+    db.execute("INSERT INTO automation_runs(id,application_id,status,engine,checkpoint,created_at,updated_at) VALUES(?,?,'needs_review','deterministic',?,?,?)",
+               ('parked', app['id'], json.dumps(old), now(), now()))
+    fact_id = coordinator.on_user_edit({'frame_url': 'https://jobs.example.test/Trainline/London', 'answer': 'new phone',
+                                       'element': {'type': 'text', 'label': 'Phone'}})
+    checkpoint = json.loads(db.one("SELECT checkpoint FROM automation_runs WHERE id='parked'")['checkpoint'])
+    assert checkpoint['snapshot_id'] is None and checkpoint['review_fingerprint'] is None
+    assert checkpoint['answers'] == [{'question': 'Phone', 'answer': 'new phone',
+                                      'fact_ids': [fact_id], 'verified': True, 'source': 'user_edit'}]
+    assert db.one('SELECT answer FROM application_answers WHERE application_id=?', (app['id'],))['answer'] == 'new phone'
+
+
+def test_browser_salary_format_is_saved_even_when_profile_editor_format_differs(db):
+    first, second = application(db), application(db, 'Other employer')
+    remember_answer(db, first, 'What are your salary expectations?', '45,000',
+                    reusable=True, direct_edit=True)
+    assert resolve_answer('What are your salary expectations?', knowledge(db, second)[0])['answer'] == '45,000'

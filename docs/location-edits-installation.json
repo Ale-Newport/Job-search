@@ -1,0 +1,35 @@
+{
+  "installed_app": "/Applications/Meridian.app",
+  "backup_directory": "/Users/alejandro/Projects/Job-search/.build-cache/install-backups/20261010T113952Z-location-edits",
+  "before_counts": {
+    "jobs": 3765,
+    "applications": 6,
+    "facts": 263,
+    "documents": 1,
+    "document_versions": 2,
+    "email_messages": 52,
+    "sources": 86,
+    "companies": 79,
+    "company_watch_rules": 0,
+    "browser_answers": 5
+  },
+  "deep_strict_signature_verified": true,
+  "after_counts": {
+    "jobs": 3765,
+    "applications": 6,
+    "facts": 263,
+    "documents": 1,
+    "document_versions": 2,
+    "email_messages": 52,
+    "sources": 89,
+    "companies": 79,
+    "company_watch_rules": 0,
+    "browser_answers": 5
+  },
+  "all_existing_ids_preserved": true,
+  "result": "passed",
+  "native_app_relaunched": true,
+  "binary_hashes_match": true,
+  "migration": "0008_reliability",
+  "native_today_loaded": true
+}

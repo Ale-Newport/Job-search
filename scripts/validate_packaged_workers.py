@@ -1,6 +1,7 @@
 """Validate frozen sidecar and owned workers with synthetic local data only."""
 
 import asyncio
+import argparse
 from functools import partial
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 import json
@@ -16,7 +17,7 @@ import uuid
 import httpx
 
 
-async def main():
+async def main(location_form=False):
     root = Path(__file__).resolve().parent.parent
     data = root / ".local-data" / ("packaged worker qa " + str(uuid.uuid4()))
     with socket.socket() as sock:
@@ -95,12 +96,16 @@ async def main():
                         "verification_status": "verified",
                     },
                 )
+            if location_form:
+                response = await client.put('/application-profile/location', json={'value': 'London, UK', 'confirmed': True})
+                response.raise_for_status()
+            fixture = 'search_location_portal.html' if location_form else 'reliability_wizard.html?identity=packaged&reload=yes'
             job = await post(
                 "/jobs",
                 {
                     "title": "Software Engineer",
                     "company": "Packaged Fixture",
-                    "url": f"http://127.0.0.1:{server.server_port}/reliability_wizard.html?identity=packaged&reload=yes",
+                    "url": f"http://127.0.0.1:{server.server_port}/{fixture}",
                     "ats": "greenhouse",
                 },
             )
@@ -179,6 +184,9 @@ async def main():
             else:
                 raise AssertionError("Frozen backend restart failed to recover the same task")
             assert len(run["checkpoint"].get("completed_steps", [])) >= before_steps
+            if location_form:
+                assert any(a.get('question') == 'Current location' and a.get('verified') for a in run['checkpoint']['answers'])
+                assert not any(step.get('label') == 'Submit application' for step in run['checkpoint'].get('steps', []))
             await post("/applications/" + application["id"] + "/cancel", {})
             report = {
                 "result": "passed",
@@ -192,7 +200,11 @@ async def main():
                 "submitted": False,
                 "synthetic_data": True,
             }
-            (root / "docs/upgrade-packaged-workers.json").write_text(json.dumps(report, indent=2) + "\n")
+            if location_form:
+                report.pop('completed_steps_preserved')
+                report['searchable_location_verified'] = True
+            report_path = 'docs/location-edits-packaged.json' if location_form else 'docs/upgrade-packaged-workers.json'
+            (root / report_path).write_text(json.dumps(report, indent=2) + "\n")
             print(json.dumps(report))
     finally:
         parent.terminate()
@@ -208,4 +220,6 @@ async def main():
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--location', action='store_true', help='Validate the searchable location fixture and its recovery')
+    asyncio.run(main(parser.parse_args().location))

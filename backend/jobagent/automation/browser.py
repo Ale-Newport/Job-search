@@ -18,7 +18,7 @@ from urllib.parse import urlparse
 import uuid
 import weakref
 
-from .types import Decision, HumanRequired, InvalidDecision, Operation, Paused, StaleState
+from .types import Decision, HumanRequired, InvalidDecision, Operation, Paused, StaleState, UserEdit
 
 
 OBSERVATION_SCRIPT = Path(__file__).with_name("observation.js").read_text()
@@ -135,6 +135,8 @@ class BrowserSession:
         self._watched_pages = weakref.WeakSet()
         self._disconnect_notified = False
         self.on_disconnect = None
+        self.edits = None
+        self.on_user_edit = None
 
     def _invalidate_approvals(self) -> None:
         self._snapshots.clear()
@@ -329,6 +331,11 @@ class BrowserSession:
         page = self.page
         if not self._context_running() or not page or page.is_closed():
             raise HumanRequired("The application browser is unavailable. Retry Auto Apply to reopen the form.")
+        if getattr(self, '_active_application_id', None):
+            if self.edits is None:
+                from .manual_edits import ManualEdits
+                self.edits = ManualEdits(OBSERVATION_SCRIPT, lambda record: self.on_user_edit(record) if self.on_user_edit else None)
+            await self.edits.watch(page)
         frames = []
         refs = {}
         elements = []
@@ -347,6 +354,8 @@ class BrowserSession:
             for element in data.pop("elements"):
                 index = len(elements) + 1
                 element.update(index=index, frame_index=position, document_id=data["document_id"], frame_url=data["url"])
+                if self.edits:
+                    self.edits.annotate(element)
                 refs[index] = (frame, element["node_id"], data["document_id"])
                 elements.append(element)
             frames.append(data)
@@ -364,6 +373,7 @@ class BrowserSession:
                     "login": any(f.get("login") for f in frames),
                     "unresolved_required": [e for f in frames for e in f.get("unresolved_required", [])],
                     "errors": [e for f in frames for e in f.get("errors", [])]}
+        snapshot['manual_revision'] = self.edits.revision if self.edits else 0
         self._snapshots[snapshot_id] = (snapshot, refs)
         while len(self._snapshots) > 16:
             self._snapshots.popitem(last=False)
@@ -378,6 +388,8 @@ class BrowserSession:
             raise StaleState("The observation has expired. Inspect and review the page again.")
         fresh = await self.observe()
         if old[0]["fingerprint"] != fresh["fingerprint"]:
+            if old[0].get('manual_revision', 0) != fresh.get('manual_revision', 0):
+                raise UserEdit('A user edited the form. Reinspect it and preserve the correction.')
             raise StaleState("The page or form changed since it was observed. Review a fresh snapshot.")
         if fresh["blocked"]:
             raise HumanRequired("Human verification required" if fresh["challenge"] else
@@ -406,6 +418,9 @@ class BrowserSession:
                                 and op == (Operation.OPEN_TAB if element.get('tag') == 'a' else Operation.CLICK))
             if element and is_submit(element) and not allow_submit and not entry_navigation:
                 raise HumanRequired("Final submission requires a separate policy check and approval.")
+            if element and element.get('user_edit') and op in {Operation.TYPE_TEXT, Operation.CLEAR, Operation.SELECT,
+                                                               Operation.CHECK, Operation.UNCHECK, Operation.UPLOAD}:
+                raise UserEdit('This control belongs to the user; automatic writes are suspended.')
             self._check_pause()
             if op in {Operation.BLOCKED, Operation.HUMAN_REQUIRED}:
                 raise HumanRequired("The browser decision engine requested human assistance.")
@@ -421,6 +436,12 @@ class BrowserSession:
                 if node is None:
                     raise StaleState("The original DOM node no longer exists in the observed document.")
                 proxy_handle = None
+                if self.edits:
+                    keys = [element.get('manual_key')]
+                    keys.extend(e.get('manual_key') for e in observed['elements']
+                                if e.get('document_id') == element.get('document_id') and
+                                element['node_id'] in (e.get('dropdown_trigger_id'), e.get('dropdown_search_id')))
+                    await self.edits.automate(self.page, keys)
                 try:
                     visible_node = node
                     if element.get('interaction_proxy_id'):
@@ -512,13 +533,19 @@ class BrowserSession:
                                 await iframe.dispose()
                             ancestor = ancestor.parent_frame
                     self._check_pause()
+                    # Scrolling and hit testing await browser IPC. A correction
+                    # made during those awaits wins before any actual write.
+                    if self.edits:
+                        record = self.edits.records.get((element.get('frame_url'), element.get('manual_key')))
+                        if record:
+                            raise UserEdit('This control was edited by the user; preserve its value.')
                     if op == Operation.TYPE_TEXT:
                         if value is None or not isinstance(value, str) or len(value) > 20000:
                             raise InvalidDecision("A verified text value is required.")
                         # React Select opens on pointer interaction, not focus alone.
                         if element['role'] == 'combobox' and not element.get('expanded'):
                             await visible_node.click()
-                        await node.fill(value)
+                        await self._write_text(node, value)
                     elif op == Operation.CLEAR:
                         if value is not None:
                             raise InvalidDecision("Clearing cannot include a replacement answer.")
@@ -552,7 +579,7 @@ class BrowserSession:
                                 node.dispatchEvent(new Event('click', {bubbles:true}));
                             }""")
                         elif element.get("role") != "combobox" and "TYPE_TEXT" in element.get("operations", []):
-                            await node.fill("")
+                            await self._write_text(node, '')
                         else:
                             raise InvalidDecision("No supported observed clear operation exists for this control.")
                     elif op == Operation.SELECT:
@@ -613,6 +640,8 @@ class BrowserSession:
                             self._set_page(new_pages[-1])
                             await self.page.wait_for_load_state("domcontentloaded")
                 finally:
+                    if self.edits:
+                        await self.edits.automate(self.page, [])
                     if proxy_handle:
                         await proxy_handle.dispose()
                     await handle.dispose()
@@ -635,9 +664,32 @@ class BrowserSession:
                     "confidence": decision.confidence, "executed": True, "url": self.page.url,
                     "decision_metadata": decision.metadata, "upload_evidence": upload_evidence}
 
+    @staticmethod
+    async def _write_text(node, value):
+        # Check the synchronous user-intent marker and write in the same JS
+        # task. Keyboard input arriving during browser IPC can never be lost.
+        # Native setters also notify React without an artificial Delete key.
+        written = await node.evaluate("""(node, value) => {
+            if (node.hasAttribute('data-meridian-user-edited')) return false;
+            if (!node.isConnected || node.disabled || node.readOnly) throw new Error('The observed text control changed.');
+            if (node instanceof HTMLInputElement || node instanceof HTMLTextAreaElement) {
+                const prototype = node instanceof HTMLInputElement ? HTMLInputElement.prototype : HTMLTextAreaElement.prototype;
+                Object.getOwnPropertyDescriptor(prototype, 'value').set.call(node, value);
+            } else if (node.isContentEditable) node.textContent = value;
+            else throw new Error('The observed text control changed.');
+            node.dispatchEvent(new Event('input', {bubbles:true}));
+            node.dispatchEvent(new Event('change', {bubbles:true}));
+            return true;
+        }""", value)
+        if not written:
+            raise UserEdit('The user changed this field before the write; preserve the correction.')
+
     @bounded(15)
     async def close(self) -> None:
         async with self._lifecycle_lock:
+            if self.edits:
+                await self.edits.close()
+                self.edits = None
             context, driver = self.context, self._playwright
             self.page = self.context = self._playwright = None
             self._invalidate_approvals()

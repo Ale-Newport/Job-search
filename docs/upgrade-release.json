@@ -1,5 +1,5 @@
 {
-  "date": "2026-10-09",
+  "date": "2026-10-10",
   "architecture": "arm64",
   "macos_minimum": "15",
   "locally_signed": true,
@@ -12,19 +12,19 @@
     {
       "path": "src-tauri/target/release/bundle/macos/Meridian.app/Contents/MacOS/meridian",
       "bytes": 11715808,
-      "sha256": "4bf6f9cb85920cba29f613a177a0bf92d291a6af61b612513dd403d24a24fd2e"
+      "sha256": "be7d810d70a9d57bc211f420c0889b38241ea046c552f02f9890e29315507266"
     },
     {
       "path": "src-tauri/target/release/bundle/macos/Meridian.app/Contents/MacOS/meridian-backend",
-      "bytes": 81676336,
-      "sha256": "2359a2a00ec45e3bef1539e625e81e298c20ab890b9a110114924a6b3c0f253f"
+      "bytes": 81696576,
+      "sha256": "967d7f9ffa9ffd5cb3234ef1daf80f76f8a6e0ed7c60345cf1d9954c176078bb"
     },
     {
       "path": "src-tauri/target/release/bundle/dmg/Meridian_0.1.0_aarch64.dmg",
-      "bytes": 86958969,
-      "sha256": "4f9535094f93cce4d50ef1d28dc2fe989fbf5292de49379f1761119121ffaa9f"
+      "bytes": 86944463,
+      "sha256": "69e8a28a9a0c03aae0e5abfb158721c7c45710f5f7313ad04eb9cc0957555486"
     }
   ],
-  "validation": "Citi entry navigation follow-up; see citi-entry-verification.json",
-  "recoverable_backup": ".build-cache/install-backups/20261009T195121Z-entry-fix"
+  "validation": "Searchable location and trusted manual-correction follow-up; see location-edits-verification.md",
+  "recoverable_backup": ".build-cache/install-backups/20261010T113952Z-location-edits"
 }

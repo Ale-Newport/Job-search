@@ -1,0 +1,10 @@
+<!doctype html><meta charset="utf-8"><title>User corrections</title>
+<style>body{font:16px sans-serif;padding:30px}label{display:block;margin:16px}input,button{padding:10px}</style>
+<form id="application" onsubmit="event.preventDefault();window.submissions++">
+<label>First name<input name="first_name" required></label>
+<label>Email<input type="email" name="email" required></label>
+<label>Phone<input name="phone" value="0123456789"></label>
+<label><input type="checkbox" name="relocation">Willing to relocate?</label>
+<label>Last name<input name="last_name" required></label>
+<button type="submit">Submit application</button></form>
+<script>window.submissions=0;if(new URLSearchParams(location.search).has('identity_only'))document.querySelector('[name=relocation]').closest('label').remove();</script>

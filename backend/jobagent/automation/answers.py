@@ -100,6 +100,19 @@ def canonical_key(label: str) -> str | None:
 
 def resolve_answer(question: str, facts: list[dict], *, hints: list[str] | None = None,
                    policies: dict | None = None) -> dict:
+    corrections = [f for f in facts if f.get('manual_correction') and f.get('profile_explicit') and
+                   f.get('verification_status') == 'verified' and
+                   (normalize(question) == normalize(f.get('key', '')) or
+                    normalize(question) in f.get('profile_aliases', []) or
+                    (canonical_key(question) and canonical_key(question) == canonical_key(f.get('key', ''))))]
+    if corrections:
+        priority = max(f.get('answer_priority', 0) for f in corrections)
+        corrections = [f for f in corrections if f.get('answer_priority', 0) == priority]
+        if len({fact_value(f) for f in corrections}) == 1:
+            answer = fact_value(corrections[0])
+            return {'question': question, 'kind': classify_question(question), 'answer': answer or None,
+                    'leave_blank': not bool(answer), 'fact_ids': [f['id'] for f in corrections],
+                    'verified': True, 'confidence': 1.0, 'source': 'user_edit'}
     disclosure = disclosure_resolution(question, policies=policies)
     if disclosure:
         return disclosure
@@ -174,6 +187,23 @@ def option_for(answer: str, options: list[dict], *, question: str = "") -> dict 
                 aliases.get(normalize(p), normalize(p)) for p in o.get("label", "").split(',')})]
             if len(matches) == 1:
                 return matches[0]
+        city_text = answer.split(',', 1)[0]
+        city_text = re.sub(r'\s*(?:\([^)]*\)|\b(?:UK|GB|United Kingdom|Great Britain))\s*$', '', city_text, flags=re.I)
+        city = normalize(city_text)
+        country = next((aliases.get(normalize(p), normalize(p)) for p in answer.split(',')[1:]
+                        if normalize(p) in {'uk', 'gb', 'u k', 'united kingdom', 'great britain'}), None)
+        if not country and re.search(r'\b(?:UK|GB|United Kingdom|Great Britain)\b', answer, re.I):
+            country = 'united kingdom'
+        if city and country:
+            matching = [o for o in options if not o.get('disabled') and
+                        re.match(r'^' + re.escape(city) + r'(?:\b|$)', normalize(o.get('label', '')))]
+            uk = [o for o in matching if re.search(r'\b(?:united kingdom|uk|great britain|england|scotland|wales)\b',
+                                                  normalize(o.get('label', '')))]
+            if uk:
+                return uk[0]  # Observed order among equivalent city/country results.
+            plain = [o for o in matching if normalize(o.get('label', '')) == city]
+            if len(plain) == 1:
+                return plain[0]
     if norm == "prefer not to say":
         matches = [o for o in options if not o.get("disabled") and
                    normalize(o.get("label", "")) in {"decline to self identify", "i do not wish to answer", "decline to answer"}]
@@ -191,8 +221,8 @@ def dropdown_search_value(resolution: dict) -> str:
     answer = resolution['answer']
     if resolution.get('canonical_intent') == 'LANGUAGE' and re.match(r'^fluent\b', answer, re.I):
         return 'Fluent'
-    if resolution.get('canonical_intent') == 'LOCATION' and ',' in answer:
+    if resolution.get('canonical_intent') == 'LOCATION' or canonical_key(resolution.get('question', '')) in {'location', 'city'}:
         # Search the locality; use the full verified city/country to choose
         # among results. Some geocoders reject a comma-separated search query.
-        return answer.split(',', 1)[0].strip()
+        return re.sub(r'\s*(?:\([^)]*\)|\b(?:UK|GB|United Kingdom|Great Britain))\s*$', '', answer.split(',', 1)[0], flags=re.I).strip()
     return answer

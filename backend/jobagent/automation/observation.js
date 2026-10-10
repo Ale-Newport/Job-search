@@ -170,6 +170,18 @@
       upload_proxy_id: type === 'file' && proxy && visible(proxy) ? identity(proxy) : null,
       interaction_proxy_id: role === 'combobox' && proxy && visible(proxy) ? identity(proxy) : null,
       dropdown_trigger_id: dropdown ? identity(dropdown) : null,
+      dropdown_search_id: (() => {
+        const ids = (node.getAttribute('aria-controls') || node.getAttribute('aria-owns') || '').split(/\s+/);
+        for (const id of ids) {
+          const list = node.getRootNode().getElementById?.(id), parent = list?.parentElement;
+          const search = list?.querySelector('input:not([readonly]):not([type="hidden"]):not([type="password"])') ||
+            (parent && !parent.matches('body,main,form') ? parent.querySelector('input[type="search"],input[role="searchbox"]') : null);
+          if (search && visible(search)) return identity(search);
+        }
+        return null;
+      })(),
+      listbox_ids: (node.getAttribute('aria-controls') || node.getAttribute('aria-owns') || '').split(/\s+/).filter(Boolean),
+      listbox_id: node.closest('[role="listbox"]')?.id || '',
       toggle_proxy_id: toggle ? identity(toggle) : null,
       clear_proxy_id: role === 'combobox' && clearProxy && visible(clearProxy) ? identity(clearProxy) : null,
       form_id: node.form || node.closest('form') ? identity(node.form || node.closest('form')) : 'page',
@@ -239,6 +251,17 @@
   }
   const jobContext = {title:document.querySelector('h1,[itemprop="title"],[data-automation-id="jobPostingHeader"]')?.textContent?.trim() || '',
     sections:employerSections.slice(0, 8)};
+  const occurrences = new Map();
+  for (const element of elements) {
+    const node = cache.nodes.get(element.node_id), form = node.form || node.closest('form');
+    const radio = element.role === 'radio';
+    const base = JSON.stringify([form?.id || form?.name || [...document.forms].indexOf(form),
+      element.section_label, radio ? 'radio' : element.role,
+      radio ? element.context || element.group : element.label, node.name || '']);
+    const count = occurrences.get(base) || 0;
+    element.manual_key = radio ? base : JSON.stringify([base, count]);
+    if (!radio) occurrences.set(base, count + 1);
+  }
   return {document_id:cache.documentId,url:location.href,title:document.title,text,elements,
     job_context:jobContext,challenge,mfa,login,errors,unresolved_required,scroll:{y:scrollY,height:document.documentElement.scrollHeight,viewport:innerHeight}};
 }

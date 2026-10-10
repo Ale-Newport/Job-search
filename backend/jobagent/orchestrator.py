@@ -41,6 +41,7 @@ class Orchestrator:
         self._run_tasks: dict[str, asyncio.Task] = {}
         self.browser.on_step = self.on_step
         self.browser.on_disconnect = self.on_browser_disconnect
+        self.browser.on_user_edit = self.on_user_edit
         # A previous process cannot attest whether an interrupted submit succeeded.
         for run in (db.query("SELECT * FROM automation_runs WHERE status NOT IN ('confirmed','reconciled','error','blocked','unconfirmed')") if recover else []):
             if application_scope and run['application_id'] != application_scope:
@@ -156,6 +157,36 @@ class Orchestrator:
 
     def paused(self):
         return bool(settings_for(self.db).get("automation_paused", True))
+
+    def on_user_edit(self, record):
+        from .application_profile import remember_answer
+        from .automation.adapters import get_adapter
+        application_id = self.browser._active_application_id
+        if not application_id:
+            return None
+        application = self.application(application_id)
+        element = record['element']
+        if element.get('type') == 'file':
+            return None  # A filename is not an approved reusable document version.
+        question = get_adapter(record['frame_url'], application.get('ats')).question(element)
+        identifier = remember_answer(self.db, application, question, record['answer'],
+            reusable=True, skip=not record['answer'].strip(), element=element, direct_edit=True)
+        # Replace the active answer immediately, including edits made while a
+        # completed browser is parked for review. No stale approval can survive.
+        with self.db.transaction() as conn:
+            conn.execute('DELETE FROM application_answers WHERE application_id=? AND question=?', (application_id, question))
+            conn.execute('INSERT INTO application_answers VALUES(?,?,?,?,?,?,?)',
+                (str(uuid4()), application_id, question, record['answer'], json.dumps([identifier]), 1, now()))
+            run = conn.execute("SELECT id,checkpoint FROM automation_runs WHERE application_id=? AND status NOT IN ('confirmed','error','unconfirmed','reconciled') ORDER BY created_at DESC LIMIT 1", (application_id,)).fetchone()
+            if run:
+                checkpoint = json.loads(run['checkpoint'])
+                answers = [a for a in checkpoint.get('answers', []) if a.get('question') != question]
+                answers.append({'question': question, 'answer': record['answer'], 'fact_ids': [identifier],
+                                'verified': True, 'source': 'user_edit'})
+                checkpoint.update(answers=answers, snapshot_id=None, review_fingerprint=None)
+                conn.execute('UPDATE automation_runs SET checkpoint=?,updated_at=? WHERE id=?',
+                             (json.dumps(private_checkpoint(checkpoint)), now(), run['id']))
+        return identifier
 
     def on_step(self, step):
         if not self.active_run:

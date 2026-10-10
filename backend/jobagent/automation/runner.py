@@ -17,7 +17,7 @@ from .browser import PROGRESS, is_submit, application_entry_target
 from .engines import make_engine
 from .job_context import enrich_job_context
 from .consent import action_key, dropdown_open_target, radio_group, resolution_element, section_plan, selected_resolution_matches
-from .types import AutomationError, Decision, HumanRequired, Operation, Paused, StaleState
+from .types import AutomationError, Decision, HumanRequired, Operation, Paused, StaleState, UserEdit
 
 
 class BrowserManager(BrowserSession):
@@ -74,10 +74,29 @@ class BrowserManager(BrowserSession):
     async def fill_application(self, application: dict, facts: list[dict], documents: list[dict],
                                mode: str = "REVIEW", settings: dict | None = None) -> dict:
         async with self._run_lock:
-            return await self._fill(application, facts, documents, mode, settings or {})
+            result = await self._fill(application, facts, documents, mode, settings or {})
+            if self.edits:
+                await self.edits.flush()
+                adapter = get_adapter(application.get('application_url') or application.get('url', ''), application.get('ats'))
+                for record in self.edits.records.values():
+                    if not record.get('changed') or record.get('pending'):
+                        continue
+                    question = adapter.question(record['element'])
+                    result['answers'][:] = [a for a in result['answers'] if a['question'] != question]
+                    result['answers'].append({'question': question, 'answer': record['answer'],
+                        'fact_ids': record.get('fact_ids', []), 'verified': bool(record.get('fact_ids')),
+                        'kind': classify_question(question), 'source': 'user_edit'})
+                    if record.get('save_error'):
+                        result['status'] = 'human_required'
+                        result['questions'].append({'question': question, 'kind': 'manual_edit_save',
+                            'reason': 'Your edit is preserved in this form, but could not be saved for future applications. Retry preparation to save it.'})
+            return result
 
     async def _fill(self, application: dict, facts: list[dict], documents: list[dict], mode: str, settings: dict) -> dict:
         same_application = self._active_application_id == application.get("id")
+        if not same_application and self.edits:
+            await self.edits.close()
+            self.edits = None
         self._active_application_id = application.get("id")
         self._review.clear()
         self._section_review.clear()
@@ -108,6 +127,11 @@ class BrowserManager(BrowserSession):
         async def resolve(element):
             element = resolution_element(element, snapshot['elements'])
             field = adapter.question(element)
+            corrections = [f for f in facts if f.get('manual_correction')]
+            if corrections:
+                corrected = profile_resolution(field, corrections, element=element, policies={})
+                if corrected['answer'] is not None or corrected['leave_blank']:
+                    return self._location_resolution(corrected, facts, element)
             disclosure = disclosure_resolution(field, element, policies)
             if disclosure:
                 return disclosure
@@ -121,7 +145,7 @@ class BrowserManager(BrowserSession):
                 result = await intelligence.answer(field, element, settings.get('_job_context', application))
                 result = intelligence.confirmed_fallback(field, result, facts, policies)
                 if result['canonical_intent'] != 'OTHER' or result['answer'] is not None:
-                    return result
+                    return self._location_resolution(result, facts, element)
             result = profile_resolution(field, facts, element=element, policies=policies,
                                        hints=[element.get("name", ""), element.get("autocomplete", "")])
             callback = settings.get("_reason_answer")
@@ -130,7 +154,7 @@ class BrowserManager(BrowserSession):
                 if key not in reasoning_cache:
                     reasoning_cache[key] = await callback(field, element)
                 result = reasoning_cache[key] or result
-            return result
+            return self._location_resolution(result, facts, element)
 
         self.allowed_uploads = {Path(d["path"]).resolve() for d in documents if d.get("path") and Path(d["path"]).is_file()}
         try:
@@ -200,9 +224,38 @@ class BrowserManager(BrowserSession):
                 upload_mime = None
                 if pending_dropdown:
                     from ..intelligence.formatting import choice as enum_choice
+                    current = next((e for e in snapshot['elements'] if e.get('manual_key') == pending_dropdown['manual_key']
+                                    and e['frame_url'] == pending_dropdown['frame_url']), None)
+                    if current and current.get('user_edit'):
+                        pending_dropdown = None
+                        continue
                     resolution = pending_dropdown["resolution"]
+                    if current and not pending_dropdown.get('searched'):
+                        visible_options = [e for e in snapshot['elements'] if e['role'] == 'option' and
+                            'CLICK' in e['operations'] and e['frame_url'] == pending_dropdown['frame_url'] and
+                            (not current.get('listbox_ids') or e.get('listbox_id') in current['listbox_ids'])]
+                        visible_choice = enum_choice(resolution['answer'], visible_options,
+                            question=resolution['question'], disclosure_concept=resolution.get('disclosure_concept'))
+                        search = current if 'TYPE_TEXT' in current['operations'] else next((e for e in snapshot['elements']
+                            if e['document_id'] == current['document_id'] and e['node_id'] == current.get('dropdown_search_id')
+                            and 'TYPE_TEXT' in e['operations']), None)
+                        from .answers import canonical_key
+                        needs_search = resolution.get('canonical_intent') == 'LOCATION' or canonical_key(resolution['question']) in {'location','city'} or not visible_choice
+                        if search and needs_search:
+                            try:
+                                await self._record_step(await self.execute(Decision(Operation.TYPE_TEXT, search['index']),
+                                    snapshot, value=dropdown_search_value(resolution)), steps, snapshot)
+                            except UserEdit:
+                                pending_dropdown = None
+                                snapshot = await self.observe()
+                                continue
+                            pending_dropdown['searched'] = True
+                            snapshot = await self.observe()
+                            continue
                     for _ in range(20):
-                        options = [e for e in snapshot["elements"] if e["role"] == "option" and "CLICK" in e["operations"]]
+                        options = [e for e in snapshot["elements"] if e["role"] == "option" and "CLICK" in e["operations"]
+                                   and e['frame_url'] == pending_dropdown['frame_url']
+                                   and (not current or not current.get('listbox_ids') or e.get('listbox_id') in current['listbox_ids'])]
                         choice = enum_choice(resolution["answer"], options, question=resolution["question"],
                                              disclosure_concept=resolution.get("disclosure_concept"))
                         choices = [choice] if choice else []
@@ -216,6 +269,10 @@ class BrowserManager(BrowserSession):
                                                         "reason": "No unique visible dropdown option matches the verified answer."}])
                     try:
                         await self._record_step(await self.execute(Decision(Operation.CLICK, choices[0]["index"]), snapshot), steps, snapshot)
+                    except UserEdit:
+                        pending_dropdown = None
+                        snapshot = await self.observe()
+                        continue
                     except StaleState:
                         if section_consent or stale_retries >= 5:
                             raise
@@ -233,6 +290,20 @@ class BrowserManager(BrowserSession):
                     pending_dropdown = None
                     continue
                 for element in snapshot["elements"]:
+                    if element.get('user_edit'):
+                        edit = element['user_edit']
+                        field = adapter.question(element)
+                        self._omitted.pop(field, None)
+                        if edit.get('changed') or edit.get('pending'):
+                            answers[:] = [a for a in answers if a['question'] != field]
+                        if edit.get('pending') or not edit.get('answer') and element.get('required'):
+                            questions.append({'question': field, 'kind': 'manual_edit', 'target': element['index'],
+                                              'reason': 'Your edit is preserved. Finish this required value or selection in the browser.'})
+                        elif edit.get('changed'):
+                            self._add_answer(answers, {'question': field, 'answer': edit['answer'],
+                                'fact_ids': edit.get('fact_ids') or [], 'verified': bool(edit.get('fact_ids')),
+                                'kind': classify_question(field), 'source': 'user_edit'})
+                        continue
                     inherit_disclosure_context(element, snapshot["elements"], adapter)
                     disclosure = disclosure_resolution(adapter.question(element), element, policies)
                     if disclosure:
@@ -302,13 +373,15 @@ class BrowserManager(BrowserSession):
                             self._add_answer(answers, dict(resolution))
                             continue
                         pending_dropdown = {"resolution": resolution, "node_id": element["node_id"],
-                                            "document_id": element["document_id"]}
+                                            "document_id": element["document_id"], 'manual_key': element.get('manual_key'),
+                                            'frame_url': element['frame_url'], 'searched': False}
                         trigger = dropdown_open_target(element, snapshot["elements"])
                         if trigger:
                             action, value = Decision(Operation.CLICK, trigger["index"]), None
                         else:
                             action = Decision(Operation.TYPE_TEXT if "TYPE_TEXT" in operations else Operation.CLICK, element["index"])
                             value = dropdown_search_value(resolution)
+                            pending_dropdown['searched'] = action.operation == Operation.TYPE_TEXT
                         break
                     if not any(op in operations for op in ("TYPE_TEXT", "SELECT", "CHECK", "UNCHECK", "UPLOAD")):
                         continue
@@ -343,6 +416,10 @@ class BrowserManager(BrowserSession):
                         if element.get("required"):
                             questions.append({"question": field, "kind": resolution["kind"], "reason": "This field is required but your policy is to leave it blank.", "target": element["index"]})
                         elif has_disclosure_value(element):
+                            if resolution.get('source') == 'user_edit' and 'CLEAR' in operations:
+                                action = Decision(Operation.CLEAR, element['index'])
+                                value = None
+                                break
                             questions.append({"question": field, "kind": resolution["kind"],
                                               "target": element["index"],
                                               "reason": "The existing answer has no confirmed supporting fact. Review it in the browser."})
@@ -413,13 +490,13 @@ class BrowserManager(BrowserSession):
                         result = await self.execute(action, snapshot, value=value, file_path=file_path,
                                                     upload_name=upload_name, upload_mime=upload_mime,
                                                     minimum_confidence=float(settings.get("browser_confidence_threshold", settings.get("min_confidence", .85))))
-                    except StaleState:
+                    except StaleState as error:
                         # ATSs hydrate and validate asynchronously while fields are filled.
                         # The rejected operation made no write. Re-observe and resolve from
                         # verified facts again; never reuse an old target or section approval.
-                        if section_consent or stale_retries >= 5:
+                        if not isinstance(error, UserEdit) and (section_consent or stale_retries >= 5):
                             raise
-                        stale_retries += 1
+                        stale_retries += int(not isinstance(error, UserEdit))
                         handled.clear()
                         pending_dropdown = None
                         snapshot = await self.wait_until_ready()
@@ -477,6 +554,12 @@ class BrowserManager(BrowserSession):
                 entry_only = not has_inputs and not form_seen
                 submit = None if entry_only else adapter.submit_button(snapshot)
                 if submit:
+                    if self.edits:
+                        await self.edits.flush()
+                        refreshed = await self.observe()
+                        if refreshed['fingerprint'] != snapshot['fingerprint']:
+                            snapshot = refreshed
+                            continue
                     self.form_state = 'FINAL_REVIEW'
                     self._review[snapshot["id"]] = {"application_id": self._active_application_id, "adapter": adapter.name,
                                                     "mode": mode.upper(), "answers": answers, "steps": steps,
@@ -611,6 +694,17 @@ class BrowserManager(BrowserSession):
                                     "answers": self._checkpoint_answers, "documents": self._checkpoint_documents})
             if inspect.isawaitable(outcome):
                 await outcome
+
+    @staticmethod
+    def _location_resolution(result, facts, element):
+        from .answers import canonical_key, resolve_answer
+        if (result.get('answer') and element.get('role') == 'combobox' and
+                (result.get('canonical_intent') == 'LOCATION' or canonical_key(result.get('question', '')) in {'location','city'})):
+            country = resolve_answer('country', facts)
+            if country.get('answer') and not re.search(r'[,()]', result['answer']) and normalize(country['answer']) not in normalize(result['answer']):
+                result = {**result, 'answer': result['answer'] + ', ' + country['answer'],
+                          'fact_ids': list(dict.fromkeys([*result['fact_ids'], *country['fact_ids']]))}
+        return result
 
     async def _decide_safe_progress(self, snapshot: dict, settings: dict) -> dict | None:
         # L3 resolves ambiguous safe navigation only. It never chooses field values,

@@ -62,7 +62,7 @@ async def test_greenhouse_full_form_review_and_verified_submit(browser, fixture_
     assert await browser.page.locator('input[name="relocation"][value="yes"]').is_checked()
     assert await browser.page.locator('select').input_value() == "gb"
     assert await browser.page.locator('input[type="file"]').evaluate("n=>n.files[0].name") == "resume.txt"
-    assert all(answer["verified"] for answer in result["answers"])
+    assert all(answer["verified"] for answer in result["answers"]), result['answers']
     submitted = await browser.submit(result["snapshot_id"])
     assert submitted["status"] == "confirmed", submitted
     assert submitted["evidence"][0]["kind"] == "visible_confirmation"
@@ -810,3 +810,199 @@ async def test_tall_iframe_checks_control_hit_point(browser, fixture_server):
     assert result['status']=='needs_review',result.get('questions')
     frame=next(f for f in browser.page.frames if f.url.endswith('tall_iframe_child.html'))
     assert await frame.locator('input').input_value()=='frame@example.test'
+
+
+@pytest.mark.parametrize('alternate,expected', [
+    (False, 'London, Greater London, England, United Kingdom'), (True, 'London (UK)')])
+@pytest.mark.parametrize('remembered', ['London, Greater London, England, United Kingdom', 'London (UK)', 'London UK'])
+async def test_location_search_uses_current_employer_options(browser, fixture_server, candidate, alternate, expected, remembered):
+    # A remembered geocoder label from another employer must still search by city.
+    facts = candidate + [fact('location', remembered)]
+    result = await browser.fill_application({'id': 'location', 'url': fixture_server +
+        '/search_location.html?single_uk_label' + ('&alternate' if alternate else '')}, facts, [],
+        settings={'assisted_autofill': True, 'skip_optional_unknown': True})
+    assert result['status'] == 'needs_review', result
+    assert await browser.page.locator('#location').input_value() == expected
+    assert await browser.page.evaluate('window.queries') == ['London']
+    assert await browser.page.evaluate('window.submissions') == 0
+    assert browser.edits.records == {}  # No engine events become candidate memory.
+
+
+async def test_user_edits_win_during_fill_and_survive_rerender(browser, fixture_server, candidate, monkeypatch):
+    import asyncio
+    entered, resume_fill = asyncio.Event(), asyncio.Event()
+    original = browser.execute
+    saved = []
+    browser.on_user_edit = lambda record: saved.append(record.copy()) or 'user-fact-' + str(len(saved))
+
+    async def wait_for_user(decision, snapshot, **kwargs):
+        target = next((e for e in snapshot['elements'] if e['index'] == decision.target), {})
+        if target.get('name') == 'email' and not entered.is_set():
+            entered.set()
+            await resume_fill.wait()
+        return await original(decision, snapshot, **kwargs)
+
+    monkeypatch.setattr(browser, 'execute', wait_for_user)
+    filling = asyncio.create_task(browser.fill_application({'id': 'manual', 'url': fixture_server + '/manual_edit.html'},
+        candidate + [fact('phone', '0123456789')], [], settings={'assisted_autofill': True, 'skip_optional_unknown': True}))
+    try:
+        await asyncio.wait_for(entered.wait(), 10)
+        for name, value in [('first_name', 'User chosen name'), ('email', 'changed@example.test'), ('phone', '')]:
+            await browser.page.locator('[name="' + name + '"]').click()
+            await browser.page.keyboard.press('Meta+A')
+            await browser.page.keyboard.press('Backspace')
+            if value:
+                await browser.page.keyboard.insert_text(value)
+        await browser.page.locator('[name="relocation"]').click()
+        # Frameworks replace DOM nodes during a render; semantic identity persists.
+        await browser.page.evaluate('''() => {const old=document.querySelector('[name=first_name]');
+            const replacement=old.cloneNode(true);replacement.value=old.value;old.replaceWith(replacement)}''')
+        await browser.edits.flush()
+        resume_fill.set()
+        result = await asyncio.wait_for(filling, 15)
+        assert result['status'] == 'needs_review', result
+        assert await browser.page.locator('[name=first_name]').input_value() == 'User chosen name'
+        assert await browser.page.locator('[name=email]').input_value() == 'changed@example.test'
+        assert await browser.page.locator('[name=phone]').input_value() == ''
+        assert await browser.page.locator('[name=relocation]').is_checked()
+        assert await browser.page.locator('[name=last_name]').input_value() == 'Example'
+        assert await browser.page.evaluate('window.submissions') == 0
+        assert {'User chosen name', 'changed@example.test', '', 'Yes'} <= {r['answer'] for r in saved}
+        assert all(a['verified'] for a in result['answers']), result['answers']
+        assert any(a.get('source') == 'user_edit' for a in result['answers'])
+    finally:
+        resume_fill.set()
+        if not filling.done():
+            filling.cancel()
+            await asyncio.gather(filling, return_exceptions=True)
+
+
+async def test_page_scripts_cannot_forge_user_correction(browser, fixture_server, candidate):
+    result = await browser.fill_application({'id': 'script', 'url': fixture_server + '/manual_edit.html'},
+        candidate + [fact('phone', '0123456789')], [], settings={'assisted_autofill': True, 'skip_optional_unknown': True})
+    assert result['status'] == 'needs_review', result
+    await browser.page.evaluate('''() => {const input=document.querySelector('[name=email]');
+        input.value='forged@example.test';input.dispatchEvent(new Event('input',{bubbles:true}));
+        input.dispatchEvent(new Event('change',{bubbles:true}));}''')
+    await browser.edits.flush()
+    assert browser.edits.records == {}
+    assert await browser.page.evaluate('typeof window.meridianUserEdit') == 'undefined'
+    assert await browser.page.evaluate('typeof window.__meridianEdits') == 'undefined'
+
+
+async def test_location_menu_opens_then_searches_linked_portal(browser, fixture_server, candidate):
+    result = await browser.fill_application({'id': 'portal', 'url': fixture_server + '/search_location_portal.html'},
+        candidate + [fact('location', 'London (UK)')], [],
+        settings={'assisted_autofill': True, 'skip_optional_unknown': True})
+    assert result['status'] == 'needs_review', {k:result[k] for k in ('status','error','questions','steps')}
+    assert await browser.page.locator('#location').get_attribute('aria-valuetext') == 'London (UK)'
+    assert await browser.page.evaluate('window.queries') == ['London']
+    assert browser.edits.records == {}
+    assert await browser.page.evaluate('window.submissions') == 0
+
+
+@pytest.mark.parametrize('fixture', ['search_location.html', 'search_location_portal.html'])
+async def test_user_location_selection_is_remembered_after_search(browser, fixture_server, candidate, monkeypatch, fixture):
+    import asyncio
+    entered, continue_fill = asyncio.Event(), asyncio.Event()
+    original = browser.execute
+    saved = []
+    browser.on_user_edit = lambda record: saved.append(record.copy()) or 'location-correction'
+
+    async def user_before_location(decision, snapshot, **kwargs):
+        target = next((e for e in snapshot['elements'] if e['index'] == decision.target), {})
+        if target.get('id') == 'location' and not entered.is_set():
+            entered.set()
+            await continue_fill.wait()
+        return await original(decision, snapshot, **kwargs)
+
+    monkeypatch.setattr(browser, 'execute', user_before_location)
+    filling = asyncio.create_task(browser.fill_application({'id': 'manual-location', 'url': fixture_server + '/' + fixture},
+        candidate + [fact('location', 'London, UK')], [], settings={'assisted_autofill': True, 'skip_optional_unknown': True}))
+    try:
+        await asyncio.wait_for(entered.wait(), 10)
+        await browser.page.locator('#location').click()
+        if fixture == 'search_location_portal.html':
+            await browser.page.get_by_role('searchbox').click()
+        await browser.page.keyboard.insert_text('London')
+        await browser.page.get_by_role('option', name='London (UK)', exact=True).click()
+        await browser.edits.flush()
+        continue_fill.set()
+        result = await asyncio.wait_for(filling, 15)
+        assert result['status'] == 'needs_review', result
+        selected = await browser.page.locator('#location').get_attribute('aria-valuetext') if fixture == 'search_location_portal.html' else await browser.page.locator('#location').input_value()
+        assert selected == 'London (UK)'
+        assert saved[-1]['answer'] == 'London (UK)'
+        assert not any(r['answer'] == 'London' for r in saved)  # Search text is never a saved location.
+        assert await browser.page.evaluate('window.submissions') == 0
+    finally:
+        continue_fill.set()
+        if not filling.done():
+            filling.cancel()
+            await asyncio.gather(filling, return_exceptions=True)
+
+
+async def test_user_typing_during_actual_write_wins_without_stopping_other_fields(browser, fixture_server, candidate, monkeypatch):
+    import asyncio
+    entered, release = asyncio.Event(), asyncio.Event()
+    original = browser._write_text
+    saved = []
+    browser.on_user_edit = lambda record: saved.append(record.copy()) or 'race-correction'
+
+    async def delayed_write(node, value):
+        if value == 'Alex' and not entered.is_set():
+            entered.set()
+            await release.wait()
+        return await original(node, value)
+
+    monkeypatch.setattr(browser, '_write_text', delayed_write)
+    filling = asyncio.create_task(browser.fill_application({'id': 'race', 'url': fixture_server + '/manual_edit.html'},
+        candidate + [fact('phone', '0123456789')], [], settings={'assisted_autofill': True, 'skip_optional_unknown': True}))
+    try:
+        await asyncio.wait_for(entered.wait(), 10)
+        await browser.page.locator('[name=first_name]').click()
+        # A real key records user intent while this exact engine action is active.
+        await browser.page.keyboard.type('Chosen during write')
+        release.set()
+        result = await asyncio.wait_for(filling, 15)
+        assert result['status'] == 'needs_review', result
+        assert await browser.page.locator('[name=first_name]').input_value() == 'Chosen during write'
+        assert await browser.page.locator('[name=email]').input_value() == 'alex@example.test'
+        assert await browser.page.locator('[name=last_name]').input_value() == 'Example'
+        assert saved[-1]['answer'] == 'Chosen during write'
+        assert await browser.page.evaluate('window.submissions') == 0
+    finally:
+        release.set()
+        if not filling.done():
+            filling.cancel()
+            await asyncio.gather(filling, return_exceptions=True)
+
+
+async def test_next_application_prioritizes_manual_memory_over_structured_inference(browser, fixture_server, candidate):
+    from jobagent.db import Database
+    from jobagent.core import prepare_application
+    from jobagent.discovery import ingest_job
+    from jobagent.application_profile import remember_answer, application_knowledge
+    from jobagent.intelligence.engine import CandidateEngine
+    from jobagent.intelligence.store import entity, ingest_fact
+    db = Database(browser.data_dir / 'corrections.sqlite')
+    job = ingest_job(db, {'title': 'Engineer', 'company': 'Previous employer',
+                         'url': 'https://jobs.example.test/previous'})[0]
+    previous = {**prepare_application(db, job['id']), 'company': 'Previous employer', 'location': 'London'}
+    person = entity(db, 'person', 'Original candidate')
+    ingest_fact(db, person, 'first_name', 'Old structured name', source='Fixture confirmation', evidence={}, verified=True)
+    for key, value in [('email','alex@example.test'), ('last_name','Example'), ('phone','0123456789')]:
+        ingest_fact(db, person, key, value, source='Fixture confirmation', evidence={}, verified=True)
+    remember_answer(db, previous, 'First name', 'Remembered correction', reusable=True, direct_edit=True)
+    remember_answer(db, previous, 'Phone', '', reusable=True, skip=True, direct_edit=True)
+    future = {'id': 'next-employer', 'company': 'Next employer', 'location': 'London',
+              'url': fixture_server + '/manual_edit.html?identity_only'}
+    memories, _ = application_knowledge(db, future, db.query("SELECT * FROM facts WHERE verification_status='verified'"))
+    result = await browser.fill_application(future, candidate + memories, [],
+        settings={'assisted_autofill': True, 'skip_optional_unknown': True, '_candidate_engine': CandidateEngine(db)})
+    assert await browser.page.locator('[name=first_name]').input_value() == 'Remembered correction'
+    assert result['status'] == 'needs_review', str(result['questions'])
+    assert await browser.page.locator('[name=phone]').input_value() == ''
+    assert not any(a['question'] == 'Phone' and a['answer'] == '0123456789' for a in result['answers'])
+    assert await browser.page.locator('[name=last_name]').input_value() == 'Example'
+    assert await browser.page.evaluate('window.submissions') == 0

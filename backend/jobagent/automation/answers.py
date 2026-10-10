@@ -173,8 +173,22 @@ def resolve_answer(question: str, facts: list[dict], *, hints: list[str] | None 
 
 def option_for(answer: str, options: list[dict], *, question: str = "") -> dict | None:
     norm = normalize(answer)
-    matches = [o for o in options if not o.get("disabled") and
-               norm in {normalize(o.get("label", "")), normalize(o.get("value", ""))}]
+    # An enum's machine value does not establish the meaning of its label.
+    # In particular, code "Yes" can represent an unrestricted right to work,
+    # a particular visa route, or a separate consent. A Boolean fact supports
+    # the exact question, never those additional assertions. Full supported
+    # label answers can still match directly; plain Yes/No controls retain
+    # their normal mapping.
+    labels = [o for o in options if not o.get("disabled")]
+    exact = [o for o in labels if norm == normalize(o.get("label", ""))]
+    if exact:
+        return exact[0] if len(exact) == 1 else None
+    boolean_labels = {"yes": {"yes", "true"}, "true": {"yes", "true"},
+                      "no": {"no", "false"}, "false": {"no", "false"}}
+    if norm in boolean_labels:
+        equivalents = [o for o in labels if normalize(o.get("label", "")) in boolean_labels[norm]]
+        return equivalents[0] if len(equivalents) == 1 else None
+    matches = [o for o in labels if norm == normalize(o.get("value", ""))]
     if len(matches) == 1:
         return matches[0]
     if canonical_key(question) in {"location", "city"} or re.search(r'\b(?:location|city|town|residence)\b', normalize(question)):

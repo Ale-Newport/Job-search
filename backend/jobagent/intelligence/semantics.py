@@ -191,8 +191,9 @@ def interpret(question, field=None):
         intent = "CONSENT"
     elif intent == "HYPOTHETICAL" and re.search(r"\b(?:will|would|do) you (?:need|require).{0,35}sponsor", text):
         intent = "SPONSORSHIP"
-    elif re.search(r"authori[sz].*work|work.*authori[sz]|right to work", text) and re.search(
-        r"permanent|unrestricted", text
+    elif re.search(r"authori[sz].*work|work.*authori[sz]|right to work|permission.*work|legally.*work", text) and (
+        not re.search(r"(?:need|require).{0,25}sponsor", text) or re.search(
+            r"permanent|unrestricted|without restrictions|without limitations|unlimited", text)
     ):
         intent = "WORK_AUTHORIZATION"
     if re.search(r"confirm|affirm|acknowledge|verify", text) and re.search(r"role|position", text) and re.search(r"applying|application|applied|matches|above|selected", text) and not re.search(r"consent|privacy|terms", text):
@@ -246,7 +247,7 @@ def interpret(question, field=None):
     qualifier = "current" if re.search(r"current|now|present", text) else "unspecified"
     if re.search(r"future|ever|later|any point", text):
         qualifier = "now_or_future" if re.search(r"now|current", text) else "future"
-    if intent == "WORK_AUTHORIZATION" and re.search(r"permanent|unrestricted|indefinite", text):
+    if intent == "WORK_AUTHORIZATION" and re.search(r"permanent|unrestricted|indefinite|without restrictions|without limitations|unlimited", text):
         qualifier = "permanent"
     if intent == "SPONSORSHIP" and re.search(r"\bif\b.*(?:offered|offer).*\b(?:would|will)\b|after (?:completing|graduating|your internship)", text):
         qualifier = "future"
@@ -257,6 +258,28 @@ def interpret(question, field=None):
             qualifier = "full_time"
         elif re.search(r"when you start|at (?:your |the )?start|after graduat|will you.*(?:authori|right to work)", text):
             qualifier = "future"
+    authorization_requirements = []
+    if intent == "WORK_AUTHORIZATION":
+        # Every requested facet must survive parsing. A single qualifier cannot
+        # represent 'unrestricted full-time permission when you start'.
+        for facet, pattern in (
+            ("permanent", r"permanent|indefinite"),
+            ("unrestricted", r"unrestricted|without restrictions|without limitations|unlimited"),
+            ("full_time", r"full time|fulltime|(?:35|40) hours"),
+            ("future", r"future|when you start|at (?:your |the )?start|after graduat|will you.*(?:authori|right to work)"),
+            ("sponsorship_free", r"without (?:visa )?sponsor|no (?:visa )?sponsor|not (?:need|require).{0,20}sponsor"),
+            ("visa_free", r"without (?:a |any )?visa\b(?! sponsor)"),
+            ("period", r"throughout|entire (?:internship|placement|period)|full duration|for (?:the )?(?:full |entire )?\d+ weeks|during (?:the |this |your )?(?:internship|placement)"),
+        ):
+            if re.search(pattern, text):
+                authorization_requirements.append(facet)
+        if re.search(r"currently|current|\bnow\b|at present", text) or "future" not in authorization_requirements:
+            authorization_requirements.append("current")
+    negated_legal_predicate = bool(re.search(
+        r"^(?:are|is|do|does|can|will|would) (?:you|the applicant) (?:not|never)\b|"
+        r"^(?:aren t|don t|can t|won t|wouldn t) (?:you|the applicant)\b|"
+        r"^do you have no (?:legal )?(?:right|permission) to work", text
+    )) if intent in {"WORK_AUTHORIZATION", "SPONSORSHIP"} else False
     if intent == "SALARY":
         qualifier = (
             "current"
@@ -310,7 +333,10 @@ def interpret(question, field=None):
         attribute = (
             "ai_interview_transcription" if re.search(r"notetaker|note taker|transcrib|transcription|record.*interview", text)
             else "future_recruiting_contact" if re.search(r"future|marketing|recruit.*contact|contact.*recruit", text)
-            else "privacy_acknowledgement" if re.search(r"acknowledge|have read|read and understood|certify|attest", text)
+            else "privacy_acknowledgement" if re.search(
+                r"acknowledge|have read|read and understood|certify|attest|"
+                r"(?:take a look|review|read).*(?:notice|policy).*(?:confirm|affirm).*\b(?:have|done|read)\b|"
+                r"(?:confirm|affirm).*(?:reviewed|read|looked at).*(?:notice|policy)", text)
             else "data_processing" if re.search(r"process|privacy|gdpr", text)
             else "terms_acknowledgement" if re.search(r"terms|agree", text)
             else "consent"
@@ -331,6 +357,8 @@ def interpret(question, field=None):
         "education_level": level,
         "requested_languages": requested_languages,
         "qualifier": qualifier,
+        "authorization_requirements": authorization_requirements,
+        "negated_legal_predicate": negated_legal_predicate,
         "attribute": attribute,
         "output": output,
         "boolean": boolean,

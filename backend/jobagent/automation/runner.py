@@ -353,6 +353,11 @@ class BrowserManager(BrowserSession):
                         return self._result("human_required", snapshot, answers=answers, steps=steps, adapter=adapter.name,
                                             questions=[{"question": resolution["question"], "kind": "option",
                                                         "reason": "The selected dropdown value could not be independently verified."}])
+                    resolution['selection_verified'] = True
+                    diagnostic = self._answer_diagnostics.get(resolution.get('question_id'))
+                    if diagnostic:
+                        diagnostic['selection_verified'] = True
+                    self._accepted_answer(resolution, selected)
                     self._add_answer(answers, dict(resolution))
                     pending_dropdown = None
                     continue
@@ -858,6 +863,9 @@ class BrowserManager(BrowserSession):
                 bool(element.get('checked')) == (normalize(str(resolution.get('answer'))) in {'yes','true','1'}))
         else:
             accepted = selected_resolution_matches(resolution, element.get('selected_text') or element.get('value', ''))
+            if element.get('role') == 'combobox' and element.get('tag') != 'select':
+                accepted = accepted and not element.get('expanded') and bool(
+                    element.get('selected_text') or resolution.get('selection_verified'))
         validity = element.get('validity') or {}
         accepted = accepted and validity.get('valid', True)
         diagnostic.update(observed_value=element.get('selected_text') or element.get('value'),

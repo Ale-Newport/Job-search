@@ -56,6 +56,20 @@ def test_role_question_mentioning_job_search_is_an_applicant_field():
     assert application_input_elements({'elements': [field]}) == [field]
 
 
+def test_custom_dropdown_search_text_is_not_an_accepted_selection(tmp_path):
+    manager = BrowserManager(tmp_path)
+    answer = {'question_id': 'q5', 'question': 'Right to work', 'answer': 'Yes',
+              'status': 'ANSWER_VALIDATED'}
+    manager._answer_diagnostics = {'q5': dict(answer)}
+    field = {'role': 'combobox', 'tag': 'input', 'value': 'Yes', 'expanded': True, 'selected_text': ''}
+    manager._accepted_answer(answer, field)
+    assert manager._answer_diagnostics['q5']['status'] == 'ANSWER_VALIDATED'
+    manager._accepted_answer(answer, {**field, 'expanded': False})
+    assert manager._answer_diagnostics['q5']['status'] == 'ANSWER_VALIDATED'
+    manager._accepted_answer({**answer, 'selection_verified': True}, {**field, 'expanded': False})
+    assert manager._answer_diagnostics['q5']['status'] == 'ANSWER_ACCEPTED_BY_FORM'
+
+
 def test_review_operations_use_exact_generated_answer_and_multiselection():
     fields = [
         {'index': 1, 'document_id': 'doc', 'node_id': 1, 'label': 'Why this role?',

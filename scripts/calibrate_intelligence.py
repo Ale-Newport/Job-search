@@ -86,6 +86,12 @@ def audit_fields(snapshot, adapter, intelligence, result, job):
                 for v in wanted))
         if (answer or reasoning).get('leave_blank') and not value:
             match = True
+        if field.get('role') == 'combobox' and field.get('tag') != 'select':
+            diagnostic = next((d for d in result.get('answer_diagnostics', [])
+                               if normalize(d.get('question', '')) == normalize(question)), {})
+            match = match and not field.get('expanded') and bool(
+                field.get('selected_text') or diagnostic.get('selection_verified'))
+        match = match and (field.get('validity') or {}).get('valid', True)
         fields.append(
             {
                 "question": question,

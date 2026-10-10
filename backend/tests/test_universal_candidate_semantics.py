@@ -249,6 +249,127 @@ def test_broad_sponsorship_policy_does_not_prove_specific_immigration_status(ver
     assert CandidateEngine(verified_db).answer_question(question, {}, {"country": "United Kingdom"})["answer"] is None
 
 
+@pytest.mark.parametrize("label", [
+    "Yes, unrestricted right to work without sponsorship",
+    "Yes, I have permanent permission to work",
+    "Yes, I hold a Graduate visa",
+    "Yes, I can work full-time for the entire internship",
+    "Yes, I am also authorised to work in the United States",
+])
+def test_boolean_enum_code_cannot_add_legal_assertions(verified_db, label):
+    from jobagent.automation.answers import option_for
+    from jobagent.intelligence.formatting import choice
+    question = "Are you currently legally authorised to work in the UK?"
+    options = [{"label": label, "value": "Yes"}, {"label": "No", "value": "No"}]
+    assert option_for("Yes", options, question=question) is None
+    assert choice("Yes", options, question=question) is None
+    result = CandidateEngine(verified_db).answer_question(question, {"options": options}, {"country": "United Kingdom"})
+    assert result["answer"] is None
+    assert result["root_cause"] == "BAD_ENUM_MAPPING"
+
+
+@pytest.mark.parametrize("answer,label,expected", [
+    ("Yes", "Yes", True), ("No", "No", True),
+    ("No", "No, I will never need sponsorship", False),
+    ("Yes", "No, I do not have permission", False),
+    ("Yes", "I have read and accepted the privacy notice", False),
+    ("I hold a Student visa", "I hold a Student visa", True),
+])
+def test_option_label_meaning_precedes_boolean_machine_code(answer, label, expected):
+    from jobagent.automation.answers import option_for
+    assert (option_for(answer, [{"label": label, "value": answer}]) is not None) is expected
+
+
+@pytest.mark.parametrize("answer,label,value", [("Yes", "True", "1"), ("No", "False", "0"), ("Yes", "Yes", "No")])
+def test_plain_boolean_labels_win_over_opaque_storage(answer, label, value):
+    from jobagent.automation.answers import option_for
+    options = [{"label": label, "value": value}]
+    assert option_for(answer, options) == options[0]
+
+
+def immigration_db(tmp_path, facts):
+    db = Database(tmp_path / "immigration.sqlite3")
+    identifier = entity(db, "immigration", "Verified permission")
+    for concept, value in {"country": "United Kingdom", **facts}.items():
+        ingest_fact(db, identifier, concept, value, value_type="boolean" if isinstance(value, bool) else "text",
+                    source="Independent permission evidence", evidence={"excerpt": str(value)}, verified=True)
+    return db
+
+
+@pytest.mark.parametrize("question,extra", [
+    ("Do you currently have right to work in the UK without restrictions?", {}),
+    ("Are you authorised to work full-time without limitations in the UK?", {"full_time_right_to_work": True}),
+    ("Do you have unrestricted full-time right to work in the UK?", {"full_time_right_to_work": True}),
+    ("Will you have unrestricted right to work in the UK when you start?", {"future_right_to_work": True}),
+    ("Do you have unlimited permission to work in the UK?", {"permanent_unrestricted": False}),
+    ("Do you have right to work in the UK without sponsorship?", {"sponsorship_now_or_future": True}),
+    ("Are you authorised to work in the UK without a visa?", {}),
+    ("Can you legally work in the UK for the full 12 weeks?", {}),
+])
+def test_every_requested_work_authorization_facet_requires_evidence(tmp_path, question, extra):
+    db = immigration_db(tmp_path, {"current_right_to_work": True, **extra})
+    result = CandidateEngine(db).answer_question(question, {"options": [{"label": "Yes"}, {"label": "No"}]}, {"country": "United Kingdom"})
+    assert result["canonical_intent"] == "WORK_AUTHORIZATION"
+    assert result["answer"] is None
+    assert result["missing_authorization_facets"]
+
+
+@pytest.mark.parametrize("authorized,expected", [(True, "No"), (False, "Yes")])
+@pytest.mark.parametrize("question", ["Are you not legally authorised to work in the UK?", "Do you not have right to work in the UK?", "Aren't you legally authorised to work in the UK?"])
+def test_negative_legal_predicate_preserves_polarity(tmp_path, authorized, expected, question):
+    db = immigration_db(tmp_path, {"current_right_to_work": authorized})
+    result = CandidateEngine(db).answer_question(question, {"options": [{"label": "Yes"}, {"label": "No"}]}, {"country": "United Kingdom"})
+    assert result["answer"] == expected, result
+    assert "negated_legal_predicate" in result["rules_used"]
+
+
+def test_composite_authorization_accepts_all_independently_verified_facets(tmp_path):
+    db = immigration_db(tmp_path, {"current_right_to_work": True, "unrestricted_right_to_work": True,
+        "full_time_right_to_work": True, "sponsorship_current": False})
+    result = CandidateEngine(db).answer_question("Do you currently have unrestricted full-time right to work in the UK without sponsorship?",
+        {"options": [{"label": "Yes"}, {"label": "No"}]}, {"country": "United Kingdom"})
+    assert result["answer"] == "Yes"
+    assert "conjunction_of_verified_work_authorization_facets" in result["rules_used"]
+
+
+def test_scoped_current_policy_cannot_answer_unrestricted_question(tmp_path):
+    db = Database(tmp_path / "policy.sqlite3")
+    policy(db, "work_authorization_current", True, {"country": "United Kingdom"})
+    result = CandidateEngine(db).answer_question("Are you legally authorised to work in the UK without restrictions?", {}, {"country": "United Kingdom"})
+    assert result["answer"] is None
+    assert "unrestricted" in result["missing_authorization_facets"]
+
+
+def test_explicit_other_work_country_cannot_reuse_vacancy_authorization(verified_db):
+    result = CandidateEngine(verified_db).answer_question("Are you legally authorised to work in the United States?", {}, {"country": "United Kingdom"})
+    assert result["answer"] is None
+    assert result["missing_fact"]["country"] == "United States"
+
+
+@pytest.mark.parametrize("question", [
+    "Please take a look at our Candidate Data Privacy Notice (linked below) and confirm that you have.",
+    "Review our privacy policy and confirm you have done so.",
+    "Please confirm that you have read our candidate privacy notice.",
+])
+def test_notice_read_acknowledgement_does_not_reuse_processing_consent(tmp_path, question):
+    db = Database(tmp_path / "privacy.sqlite3")
+    policy(db, "consent_data_processing", True)
+    assert interpret(question)["attribute"] == "privacy_acknowledgement"
+    result = CandidateEngine(db).answer_question(question, {"options": [{"label": "Yes"}, {"label": "No"}]})
+    assert result["answer"] is None
+    assert result["missing_fact"]["concept"] == "consent_privacy_acknowledgement"
+
+
+def test_data_processing_consent_remains_separate_from_notice_reading(tmp_path):
+    db = Database(tmp_path / "processing.sqlite3")
+    policy(db, "consent_privacy_acknowledgement", True)
+    question = "I consent to collecting, storing and processing my personal data."
+    assert interpret(question)["attribute"] == "data_processing"
+    result = CandidateEngine(db).answer_question(question, {"type": "checkbox"})
+    assert result["answer"] is None
+    assert result["missing_fact"]["concept"] == "consent_data_processing"
+
+
 @pytest.mark.parametrize("question,intent", [
     ("If this company didn't exist, what work would excite you?", "HYPOTHETICAL"),
     ("Imagine you could choose any kind of work. What would you build?", "HYPOTHETICAL"),

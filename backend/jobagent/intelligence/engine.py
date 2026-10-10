@@ -57,6 +57,13 @@ def country_name(value):
 
 def target_country(job, question=""):
     """Use the vacancy's jurisdiction before generic visa examples or residency."""
+    # A question explicitly asking about work in another jurisdiction must
+    # not receive the vacancy country's authorization. Parenthetical visa
+    # examples remain excluded from this interpretation.
+    explicit_text = normalize(re.sub(r"\([^)]*\)", "", question))
+    explicit = re.findall(r"(?:work|employment|employed) (?:legally )?(?:in|within) (?:the )?(united kingdom|uk|united states|usa|spain|france|germany|canada)\b", explicit_text)
+    if len(set(country_name(value) for value in explicit)) == 1:
+        return country_name(explicit[0])
     if job.get("country"):
         return country_name(job["country"])
     location = normalize(str(job.get("location") or ""))
@@ -667,20 +674,54 @@ class CandidateEngine:
                                     answer += "."
                         rules.append("visa_status_with_verified_study_context")
                         confidence = "DERIVED_HIGH"
-                else:
-                    key = (
-                        {"permanent": "permanent_unrestricted", "full_time": "full_time_right_to_work", "future": "future_right_to_work"}.get(s["qualifier"], "current_right_to_work")
-                        if intent == "WORK_AUTHORIZATION"
-                        else "sponsorship_" + ("now_or_future" if s["qualifier"] == "unspecified" else s["qualifier"])
-                    )
-                    # Legal determinations require a current explicit fact with its evidence.
-                    answer = read(record, key)
+                elif intent == "SPONSORSHIP":
+                    answer = read(record, "sponsorship_" + ("now_or_future" if s["qualifier"] == "unspecified" else s["qualifier"]))
                     if answer is None:
                         out["reason"] = out["root_cause"] = "MISSING_CURRENT_IMMIGRATION_EVIDENCE"
-            if answer is None and country and intent != "VISA":
-                policy_subject = (
-                    "work_authorization_" + (s["qualifier"] if s["qualifier"] in {"permanent", "full_time", "future"} else "current")
-                ) if intent == "WORK_AUTHORIZATION" else "sponsorship_" + ("now_or_future" if s["qualifier"] == "unspecified" else s["qualifier"])
+            if intent == "WORK_AUTHORIZATION" and country:
+                facets = s.get("authorization_requirements") or [
+                    s["qualifier"] if s["qualifier"] in {"permanent", "full_time", "future"} else "current"]
+                facets_values = []
+                for facet in facets:
+                    field_key = {"permanent": "permanent_unrestricted", "unrestricted": "unrestricted_right_to_work",
+                        "full_time": "full_time_right_to_work", "future": "future_right_to_work",
+                        "current": "current_right_to_work", "visa_free": "visa_free_right_to_work"}.get(facet)
+                    if facet == "sponsorship_free":
+                        sponsor_key = "sponsorship_future" if "future" in facets else "sponsorship_current"
+                        sponsor = read(record or {}, sponsor_key)
+                        if sponsor is None and read(record or {}, "sponsorship_now_or_future") is False:
+                            sponsor = False
+                        facet_value = not sponsor if isinstance(sponsor, bool) else None
+                    elif facet == "period":
+                        # A duration-specific assurance cannot come from a
+                        # global Boolean. Require the actual application's
+                        # confirmed permission policy and jurisdiction.
+                        scoped = k.get_policy("work_authorization_period", job)
+                        facet_value = use_policy("work_authorization_period") if scoped and (
+                            scoped["scope"].get("country") and {"id", "job_id", "application_id"}.intersection(scoped["scope"])
+                        ) else None
+                        if facet_value is not None:
+                            confidence = "POLICY"
+                    else:
+                        facet_value = read(record or {}, field_key)
+                        if facet == "unrestricted" and facet_value is None:
+                            # A positive conjunction entails unrestricted; a
+                            # negative conjunction cannot prove its negation.
+                            if read(record or {}, "permanent_unrestricted") is True:
+                                facet_value = True
+                    if facet_value is None and facet not in {"sponsorship_free", "period"}:
+                        scoped = k.get_policy("work_authorization_" + facet, job)
+                        if scoped and scoped["scope"].get("country"):
+                            facet_value = use_policy("work_authorization_" + facet)
+                            confidence = "POLICY"
+                    facets_values.append(facet_value if isinstance(facet_value, bool) else None)
+                answer = False if False in facets_values else True if all(v is True for v in facets_values) else None
+                if answer is None:
+                    out["missing_authorization_facets"] = [facet for facet, value in zip(facets, facets_values) if value is None]
+                elif len(facets) > 1:
+                    rules.append("conjunction_of_verified_work_authorization_facets")
+            if answer is None and country and intent == "SPONSORSHIP":
+                policy_subject = "sponsorship_" + ("now_or_future" if s["qualifier"] == "unspecified" else s["qualifier"])
                 scoped = k.get_policy(policy_subject, job)
                 # An unscoped immigration policy must never leak across countries.
                 if scoped and scoped["scope"].get("country"):
@@ -689,6 +730,9 @@ class CandidateEngine:
             if answer is None:
                 missing = "MISSING_TARGET_WORK_COUNTRY" if not country else "MISSING_" + intent + "_EVIDENCE:" + country
                 out.update(reason=missing, root_cause=missing, missing_fact={"concept": intent.lower(), "country": country, "qualifier": s["qualifier"]})
+            elif isinstance(answer, bool) and s.get("negated_legal_predicate"):
+                answer = not answer
+                rules.append("negated_legal_predicate")
             out["sensitivity"] = "immigration"
         elif intent == "DEMOGRAPHIC":
             p = use_policy("optional_demographics")

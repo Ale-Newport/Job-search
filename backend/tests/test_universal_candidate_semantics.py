@@ -135,12 +135,51 @@ def test_date_format_from_all_visible_instructions(verified_db, question, format
 
 @pytest.mark.parametrize("level,expected", [
     ("SECONDARY", "secondary"), ("HIGH_SCHOOL", "secondary"), ("SIXTH_FORM", "secondary"),
+    ("Secondary education", "secondary"), ("Primary education", "primary"),
     ("BACCALAUREATE", "secondary"), ("Bachillerato", "secondary"), ("ESO", "secondary"),
     ("UNDERGRADUATE", "bachelor"), ("BACHELOR", "bachelor"), ("Bachelor's degree", "bachelor"),
     ("POSTGRADUATE", "master"), ("MASTER", "master"), ("MSc", "master"), ("DOCTORATE", "doctorate"),
 ])
 def test_education_level_vocabulary(level, expected):
     assert education_level(level) == expected
+
+
+@pytest.mark.parametrize("level_fields", [
+    {"education_level": "SECONDARY"},
+    {"level": "Secondary education"},
+    {"education_level": "SECONDARY", "level": "Secondary education"},
+])
+def test_verified_secondary_level_fields_select_school_and_native_graduation_year(tmp_path, level_fields):
+    db = Database(tmp_path / "education.sqlite3")
+    evidence_ids = {}
+    for name, fields in [
+        ("Harbor School", {"institution": "Harbor School", "status": "completed", "end_date": "2023",
+                           "graduation_year": 2023, **level_fields}),
+        ("Later University", {"institution": "Later University", "level": "MASTER", "status": "studying",
+                              "start_date": "2026-09", "end_date": "2027-09", "rank": 2}),
+    ]:
+        identifier = entity(db, "education", name)
+        for concept, value in fields.items():
+            fact_id = ingest_fact(db, identifier, concept, value,
+                                  value_type="integer" if isinstance(value, int) else "text",
+                                  source="Verified school record", evidence={"excerpt": str(value)}, verified=True)
+            if name == "Harbor School":
+                evidence_ids[concept] = fact_id
+    engine = CandidateEngine(db, as_of="2026-10-10")
+    for question in ("High School Name✱", "Secondary school name"):
+        result = engine.answer_question(question, {"type": "textarea", "required": True})
+        assert result["answer"] == "Harbor School", result
+        assert result["root_cause"] is None
+        assert evidence_ids["institution"] in result["fact_ids"]
+        assert evidence_ids.get("education_level", evidence_ids.get("level")) in result["fact_ids"]
+    question = "Year of High School Graduation"
+    result = engine.answer_question(question, {"type": "select-one", "tag": "select", "required": True,
+        "options": [{"label": "Select...", "value": ""}, *[
+            {"label": str(year), "value": str(year)} for year in range(2020, 2031)],
+            {"label": "Other", "value": "Other"}]})
+    assert result["answer"] == result["form_value"] == "2023", result
+    assert result["root_cause"] is None
+    assert evidence_ids["end_date"] in result["fact_ids"]
 
 
 @pytest.mark.parametrize("country", ["United Kingdom", "UK", "GB", "Spain", "United States", "France", "Germany", "Canada"])

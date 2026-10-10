@@ -293,9 +293,12 @@ class CandidateEngine:
             return None
 
         def education(selector):
+            def record_level(record):
+                return education_level(val(record, "education_level", "")) or education_level(val(record, "level", ""))
+
             rows = k.records("education")
             if selector in {"primary", "secondary", "bachelor", "master", "doctorate"}:
-                rows = [e for e in rows if education_level(val(e, "level", "")) == selector]
+                rows = [e for e in rows if record_level(e) == selector]
             elif selector == "latest":
                 rows = [e for e in rows if val(e, "start_date") and val(e, "start_date")[:7] <= k.today.isoformat()[:7]]
             elif selector == "completed":
@@ -311,12 +314,12 @@ class CandidateEngine:
             # Completion and level are independent constraints. A completed
             # master's question cannot use an ongoing master's record.
             if s.get("education_level") and selector == "completed":
-                rows = [e for e in rows if education_level(val(e, "level", "")) == s["education_level"]]
+                rows = [e for e in rows if record_level(e) == s["education_level"]]
             rows.sort(key=lambda e: (val(e, "rank", 0), val(e, "end_date", "")), reverse=True)
             if not rows:
                 return None
             e = rows[0]
-            for key in ("status", "start_date", "end_date", "rank", "level"):
+            for key in ("status", "start_date", "end_date", "rank", "level", "education_level"):
                 read(e, key)
             return e
 

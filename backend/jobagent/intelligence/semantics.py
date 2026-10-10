@@ -26,9 +26,9 @@ ONTOLOGY.update({"HYPOTHETICAL", "NOT_ON_RESUME", "ROLE_PREFERENCE", "PRODUCT_PR
 
 # International names describe education levels, never particular institutions.
 EDUCATION_LEVELS = {
-    "primary": {"primary", "elementary"},
+    "primary": {"primary", "elementary", "primary education", "elementary education"},
     "secondary": {"secondary", "high school", "high_school", "sixth form", "sixth_form", "baccalaureate",
-                  "bachillerato", "eso", "educacion secundaria", "secondary school"},
+                  "bachillerato", "eso", "educacion secundaria", "secondary school", "secondary education", "high school education"},
     "bachelor": {"bachelor", "bachelor s degree", "bsc", "undergraduate", "grado", "licenciatura"},
     "master": {"master", "master s degree", "msc", "postgraduate", "posgrado", "postgrado", "maestria"},
     "doctorate": {"doctorate", "doctoral", "phd", "doctorado"},

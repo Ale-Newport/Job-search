@@ -332,6 +332,21 @@ def test_composite_authorization_accepts_all_independently_verified_facets(tmp_p
     assert "conjunction_of_verified_work_authorization_facets" in result["rules_used"]
 
 
+@pytest.mark.parametrize("phrase", ["without requiring sponsorship", "without any visa sponsorship",
+    "without the need for employer sponsorship", "without needing any visa sponsorship", "without a requirement for sponsorship"])
+@pytest.mark.parametrize("sponsor,expected", [(None, None), (True, "No"), (False, "Yes")])
+def test_sponsorship_free_permission_preserves_all_phrase_facets(tmp_path, phrase, sponsor, expected):
+    facts = {"current_right_to_work": True}
+    if sponsor is not None:
+        facts["sponsorship_current"] = sponsor
+    db = immigration_db(tmp_path, facts)
+    result = CandidateEngine(db).answer_question(f"Are you currently authorised to work in the UK {phrase}?",
+        {"options": [{"label": "Yes"}, {"label": "No"}]}, {"country": "United Kingdom"})
+    assert result["canonical_intent"] == "WORK_AUTHORIZATION"
+    assert "sponsorship_free" in result["semantic"]["authorization_requirements"]
+    assert result["answer"] == expected, result
+
+
 def test_scoped_current_policy_cannot_answer_unrestricted_question(tmp_path):
     db = Database(tmp_path / "policy.sqlite3")
     policy(db, "work_authorization_current", True, {"country": "United Kingdom"})

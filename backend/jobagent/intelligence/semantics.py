@@ -36,6 +36,12 @@ EDUCATION_LEVELS = {
 HUMAN_LANGUAGES = {"english", "spanish", "french", "german", "portuguese", "italian", "dutch", "arabic",
                    "mandarin", "chinese", "japanese", "korean", "russian", "hindi", "bengali", "polish", "turkish",
                    "ukrainian", "catalan", "galician", "basque"}
+SPONSORSHIP_FREE = re.compile(
+    r"\bwithout (?:(?:any|a|the) )?(?:(?:need|requirement) for |needing |requiring )?"
+    r"(?:(?:any|a|the) )?(?:(?:visa|employer|work) )?sponsor(?:ship)?\b|"
+    r"\bno (?:visa |employer |work )?sponsor(?:ship)?\b|"
+    r"\bnot (?:need|require|needing|requiring).{0,20}sponsor"
+)
 
 
 def education_level(value):
@@ -192,7 +198,7 @@ def interpret(question, field=None):
     elif intent == "HYPOTHETICAL" and re.search(r"\b(?:will|would|do) you (?:need|require).{0,35}sponsor", text):
         intent = "SPONSORSHIP"
     elif re.search(r"authori[sz].*work|work.*authori[sz]|right to work|permission.*work|legally.*work", text) and (
-        not re.search(r"(?:need|require).{0,25}sponsor", text) or re.search(
+        SPONSORSHIP_FREE.search(text) or not re.search(r"(?:need|require).{0,25}sponsor", text) or re.search(
             r"permanent|unrestricted|without restrictions|without limitations|unlimited", text)
     ):
         intent = "WORK_AUTHORIZATION"
@@ -267,12 +273,13 @@ def interpret(question, field=None):
             ("unrestricted", r"unrestricted|without restrictions|without limitations|unlimited"),
             ("full_time", r"full time|fulltime|(?:35|40) hours"),
             ("future", r"future|when you start|at (?:your |the )?start|after graduat|will you.*(?:authori|right to work)"),
-            ("sponsorship_free", r"without (?:visa )?sponsor|no (?:visa )?sponsor|not (?:need|require).{0,20}sponsor"),
             ("visa_free", r"without (?:a |any )?visa\b(?! sponsor)"),
             ("period", r"throughout|entire (?:internship|placement|period)|full duration|for (?:the )?(?:full |entire )?\d+ weeks|during (?:the |this |your )?(?:internship|placement)"),
         ):
             if re.search(pattern, text):
                 authorization_requirements.append(facet)
+        if SPONSORSHIP_FREE.search(text):
+            authorization_requirements.append("sponsorship_free")
         if re.search(r"currently|current|\bnow\b|at present", text) or "future" not in authorization_requirements:
             authorization_requirements.append("current")
     negated_legal_predicate = bool(re.search(

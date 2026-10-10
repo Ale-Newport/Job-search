@@ -28,9 +28,10 @@ export async function api<T = Data>(
   method = "GET",
   body?: unknown,
   signal?: AbortSignal,
+  requestTimeoutMs?: number,
 ): Promise<T> {
   const controller = new AbortController();
-  const timeoutMs = method === "GET" ? 15000 : 90000;
+  const timeoutMs = requestTimeoutMs ?? (method === "GET" ? 15000 : 90000);
   let timedOut = false;
   const abort = () => controller.abort();
   signal?.addEventListener("abort", abort, { once: true });

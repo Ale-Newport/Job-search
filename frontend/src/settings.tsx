@@ -1,4 +1,5 @@
 import { CandidateIntelligence } from "./intelligence";
+import { ApplicationAnswerLLMSetup } from "./answer-llm";
 import { useEffect, useRef, useState } from "react";
 import {
   ArrowDownToLine,
@@ -29,7 +30,6 @@ import {
   download,
   items,
   label,
-  openExternal,
   time,
   useResource,
 } from "./api";
@@ -143,34 +143,7 @@ const aiFields: Field[] = [
     label: "Allow fallback to Jev when local confidence is low",
     type: "checkbox",
   },
-  {
-    key: "text_provider",
-    label: "Text generation provider",
-    type: "select",
-    options: [
-      "none",
-      "ollama",
-      "openai",
-      "anthropic",
-      "gemini",
-      "openai-compatible",
-    ],
-    required: true,
-  },
-  { key: "text_model", label: "Text model name" },
-  {
-    key: "text_base_url",
-    label: "Text provider base URL",
-    type: "url",
-    hint: "Ollama default: http://127.0.0.1:11434/v1",
-  },
-  {
-    key: "monthly_budget",
-    label: "Monthly remote AI budget (USD)",
-    type: "number",
-    min: 0,
-    step: 0.01,
-  },
+
 ];
 export function Automation({ ctx }: { ctx: AppContext }) {
   const r = useResource("/automation", ctx.refresh),
@@ -438,8 +411,6 @@ export function Settings({
     [edit, setEdit] = useState<"automation" | "ai" | null>(null),
     [credential, setCredential] = useState<string | null>(null),
     [result, setResult] = useState<Data | null>(null),
-    [textResult, setTextResult] = useState<Data | null>(null),
-    [deepSeek, setDeepSeek] = useState(false),
     s = r.data || {};
   const tabs = [
     ["general", "General", Settings2],
@@ -654,73 +625,7 @@ export function Settings({
                 />
               )}
             </Panel>
-            <Panel
-              title="Text generation"
-              description="Drafts grounded in the verified facts you select"
-              action={
-                <Button secondary onClick={() => setDeepSeek(true)}>
-                  Set up DeepSeek
-                </Button>
-              }
-            >
-              <KeyValues
-                data={{
-                  provider: s.text_provider || "none",
-                  model: s.text_model,
-                  endpoint: s.text_base_url,
-                  monthly_budget_usd: s.monthly_budget ?? 0,
-                }}
-              />
-              <div className="info-card compact">
-                <LockKeyhole size={20} />
-                <p>
-                  {!s.text_provider || s.text_provider === "none"
-                    ? "Extractive mode uses your selected verified facts without sending them to a model."
-                    : s.text_provider === "ollama"
-                      ? "Ollama sends selected verified facts and role context to your local endpoint."
-                      : "Your selected remote provider receives the question, role context, and the verified facts you choose. Review every generated answer."}
-                </p>
-              </div>
-              <div className="panel-actions">
-                <Button
-                  secondary
-                  loading={ctx.busy === "text-test"}
-                  onClick={async () => {
-                    const value = await ctx.act("text-test", () =>
-                      api("/ai/text/test", "POST", {}),
-                    );
-                    if (value) setTextResult(value);
-                  }}
-                >
-                  <Zap size={15} />
-                  Test text provider
-                </Button>
-                <span className="muted">
-                  Uses a synthetic prompt with no CV or profile facts. Remote
-                  tests use your configured budget.
-                </span>
-                <Button
-                  secondary
-                  onClick={() =>
-                    ctx.act("deepseek-pricing", () =>
-                      openExternal(
-                        "https://api-docs.deepseek.com/quick_start/pricing/",
-                      ),
-                    )
-                  }
-                >
-                  DeepSeek official pricing
-                  <ExternalLink size={13} />
-                </Button>
-              </div>
-              {textResult && (
-                <JsonDetails
-                  title="Text provider test result"
-                  data={textResult}
-                  open
-                />
-              )}
-            </Panel>
+            <ApplicationAnswerLLMSetup ctx={ctx} settings={s} integrations={items(integrations.data)} />
             <Panel
               title="Provider credentials & cost control"
               description="Credentials are stored in Keychain; price settings support budget enforcement."
@@ -844,75 +749,7 @@ export function Settings({
           }}
         />
       )}
-      {deepSeek && (
-        <Editor
-          title="Set up DeepSeek"
-          description="Uses the OpenAI-compatible provider slot. Verified 29 September 2026: deepseek-flash, https://api.deepseek.com/v1. Prices below use peak, uncached rates as a conservative budget bound. Enter your own key; no profile is sent by saving."
-          fields={[
-            {
-              key: "secret",
-              label: "DeepSeek API key",
-              type: "password",
-              hint: "Stored only in macOS Keychain. Blank retains the current OpenAI-compatible key; replace it if it belongs to a different provider.",
-            },
-            {
-              key: "monthly_budget",
-              label: "Monthly remote AI budget (USD)",
-              type: "number",
-              min: 0,
-              step: 0.01,
-              required: true,
-              hint: "Set your own limit. Zero blocks paid remote inference.",
-            },
-            {
-              key: "input_cost_per_million",
-              label: "Input price per million tokens (USD)",
-              type: "number",
-              min: 0,
-              step: 0.01,
-              required: true,
-            },
-            {
-              key: "output_cost_per_million",
-              label: "Output price per million tokens (USD)",
-              type: "number",
-              min: 0,
-              step: 0.01,
-              required: true,
-            },
-          ]}
-          initial={{
-            secret: "",
-            monthly_budget: s.monthly_budget ?? 0,
-            input_cost_per_million: 0.3,
-            output_cost_per_million: 1.2,
-          }}
-          submit="Save DeepSeek configuration"
-          onClose={() => setDeepSeek(false)}
-          onSave={async (values) => {
-            const { secret, monthly_budget, ...prices } = values;
-            const previous =
-              items(integrations.data).find(
-                (entry) => entry.provider === "openai-compatible",
-              )?.config || {};
-            await api("/integrations/openai-compatible", "PUT", {
-              config: { ...previous, ...prices },
-              ...(secret ? { secret } : {}),
-            });
-            await api("/settings", "PATCH", {
-              text_provider: "openai-compatible",
-              text_base_url: "https://api.deepseek.com/v1",
-              text_model: "deepseek-flash",
-              monthly_budget,
-            });
-            await ctx.act(
-              "refresh",
-              () => Promise.resolve({}),
-              "DeepSeek configuration saved. Use Test text provider to verify the connection.",
-            );
-          }}
-        />
-      )}
+
     </>
   );
 }

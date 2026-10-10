@@ -46,6 +46,43 @@ export interface Application extends Entity {
   runs?: Data[];
   tasks?: Data[];
 }
+export interface AnswerLLMStatus extends Data {
+  configured: boolean;
+  provider: string;
+  model: string;
+  key_present: boolean;
+  setup_required: boolean;
+  message: string;
+  endpoint?: string;
+  local?: {
+    available: boolean;
+    models: Array<string | { id: string; label?: string }>;
+    error?: string;
+  };
+  usage?: Data;
+}
+export interface AnswerDiagnostic extends Data {
+  question?: string;
+  exact_question?: string;
+  question_id?: string;
+  answer?: unknown;
+  intent?: string;
+  state?: string;
+  status?: string;
+  facts_used?: string[];
+  requested_format?: string;
+  word_count?: number;
+  quality?: {
+    passed?: boolean;
+    scores?: Data;
+    issues?: unknown[];
+    review?: unknown;
+  };
+  provider?: string;
+  model?: string;
+  selected_roles?: string[];
+  company_claims?: Array<{ text: string; source_urls: string[] }>;
+}
 export interface Document extends Entity {
   name?: string;
   filename?: string;

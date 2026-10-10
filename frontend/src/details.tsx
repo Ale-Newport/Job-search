@@ -1,4 +1,5 @@
 import { OpportunityActions } from "./tracking";
+import { AnswerInspector, ApplicationAnswerInspector } from "./answer-inspector";
 import { Networking } from "./networking";
 import { useEffect, useRef, useState } from "react";
 import {
@@ -890,7 +891,7 @@ export function ApplicationDetail({
           {tab === "answers" && (
             <Panel
               title="Answers & provenance"
-              description="Each answer retains the facts that support it"
+              description="Inspect each question, supporting facts, generation progress and validation"
               action={
                 <Button secondary onClick={() => setAnswer(true)}>
                   <PlusIcon />
@@ -898,6 +899,7 @@ export function ApplicationDetail({
                 </Button>
               }
             >
+              <ApplicationAnswerInspector application={a} />
               {a.answers?.length ? (
                 <div className="answer-list">
                   {a.answers.map((v, i) => (
@@ -910,16 +912,7 @@ export function ApplicationDetail({
                       </div>
                       <p className="prose-text">{v.answer}</p>
                       {v.reason && <p className="muted">{v.reason}</p>}
-                      <JsonDetails
-                        title="Why this answer? View evidence"
-                        data={{
-                          fact_ids: v.fact_ids || v.facts_used,
-                          evidence: v.evidence,
-                          confidence: v.confidence,
-                          reason: v.reason,
-                          source: v.source,
-                        }}
-                      />
+                      <AnswerInspector answer={v} />
                     </div>
                   ))}
                 </div>
@@ -1433,7 +1426,7 @@ function AnswerComposer({
         </div>
         <Button
           secondary
-          disabled={!question || !factIds.length}
+          disabled={!question.trim()}
           loading={busy}
           onClick={async () => {
             setBusy(true);
@@ -1443,9 +1436,10 @@ function AnswerComposer({
                 question,
                 job_id: a.job_id,
                 fact_ids: factIds,
-              });
+              }, undefined, 300000);
               setAnswer(d.answer || "");
-              setEvidence(d);
+              setEvidence({ ...d, question });
+              if (!d.answer) setError(d.reason || "No supported answer is available. Inspect the diagnostics below.");
             } catch (e) {
               setError((e as Error).message);
             } finally {
@@ -1465,7 +1459,7 @@ function AnswerComposer({
           />
         </label>
         {evidence && (
-          <JsonDetails title="Draft evidence and confidence" data={evidence} />
+          <AnswerInspector answer={evidence} open />
         )}{" "}
         {error && <ErrorBox error={error} />}
       </div>

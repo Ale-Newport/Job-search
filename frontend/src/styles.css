@@ -2749,3 +2749,29 @@ kbd {
 .application-profile-body {
   padding: 22px;
 }
+
+.answer-llm-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: start;
+}
+.answer-inspector {
+  margin-top: 16px;
+  min-width: 0;
+}
+.answer-inspector > summary {
+  margin-bottom: 12px;
+  cursor: pointer;
+  color: var(--muted);
+  font-size: 12px;
+}
+.knowledge-fact {
+  border-top: 1px solid var(--border);
+  margin-top: 16px;
+  padding-top: 16px;
+}
+@media (max-width: 850px) {
+  .answer-llm-fields {
+    grid-template-columns: 1fr;
+  }
+}

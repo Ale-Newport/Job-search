@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import asyncio
 import inspect
+import hashlib
+import json
 from pathlib import Path
 import re
 
@@ -13,7 +15,7 @@ from ..intelligence.formatting import choice as option_for
 from .reasoning import conditional_state, profile_resolution
 from .disclosures import disclosure_resolution, disclosure_clear_operation, disclosure_memory_key, has_disclosure_value, inherit_disclosure_context, personal_disclosure_kind
 from .browser import BrowserSession, confirmation_evidence
-from .browser import PROGRESS, is_submit, application_entry_target
+from .browser import PROGRESS, is_submit, application_entry_target, application_input_elements
 from .engines import make_engine
 from .job_context import enrich_job_context
 from .consent import action_key, dropdown_open_target, radio_group, resolution_element, section_plan, selected_resolution_matches
@@ -36,6 +38,7 @@ class BrowserManager(BrowserSession):
         self.completed_steps = []
         self._checkpoint_answers = []
         self._checkpoint_documents = []
+        self._answer_diagnostics = {}
 
     def _invalidate_approvals(self):
         super()._invalidate_approvals()
@@ -60,11 +63,25 @@ class BrowserManager(BrowserSession):
     def _result(self, status: str, snapshot: dict | None, *, answers: list | None = None,
                 questions: list | None = None, steps: list | None = None,
                 evidence: list | None = None, adapter: str = "generic", error: str | None = None) -> dict:
+        if snapshot:
+            self._reconcile_diagnostics(snapshot)
+        from ..intelligence.answer_evidence import ApplicationConsistencyReviewer
+        narratives = [d for d in self._answer_diagnostics.values() if d.get('provider') in
+                      {'openai', 'anthropic', 'gemini', 'ollama', 'openai-compatible'} and d.get('answer')]
+        coherence = ApplicationConsistencyReviewer().review(narratives)
+        if status == 'needs_review' and not coherence['passed']:
+            status = 'human_required'
+            questions = [*(questions or []), {'question': 'Review repeated or inconsistent application answers.',
+                         'kind': 'application_consistency', 'reason': json.dumps(coherence['issues'])}]
         result = {"status": status, "answers": answers or [], "questions": questions or [], "steps": steps or [],
                   "evidence": evidence or [], "omitted": list(self._omitted.values()), "snapshot_id": snapshot["id"] if snapshot else None,
                   "current_url": snapshot["url"] if snapshot else self.status()["current_url"],
                   "adapter": adapter, "error": error, "application_id": self._active_application_id,
                   "form_state": self.form_state, "completed_steps": self.completed_steps, "documents": self._checkpoint_documents,
+                  "answer_diagnostics": list(self._answer_diagnostics.values()),
+                  "consistency_review": coherence,
+                  "answer_progress": [{"question_id": d.get("question_id"), "question": d.get("question"),
+                                       "status": d.get("status")} for d in self._answer_diagnostics.values()],
                   "validation_errors": snapshot.get("errors", []) if snapshot else [],
                   "sensitive": any(a.get("kind") in {"disability", "ethnicity", "gender", "criminal_record",
                                                        "demographic", "legal_certification"} for a in answers or [])}
@@ -107,7 +124,8 @@ class BrowserManager(BrowserSession):
         adapter = get_adapter(url, application.get("ats"))
         section_consent = bool(settings.get("section_consent"))
         skip_optional = bool(settings.get("skip_optional_unknown"))
-        section_grant = {tuple(key) for key in settings.get("_section_grant", [])}
+        section_grant = {tuple(tuple(v) if isinstance(v, list) else v for v in key)
+                         for key in settings.get("_section_grant", [])}
         if mode.upper() == "MANUAL":
             return self._result("needs_review", None, adapter=adapter.name,
                                 questions=[{"question": "Manual mode: open and complete the prepared application yourself.", "kind": "manual"}])
@@ -123,10 +141,25 @@ class BrowserManager(BrowserSession):
         policies["_candidate_engine"] = settings.get("_candidate_engine")
         policies["_job_context"] = settings.get("_job_context", application)
         reasoning_cache = {}
+        self._answer_diagnostics = {}
+        from .company_research import CompanyResearch
+        research = CompanyResearch(self.data_dir / "cache" / "company-research")
+        resumes = [d for d in documents if d.get('kind') in {'cv', 'resume', 'base_cv', 'import'}]
+        if len(resumes) == 1:
+            settings['_job_context'] = {**settings.get('_job_context', application),
+                'resume_text': resumes[0].get('text', ''), 'resume_hash': resumes[0].get('content_hash', ''),
+                'resume_document_id': resumes[0].get('id'), 'resume_version_id': resumes[0].get('id')}
 
         async def resolve(element):
             element = resolution_element(element, snapshot['elements'])
             field = adapter.question(element)
+            question_id = hashlib.sha256(json.dumps([application.get('id'), element.get('name') or
+                element.get('field_path') or element.get('group') or element.get('node_id'), field],
+                ensure_ascii=False).encode()).hexdigest()
+            # Context is copied per question. A checkbox group shares one selection
+            # result but every distinct question has its own immutable identity.
+            element = {**element, 'question_id': question_id,
+                       '_related_answers': [dict(a) for a in answers if a.get('question_id') != question_id]}
             corrections = [f for f in facts if f.get('manual_correction')]
             if corrections:
                 corrected = profile_resolution(field, corrections, element=element, policies={})
@@ -142,14 +175,38 @@ class BrowserManager(BrowserSession):
                     element['_education_reference'] = parent.get('selected_text') or parent.get('value')
             intelligence = settings.get('_candidate_engine')
             if intelligence:
-                result = await intelligence.answer(field, element, settings.get('_job_context', application))
+                job = settings.get('_job_context', application)
+                job = await research.enrich(job, field, element)
+                settings['_job_context'] = job
+                policies['_job_context'] = job
+                cache_key = hashlib.sha256(json.dumps([question_id, intelligence.knowledge.version,
+                    job, {k: element.get(k) for k in ('type','multiple','options','description','placeholder',
+                    'max_length','min_length','pattern','section_label','_education_reference','_condition')}],
+                    sort_keys=True, default=str).encode()).hexdigest()
+                if cache_key not in reasoning_cache:
+                    self._answer_diagnostics[question_id] = {'question_id': question_id, 'question': field,
+                                                            'status': 'GENERATING'}
+                    if self.on_step:
+                        progress = self.on_step({'operation': 'ANSWER_PROGRESS', 'executed': False,
+                            'label': field, 'application_id': self._active_application_id,
+                            'observation': snapshot, 'answer_diagnostics': list(self._answer_diagnostics.values())})
+                        if inspect.isawaitable(progress):
+                            await progress
+                    reasoning_cache[cache_key] = await intelligence.answer(field, element, job)
+                result = dict(reasoning_cache[cache_key])
                 result = intelligence.confirmed_fallback(field, result, facts, policies)
+                result.update(question_id=question_id, status='ANSWER_VALIDATED' if result['answer'] is not None or result['leave_blank']
+                              else 'ANSWER_FAILED', company_context=job.get('company_context', []))
+                previous = self._answer_diagnostics.get(question_id, {})
+                if previous.get('status') == 'ANSWER_ACCEPTED_BY_FORM' and previous.get('answer') == result['answer']:
+                    result['status'] = previous['status']
+                self._answer_diagnostics[question_id] = dict(result)
                 if result['canonical_intent'] != 'OTHER' or result['answer'] is not None:
                     return self._location_resolution(result, facts, element)
             result = profile_resolution(field, facts, element=element, policies=policies,
                                        hints=[element.get("name", ""), element.get("autocomplete", "")])
             callback = settings.get("_reason_answer")
-            if result['answer'] is None and not result['leave_blank'] and callback and settings.get('assisted_autofill') and not intelligence:
+            if result['answer'] is None and not result['leave_blank'] and not result.get('root_cause') and callback and settings.get('assisted_autofill') and not intelligence:
                 key = (field, element.get('type'), tuple(o.get('label', '') for o in element.get('options', [])))
                 if key not in reasoning_cache:
                     reasoning_cache[key] = await callback(field, element)
@@ -167,7 +224,15 @@ class BrowserManager(BrowserSession):
                 return self._result("human_required", snapshot, adapter=adapter.name,
                                     questions=[{"question": "This source uses manual handoff. Complete the application in the visible browser.",
                                                 "kind": "platform_restriction"}])
-            max_steps = min(100, max(1, int(settings.get("browser_max_steps", 100))))
+            # Research all observed question links before any narrative is generated.
+            # This keeps company context stable as later answers are inserted.
+            initial_job = settings.get('_job_context', application)
+            for field in snapshot['elements']:
+                if any(op in field.get('operations', []) for op in ('TYPE_TEXT', 'SELECT', 'CHECK')):
+                    initial_job = await research.enrich(initial_job, adapter.question(field),
+                                                       resolution_element(field, snapshot['elements']))
+            settings['_job_context'] = initial_job
+            max_steps = min(500, max(1, int(settings.get("browser_max_steps", 100))))
             handled: set[tuple] = set()
             page_advances = 0
             stale_retries = 0
@@ -189,11 +254,13 @@ class BrowserManager(BrowserSession):
                     if disclosure_policy:
                         policies['personal_disclosures'] = disclosure_policy['value']
                 self._check_pause()
-                form_seen = form_seen or any(any(op in e['operations'] for op in ('TYPE_TEXT','SELECT','CHECK','UPLOAD')) for e in snapshot['elements'])
+                snapshot['application_started'] = form_seen
+                application_fields = application_input_elements(snapshot)
+                form_seen = form_seen or bool(application_fields)
                 snapshot['application_started'] = form_seen
                 cookie_text = ' '.join(frame.get('text','') for frame in snapshot.get('frames',[]))
                 if re.search(r'cookies?|privacy preferences', cookie_text, re.I):
-                    declines = [e for e in snapshot['elements'] if e.get('role')=='button' and 'CLICK' in e['operations'] and (e['document_id'],e['node_id']) not in dismissed_cookies and re.fullmatch(r'(?:reject|decline)(?: all(?: cookies)?| optional cookies| non-essential cookies)|only necessary(?: cookies)?|necessary cookies only',e.get('label','').strip(),re.I)]
+                    declines = [e for e in snapshot['elements'] if e.get('role')=='button' and 'CLICK' in e['operations'] and (e['document_id'],e['node_id']) not in dismissed_cookies and re.fullmatch(r'(?:reject|decline|deny)(?: all(?: cookies)?| optional cookies| non-essential cookies)?|only necessary(?: cookies)?|necessary cookies only|rechazar(?: todas)?|rechazar (?:las )?cookies(?: opcionales)?',e.get('label','').strip(),re.I)]
                     if len(declines)==1:
                         try:
                             await self._record_step(await self.execute(Decision(Operation.CLICK,declines[0]['index']),snapshot),steps,snapshot)
@@ -290,6 +357,12 @@ class BrowserManager(BrowserSession):
                     pending_dropdown = None
                     continue
                 for element in snapshot["elements"]:
+                    if (any(op in element.get('operations', []) for op in ('TYPE_TEXT', 'SELECT', 'CHECK', 'UPLOAD'))
+                            and element not in application_fields):
+                        continue
+                    if not any(op in element.get('operations', []) for op in
+                               ('TYPE_TEXT', 'SELECT', 'CHECK', 'UNCHECK', 'UPLOAD', 'CLEAR')) and element.get('role') != 'combobox':
+                        continue
                     if element.get('user_edit'):
                         edit = element['user_edit']
                         field = adapter.question(element)
@@ -416,7 +489,10 @@ class BrowserManager(BrowserSession):
                         if element.get("required"):
                             questions.append({"question": field, "kind": resolution["kind"], "reason": "This field is required but your policy is to leave it blank.", "target": element["index"]})
                         elif has_disclosure_value(element):
-                            if resolution.get('source') == 'user_edit' and 'CLEAR' in operations:
+                            explicit_blank = (resolution.get('confidence_level') == 'EXACT'
+                                              and resolution.get('fact_ids') and not resolution.get('root_cause'))
+                            if (resolution.get('source') == 'user_edit' or explicit_blank) and 'CLEAR' in operations:
+                                self._add_answer(answers, dict(resolution))
                                 action = Decision(Operation.CLEAR, element['index'])
                                 value = None
                                 break
@@ -425,6 +501,7 @@ class BrowserManager(BrowserSession):
                                               "reason": "The existing answer has no confirmed supporting fact. Review it in the browser."})
                         else:
                             handled.add(signature)
+                            self._accepted_answer(resolution, element)
                         continue
                     if resolution["answer"] is None:
                         if element.get("required") or not skip_optional or element.get('value'):
@@ -436,15 +513,22 @@ class BrowserManager(BrowserSession):
                     answer = resolution["answer"]
                     operation = None
                     if "TYPE_TEXT" in operations:
-                        if element["value"] != answer:
+                        phone_equivalent = bool(re.search(r'\bphone|\bmobile|\btelephone', field, re.I)
+                                                and selected_resolution_matches(resolution, element['value']))
+                        if element["value"] != answer and not phone_equivalent:
                             operation, value = Operation.TYPE_TEXT, answer
                     elif "SELECT" in operations:
-                        option = option_for(answer, element["options"], question=field, disclosure_concept=resolution.get("disclosure_concept"))
-                        if option is None:
+                        selected = resolution.get('form_value')
+                        values = selected if element.get('multiple') and isinstance(selected, list) else [answer]
+                        options = [option_for(item, element["options"], question=field,
+                                             disclosure_concept=resolution.get("disclosure_concept")) for item in values]
+                        if not options or any(option is None for option in options):
                             questions.append({"question": field, "kind": "option", "reason": "The verified answer does not match any observed option.", "target": element["index"]})
                             continue
-                        if element["value"] != option["value"]:
-                            operation, value = Operation.SELECT, option["value"]
+                        wanted = [option['value'] for option in options]
+                        if (set(element.get('selected_values', [])) != set(wanted) if element.get('multiple')
+                                else element['value'] != wanted[0]):
+                            operation, value = Operation.SELECT, wanted if element.get('multiple') else wanted[0]
                     elif element["role"] == "radio":
                         if normalize(answer) not in {normalize(element["label"]), normalize(element["value"])}:
                             # Resolve the group as a whole, not one radio independently.
@@ -459,6 +543,9 @@ class BrowserManager(BrowserSession):
                             operation = Operation.CHECK
                     else:
                         truth = normalize(answer)
+                        if element.get('multiple') and isinstance(resolution.get('form_value'), list):
+                            truth = 'yes' if any(option_for(item, [{'label': element['label'], 'value': element['value']}],
+                                question=field) for item in resolution['form_value']) else 'no'
                         if truth not in {"yes", "no", "true", "false", "1", "0"}:
                             questions.append({"question": field, "kind": "checkbox", "reason": "A verified yes/no answer is required.", "target": element["index"]})
                             continue
@@ -470,6 +557,7 @@ class BrowserManager(BrowserSession):
                         action = Decision(operation, element["index"])
                         break
                     handled.add(signature)
+                    self._accepted_answer(resolution, element)
                 if action:
                     self.form_state = 'FILL_FIELDS'
                     target = next(e for e in snapshot['elements'] if e['index']==action.target)
@@ -481,6 +569,13 @@ class BrowserManager(BrowserSession):
                         target = next(e for e in snapshot["elements"] if e["index"] == action.target)
                         key = action_key(target, action.operation, value, file_path, upload_name)
                         if key not in section_grant:
+                            exact_resolutions = {}
+                            for peer in snapshot['elements']:
+                                if (peer.get('section_id', 'page') == target.get('section_id', 'page')
+                                        and peer.get('document_id') == target.get('document_id')
+                                        and any(op in peer.get('operations', []) for op in ('TYPE_TEXT', 'SELECT', 'CHECK'))):
+                                    exact_resolutions[adapter.question(peer)] = await resolve(peer)
+                            policies['_answer_resolutions'] = exact_resolutions
                             fields, keys = section_plan(snapshot, target, adapter, facts, documents, policies, self._documents_for)
                             if key not in keys:
                                 raise HumanRequired("This field needs manual review before it can be filled.")
@@ -509,6 +604,17 @@ class BrowserManager(BrowserSession):
                     if cleared and disclosure_resolution(adapter.question(cleared), cleared, policies):
                         cleared_disclosures.add((cleared["document_id"], cleared["node_id"]))
                     snapshot = await self.observe()
+                    if action.operation in {Operation.TYPE_TEXT, Operation.SELECT, Operation.CHECK, Operation.UNCHECK, Operation.CLEAR}:
+                        observed = next((e for e in snapshot['elements'] if e['node_id'] == target['node_id']
+                                         and e['document_id'] == target['document_id']), None)
+                        if observed:
+                            diagnostic = self._answer_diagnostics.get(hashlib.sha256(json.dumps([
+                                application.get('id'), target.get('name') or target.get('field_path') or
+                                target.get('group') or target.get('node_id'), adapter.question(target)],
+                                ensure_ascii=False).encode()).hexdigest())
+                            if diagnostic:
+                                diagnostic['status'] = 'ANSWER_INSERTED'
+                                self._accepted_answer(diagnostic, observed)
                     continue
                 for hidden in snapshot.get("unresolved_required", []):
                     question = hidden["label"] or "Required hidden control"
@@ -548,7 +654,7 @@ class BrowserManager(BrowserSession):
                 if snapshot["errors"]:
                     return self._result("human_required", snapshot, answers=answers, steps=steps, adapter=adapter.name,
                                         questions=[{"question": e, "kind": "validation"} for e in snapshot["errors"]])
-                has_inputs = any(any(op in e['operations'] for op in ('TYPE_TEXT','SELECT','CHECK','UPLOAD')) for e in snapshot['elements'])
+                has_inputs = bool(application_fields)
                 # Entry and method-choice pages precede any candidate form.
                 # A completed wizard may have a review page with no inputs.
                 entry_only = not has_inputs and not form_seen
@@ -691,6 +797,9 @@ class BrowserManager(BrowserSession):
             outcome = self.on_step({**step, "application_id": self._active_application_id,
                                     "snapshot_id": snapshot["id"], "observation": snapshot,
                                     "form_state": self.form_state, "completed_steps": self.completed_steps,
+                                    "answer_diagnostics": list(self._answer_diagnostics.values()),
+                                    "answer_progress": [{"question_id": d.get('question_id'), "question": d.get('question'),
+                                                         "status": d.get('status')} for d in self._answer_diagnostics.values()],
                                     "answers": self._checkpoint_answers, "documents": self._checkpoint_documents})
             if inspect.isawaitable(outcome):
                 await outcome
@@ -728,8 +837,70 @@ class BrowserManager(BrowserSession):
 
     @staticmethod
     def _add_answer(answers: list[dict], answer: dict) -> None:
-        if not any(a["question"] == answer["question"] and a["answer"] == answer["answer"] for a in answers):
-            answers.append(answer)
+        key = answer.get('question_id') or answer['question']
+        answers[:] = [a for a in answers if (a.get('question_id') or a['question']) != key]
+        answers.append(answer)
+
+    def _accepted_answer(self, resolution, element):
+        """Advance only from values independently observed after a browser write."""
+        diagnostic = self._answer_diagnostics.get(resolution.get('question_id'))
+        if not diagnostic:
+            return
+        if element.get('multiple'):
+            # A group is accepted only once all its members have been reconciled.
+            return
+        if resolution.get('leave_blank'):
+            accepted = not has_disclosure_value(element)
+        elif element.get('role') in {'checkbox', 'radio'}:
+            accepted = (bool(element.get('checked')) and bool(option_for(str(resolution.get('answer')),
+                        [{'label': element.get('label', ''), 'value': element.get('value', '')}],
+                        question=resolution.get('question', '')))) if element.get('role') == 'radio' else (
+                bool(element.get('checked')) == (normalize(str(resolution.get('answer'))) in {'yes','true','1'}))
+        else:
+            accepted = selected_resolution_matches(resolution, element.get('selected_text') or element.get('value', ''))
+        validity = element.get('validity') or {}
+        accepted = accepted and validity.get('valid', True)
+        diagnostic.update(observed_value=element.get('selected_text') or element.get('value'),
+                          observed_checked=element.get('checked'), website_validation=validity,
+                          validation_message=element.get('validation_message', ''))
+        if accepted:
+            diagnostic['status'] = 'ANSWER_ACCEPTED_BY_FORM'
+        elif diagnostic.get('status') == 'ANSWER_ACCEPTED_BY_FORM':
+            diagnostic['status'] = 'ANSWER_INSERTED'
+        for answer in self._checkpoint_answers:
+            if answer.get('question_id') == resolution.get('question_id'):
+                answer['status'] = diagnostic['status']
+
+    def _reconcile_diagnostics(self, snapshot):
+        adapter = get_adapter(snapshot.get('url', ''))
+        for diagnostic in self._answer_diagnostics.values():
+            if diagnostic.get('answer') is None and not diagnostic.get('leave_blank'):
+                continue
+            fields = [e for e in snapshot.get('elements', []) if adapter.question(e) == diagnostic['question']]
+            if not fields:
+                continue  # Earlier wizard pages retain their observed acceptance.
+            if any(e.get('multiple') for e in fields):
+                expected = diagnostic.get('form_value')
+                if not isinstance(expected, list):
+                    continue
+                if fields[0].get('tag') == 'select':
+                    actual = [o['label'] for o in fields[0]['options'] if o['value'] in fields[0].get('selected_values', [])]
+                else:
+                    actual = [e['label'] for e in fields if e.get('checked')]
+                accepted = len(expected) == len(actual) and all(option_for(item,
+                    [{'label': value, 'value': value} for value in actual], question=diagnostic['question'])
+                    for item in expected)
+                diagnostic.update(observed_choices=actual, website_validation={'selection_matches': accepted})
+                if accepted:
+                    diagnostic['status'] = 'ANSWER_ACCEPTED_BY_FORM'
+                elif diagnostic.get('status') == 'ANSWER_ACCEPTED_BY_FORM':
+                    diagnostic['status'] = 'ANSWER_INSERTED'
+            else:
+                element = next((e for e in fields if e.get('checked')), fields[0])
+                self._accepted_answer(diagnostic, element)
+            for answer in self._checkpoint_answers:
+                if answer.get('question_id') == diagnostic.get('question_id'):
+                    answer['status'] = diagnostic['status']
 
     @staticmethod
     def _dedupe_questions(questions: list[dict]) -> list[dict]:

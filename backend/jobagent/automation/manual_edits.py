@@ -41,9 +41,18 @@ class ManualEdits:
         tree = (await cdp.send('Page.getFrameTree'))['frameTree']
 
         async def attach(branch):
-            result = await cdp.send('Page.createIsolatedWorld', {'frameId': branch['frame']['id'], 'worldName': world})
-            contexts.add(result['executionContextId'])
-            await cdp.send('Runtime.evaluate', {'contextId': result['executionContextId'], 'expression': source})
+            try:
+                result = await cdp.send('Page.createIsolatedWorld', {'frameId': branch['frame']['id'], 'worldName': world})
+                contexts.add(result['executionContextId'])
+                await cdp.send('Runtime.evaluate', {'contextId': result['executionContextId'], 'expression': source})
+            except Exception as exc:
+                # Third-party ATS frames can disappear between getFrameTree and
+                # attachment. The registered new-document script watches their
+                # replacements; an obsolete frame must not abort the whole form.
+                if any(message in str(exc) for message in ('No frame for given id',
+                    'Cannot find context with specified id', 'Execution context was destroyed')):
+                    return
+                raise
             for child in branch.get('childFrames', []):
                 await attach(child)
         await attach(tree)

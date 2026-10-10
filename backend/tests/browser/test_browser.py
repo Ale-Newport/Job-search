@@ -527,19 +527,20 @@ async def test_general_profile_fills_infers_skips_conditions_and_marks_review(br
         if question=='Tell us about a technically challenging project.':
             return derived(question,'I developed a retrieval system.',[candidate[-1]],'AI draft from professional profile.',.6)
     result = await browser.fill_application({'id':'reasoning','url':fixture_server+'/profile_reasoning.html'}, candidate, [], settings={'assisted_autofill':True,'_reason_answer':reason})
-    assert result['status']=='needs_review', result
+    assert result['status']=='human_required', result
     assert await browser.page.locator('[name=notice]').input_value()=='Other'
     assert 'September 2027' in await browser.page.locator('#notice_other').input_value()
     assert await browser.page.locator('#visa').input_value()==''
     assert await browser.page.locator('#gender').input_value()==''
-    assert await browser.page.locator('#start').input_value()=='2027-09-01'
+    assert await browser.page.locator('#start').input_value()==''
+    assert any(q.get('reason') == 'MISSING_EXACT_START_DAY' for q in result['questions'])
     assert await browser.page.locator('#project').input_value()=='I developed a retrieval system.'
     assert len(calls)==1, calls
-    assert len([a for a in result['answers'] if a.get('inferred')])==4
+    assert len([a for a in result['answers'] if a.get('inferred')])==3
     assert all(not a['verified'] for a in result['answers'] if a.get('inferred'))
     assert await browser.page.evaluate('window.submissions')==0
     await browser.mark_inferred_answers(result)
-    assert await browser.page.locator('[data-meridian-inference-badge]').count()==4
+    assert await browser.page.locator('[data-meridian-inference-badge]').count()==3
     # Visible badges must not invalidate the approval snapshot.
     await browser._validate_snapshot(result['snapshot_id'])
     assert await browser.page.evaluate('window.submissions')==0
@@ -551,6 +552,7 @@ async def test_typed_intelligence_live_dom_formats_and_submission_gate(browser,f
     from jobagent.intelligence.ingestion import import_bundle
     db=Database(tmp_path/'intelligence.sqlite')
     import_bundle(db,{'source':'test evidence','entities':[
+        {'key':'person','kind':'person','name':'Test Candidate','facts':{'earliest_full_time_start_date':'2027-09-28'}},
         {'key':'bsc','kind':'education','name':'North University','facts':{'institution':'North University','level':"Bachelor's degree",'rank':1,'status':'completed','classification':'First Class Honours','average':79.94}},
         {'key':'msc','kind':'education','name':'South University','facts':{'institution':'South University','level':"Master's degree",'rank':2,'start_date':'2026-09-28','end_date':'2027-09-27','status':'studying'}},
         {'key':'project','kind':'project','name':'Project','facts':{'story':'I built the frontend and backend of an educational product.','tags':['ownership']}}
@@ -563,7 +565,9 @@ async def test_typed_intelligence_live_dom_formats_and_submission_gate(browser,f
     assert await browser.page.locator('[name="card[2]"]').input_value()=='first'
     assert await browser.page.locator('[name="start"]').input_value()=='2027-09-28'
     assert await browser.page.locator('[name="grade"]').input_value()=='80'
-    assert 'educational product' in await browser.page.locator('[name="story"]').input_value()
+    # An unconfigured generative provider cannot silently paste a project summary.
+    assert await browser.page.locator('[name="story"]').input_value() == ''
+    assert any(q.get('reason') in {'LLM_SETUP_REQUIRED', 'LLM_CONFIGURATION_REQUIRED'} for q in result['questions'])
     assert not await browser.page.locator('[name="consent"]').is_checked()
     assert await browser.page.evaluate('window.submissions')==0
     assert len([q for q in result['questions'] if 'GDPR' in q['question']])==1
@@ -587,6 +591,66 @@ async def test_hidden_lever_upload_and_ambiguous_attach_keep_document_types(brow
     await browser.execute(Decision(Operation.UPLOAD,uploads[0]['index']),snapshot,file_path=cv)
     assert await browser.page.locator('[name=resume]').evaluate('n=>n.files.length')==1
     assert await browser.page.locator('#cover_letter').evaluate('n=>n.files.length')==0
+
+
+async def test_universal_groups_exact_questions_and_post_write_verification(browser, tmp_path):
+    from jobagent.db import Database
+    from jobagent.intelligence.engine import CandidateEngine
+    from jobagent.intelligence.ingestion import import_bundle
+
+    db = Database(tmp_path / 'group-regression.sqlite3')
+    import_bundle(db, {'source': 'Synthetic user evidence', 'entities': [
+        {'key': 'person', 'kind': 'person', 'name': 'Example', 'facts': {
+            'preferred_name': 'Alex', 'earliest_full_time_start_date': '2027-09'}},
+        {'key': 'en', 'kind': 'language', 'name': 'English', 'facts': {'proficiency': 'Fluent'}},
+        {'key': 'es', 'kind': 'language', 'name': 'Spanish', 'facts': {'proficiency': 'Native'}},
+    ]}, trusted_user_input=True)
+    await browser.page.set_content('''<form novalidate>
+      <li class="application-question"><div class="application-label"><div class="text">Language Skill(s) (Check all that apply)<span class="required">*</span></div></div>
+        <label><input type="checkbox" name="languages" value="English (ENG)" required>English (ENG)</label>
+        <label><input type="checkbox" name="languages" value="Spanish (SPA)" required>Spanish (SPA)</label>
+        <label><input type="checkbox" name="languages" value="German (DEU)" required>German (DEU)</label></li>
+      <label>Preferred name<input name="preferred"></label>
+      <label>When would you be available to start? (Month/Year)<input name="start" pattern="[0-9]{2}/[0-9]{4}"></label>
+      <label>High school institution<input name="secondary" required></label>
+      <button type="submit">Submit application</button></form>
+      <script>window.submissions=0;document.querySelector('form').onsubmit=e=>{e.preventDefault();window.submissions++}</script>''')
+    browser._active_application_id = 'universal-groups'
+    result = await browser.fill_application({'id': 'universal-groups', 'url': 'about:blank'}, [], [], settings={
+        '_candidate_engine': CandidateEngine(db, as_of='2026-10-10'), 'skip_optional_unknown': True})
+    assert result['status'] == 'human_required', result
+    assert await browser.page.locator('[name=languages]:checked').evaluate_all('nodes=>nodes.map(n=>n.value)') == ['English (ENG)', 'Spanish (SPA)']
+    assert await browser.page.locator('[name=start]').input_value() == '09/2027'
+    assert await browser.page.locator('[name=preferred]').input_value() == 'Alex'
+    assert await browser.page.locator('[name=secondary]').input_value() == ''
+    assert await browser.page.evaluate('window.submissions') == 0
+    language = next(d for d in result['answer_diagnostics'] if d['canonical_intent'] == 'LANGUAGE')
+    assert language['question'] == 'Language Skill(s) (Check all that apply)'
+    assert language['status'] == 'ANSWER_ACCEPTED_BY_FORM'
+    assert language['observed_choices'] == ['English (ENG)', 'Spanish (SPA)']
+    assert len({d['question_id'] for d in result['answer_diagnostics']}) == len(result['answer_diagnostics'])
+
+
+async def test_native_multiselect_uses_observed_options_and_verifies_all_selections(browser, tmp_path):
+    from jobagent.db import Database
+    from jobagent.intelligence.engine import CandidateEngine
+    from jobagent.intelligence.ingestion import import_bundle
+
+    db = Database(tmp_path / 'multiselect.sqlite3')
+    import_bundle(db, {'source': 'Synthetic user evidence', 'entities': [
+        {'key': 'en', 'kind': 'language', 'name': 'English', 'facts': {'proficiency': 'Fluent'}},
+        {'key': 'es', 'kind': 'language', 'name': 'Spanish', 'facts': {'proficiency': 'Native'}},
+    ]}, trusted_user_input=True)
+    await browser.page.set_content('''<form><label>Languages you speak (select all that apply)
+      <select name="langs" multiple required><option value="en">English (ENG)</option>
+      <option value="de">German (DEU)</option><option value="es">Spanish (SPA)</option></select></label>
+      <button type="submit">Submit application</button></form>''')
+    browser._active_application_id = 'native-multi'
+    result = await browser.fill_application({'id': 'native-multi', 'url': 'about:blank'}, [], [], settings={
+        '_candidate_engine': CandidateEngine(db), 'skip_optional_unknown': True})
+    assert result['status'] == 'needs_review', result
+    assert await browser.page.locator('select').evaluate('n=>[...n.selectedOptions].map(o=>o.value)') == ['en', 'es']
+    assert result['answer_diagnostics'][0]['status'] == 'ANSWER_ACCEPTED_BY_FORM'
 
 
 async def test_intelligence_missing_fact_accepts_scoped_browser_confirmation(browser,fixture_server,tmp_path,candidate):

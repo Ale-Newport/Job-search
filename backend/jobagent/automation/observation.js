@@ -34,10 +34,18 @@
       (['submit', 'button'].includes(node.type) ? node.value : '') ||
       (['BUTTON', 'A', 'SUMMARY', 'OPTION'].includes(node.tagName) ? node.innerText : '') ||
       questionContainerText(node) || node.getAttribute('placeholder') || node.getAttribute('title') ||
-      node.getAttribute('name') || node.id || node.innerText || '').trim().slice(0, 500);
+      node.getAttribute('name') || node.id || node.innerText || '').trim();
   };
   const fieldFor = node => node.closest('[data-field-path],.ashby-application-form-field-entry');
-  const questionFor = node => fieldFor(node)?.querySelector('.ashby-application-form-question-title');
+  const questionFor = node => fieldFor(node)?.querySelector('.ashby-application-form-question-title') ||
+    node.closest('.application-question')?.querySelector('.application-label .text');
+  const questionText = node => {
+    const heading = questionFor(node);
+    if (!heading) return '';
+    const copy = heading.cloneNode(true);
+    copy.querySelectorAll('.required,[aria-hidden="true"]').forEach(n => n.remove());
+    return copy.textContent.trim();
+  };
   const plainCopy = node => {
     if (!node || node.matches('[role="alert"],.field-error,.error-message,[data-applicant-answer],[data-candidate-answer]')) return '';
     const copy = node.cloneNode(true);
@@ -54,14 +62,14 @@
     const hints = field ? [...field.querySelectorAll('.ashby-application-form-question-description,' +
       '.application-question-description,.field-description,.description,.help-text,.hint,[data-description]')]
       .filter(hint => !hint.closest('[hidden],[aria-hidden="true"]')).map(plainCopy) : [];
-    return [...new Set([...hints, ...described])].join(' ').slice(0, 2400);
+    return [...new Set([...hints, ...described])].join(' ').slice(0, 20000);
   };
   const questionContainerText = node => {
     const container = node.closest('.application-question') || node.closest('.application-field')?.parentElement;
     if (!container || container.tagName === 'FORM') return '';
     const copy = container.cloneNode(true);
     copy.querySelectorAll('input,textarea,select,button,script,.select2-container').forEach(n => n.remove());
-    return copy.textContent.replace(/\s+/g, ' ').trim().slice(0, 1000);
+    return copy.textContent.replace(/\s+/g, ' ').trim().slice(0, 20000);
   };
   const required = node => !!node.required || node.getAttribute('aria-required') === 'true' ||
     /(?:^|\s)_required_/.test(questionFor(node)?.className || '');
@@ -163,9 +171,11 @@
       !['file','submit','button','reset','image','hidden','password'].includes(type) && !readonly);
     if (nativeClear || (role === 'combobox' && !readonly && clearProxy && visible(clearProxy))) operations.push('CLEAR');
     const rect = node.getBoundingClientRect();
-    const question = questionFor(node)?.innerText?.trim();
+    const question = questionText(node);
     const dropdown = dropdownTrigger(node);
     elements.push({node_id: identity(node), role, tag, type, explicit_type: node.getAttribute('type'),
+      auxiliary_control: !!node.closest('search,[role="search"],[class*="search-widget"],[class*="jobsearch"],' +
+        '[class*="chat-widget"],[class*="chatbot"],[id*="chatbot"],[data-chat-widget]'),
       label: role === 'combobox' || role === 'upload' ? question || fileQuestion(node) || questionContainerText(node) || label(node) : label(node), ...sectionFor(node),
       upload_proxy_id: type === 'file' && proxy && visible(proxy) ? identity(proxy) : null,
       interaction_proxy_id: role === 'combobox' && proxy && visible(proxy) ? identity(proxy) : null,
@@ -187,7 +197,19 @@
       form_id: node.form || node.closest('form') ? identity(node.form || node.closest('form')) : 'page',
       navigation_parent_id: tag === 'button' && node.closest('a[href]') ? identity(node.closest('a[href]')) : null,
       accept: node.getAttribute('accept') || '',
-      max_length: node.maxLength > 0 ? node.maxLength : null, step: node.getAttribute('step'), min: node.getAttribute('min'), max: node.getAttribute('max'),
+      max_length: node.maxLength > 0 ? node.maxLength : null,
+      min_length: node.minLength > 0 ? node.minLength : null, pattern: node.getAttribute('pattern') || '',
+      validation_message: node.validationMessage || '', validity: node.validity ? {
+        valid: node.validity.valid, value_missing: node.validity.valueMissing,
+        type_mismatch: node.validity.typeMismatch, pattern_mismatch: node.validity.patternMismatch,
+        too_long: node.validity.tooLong, too_short: node.validity.tooShort,
+        range_underflow: node.validity.rangeUnderflow, range_overflow: node.validity.rangeOverflow,
+        step_mismatch: node.validity.stepMismatch, custom_error: node.validity.customError
+      } : null,
+      multiple: !!node.multiple || (role === 'checkbox' && !!node.name &&
+        all.filter(peer => peer.type === 'checkbox' && peer.name === node.name && peer.form === node.form).length > 1),
+      selected_values: tag === 'select' ? [...node.selectedOptions].map(o => o.value) : [],
+      step: node.getAttribute('step'), min: node.getAttribute('min'), max: node.getAttribute('max'),
       field_path: fieldFor(node)?.getAttribute('data-field-path') || '',
       expanded: node.getAttribute('aria-expanded') === 'true',
       value: type === 'file' ? [...node.files || []].map(f => f.name).join(', ') :
@@ -201,7 +223,7 @@
       href: tag === 'a' ? node.href : null,
       options: tag === 'select' ? [...node.options].map(o => ({label:o.label, value:o.value,
         disabled:o.disabled || !!o.closest('optgroup[disabled]')})) : [],
-      group: role === 'radio' ? fieldFor(node)?.getAttribute('data-field-path') || node.name || node.closest('[role="radiogroup"],fieldset')?.textContent?.slice(0,500) || '' : '',
+      group: ['radio','checkbox'].includes(role) ? fieldFor(node)?.getAttribute('data-field-path') || node.name || node.closest('[role="radiogroup"],fieldset')?.textContent?.slice(0,500) || '' : '',
       selected_text: role === 'combobox' ? node.getAttribute('aria-valuetext') ||
         selectedText(node) ||
         (tag !== 'input' && tag !== 'select' ? node.innerText : '') : '',
@@ -212,7 +234,7 @@
     });
   }
   const text = (document.body?.innerText || '').slice(0, 16000);
-  const challenge = /verify (?:that )?you(?:'re| are) human|human verification|complete the captcha|security check|unusual traffic|additional verification required|verificaci[oó]n adicional requerida/i.test(text)
+  const challenge = /verify (?:that )?you(?:'re| are) human|human verification|complete the captcha|security check|unusual traffic|additional verification required|verificaci[oó]n adicional requerida|access (?:is )?(?:temporarily )?restricted|acceso est[aá] restringido temporalmente|comportamiento del navegador.{0,160}bloqueo/i.test(text)
     || [...document.querySelectorAll('iframe')].some(f => visible(f) && /recaptcha|hcaptcha|challenges.cloudflare/.test(f.src)
       && !(f.closest('.grecaptcha-badge') && /[?&]size=invisible(?:&|$)/.test(f.src)));
   const mfa = /enter (?:the |your )?(?:verification|authentication|security|one.time) code|two.factor authentication|approve (?:the |this )?sign.in/i.test(text);

@@ -173,12 +173,12 @@ def test_text_drafts_only_trusted_facts(api):
         == 400
     )
     api.patch("/api/facts/" + fact["id"], json={"verification_status": "verified"})
-    answer = api.post(
+    response = api.post(
         "/api/ai/draft",
         json={"job_id": job["id"], "question": "What experience do you have?", "fact_ids": [fact["id"]]},
-    ).json()
-    assert answer["requires_review"] is True
-    assert answer["facts_used"] == [fact["id"]]
+    )
+    assert response.status_code == 400
+    assert "LLM" in response.json()["detail"]
 
 
 def test_oauth_callback_shows_recoverable_error_without_leaking_provider_payload(api, monkeypatch):

@@ -220,6 +220,8 @@ class Orchestrator:
             "answers": step.get('answers', checkpoint.get('answers', [])),
             "completed_steps": step.get('completed_steps', checkpoint.get('completed_steps', [])),
             "documents": step.get('documents', checkpoint.get('documents', [])),
+            "answer_diagnostics": step.get('answer_diagnostics', checkpoint.get('answer_diagnostics', [])),
+            "answer_progress": step.get('answer_progress', checkpoint.get('answer_progress', [])),
         })
         self.db.execute(
             "UPDATE automation_runs SET checkpoint=?,updated_at=? WHERE id=?",
@@ -458,6 +460,12 @@ class Orchestrator:
                 config = await asyncio.to_thread(decision_settings, self.db, config, SecretStore())
                 from .automation.job_context import prepare_job_context
                 config['_job_context'] = await prepare_job_context(application)
+                resumes = [d for d in documents if d.get('kind') in {'cv', 'resume', 'base_cv', 'import'}]
+                if len(resumes) == 1:
+                    config['_job_context']['resume_text'] = resumes[0].get('text', '')
+                    config['_job_context']['resume_hash'] = resumes[0].get('content_hash', '')
+                    config['_job_context']['resume_document_id'] = resumes[0]['id']
+                    config['_job_context']['resume_version_id'] = resumes[0]['id']
                 async def generate_required(kind):
                     from .documents import generate_required_draft
                     return await asyncio.to_thread(generate_required_draft, self.db, self.data_dir, application['job_id'], kind)
@@ -465,7 +473,9 @@ class Orchestrator:
                 if config['assisted_autofill'] and self.text_service:
                     config['_reason_answer'] = self.field_reasoner(config['_job_context'], facts, config)
                 from .intelligence.engine import CandidateEngine
-                intelligence = CandidateEngine(self.db, settings=config)
+                from .application_answer_llm import ApplicationAnswerLLM
+                intelligence = CandidateEngine(self.db, settings=config,
+                                               answer_llm=ApplicationAnswerLLM(self.db, SecretStore()))
                 disclosure = intelligence.knowledge.get_policy('personal_disclosures', application)
                 if disclosure:
                     config['sensitive_policies']['personal_disclosures'] = disclosure['value']
@@ -518,7 +528,7 @@ class Orchestrator:
     def field_reasoner(self, application, facts, config):
         from .automation.answers import classify_question, SENSITIVE, normalize, option_for
         from .application_profile import draft_fact_ids
-        from .automation.reasoning import derived, extractive_narrative
+        from .automation.reasoning import derived
         import re
 
         async def reason(question, element):
@@ -536,11 +546,10 @@ class Orchestrator:
             if not ids:
                 return None
             choices = [o['label'] for o in element.get('options', []) if o.get('value') and not o.get('disabled')]
-            def fallback():
-                result = extractive_narrative(question, facts) if element.get('tag') == 'textarea' and not choices else None
-                if result and element.get('max_length') and len(result['answer']) > element['max_length']:
-                    return None
-                return result
+            def failed(reason, code='MODEL_API_ERROR'):
+                return dict(question=question, answer=None, fact_ids=[], kind=kind, verified=False,
+                            confidence=0, leave_blank=False, requires_review=True,
+                            reason=reason, root_cause=code, status='ANSWER_FAILED')
             try:
                 draft = await self.text_service.infer_field(config, question, application, ids, {
                     'type': element.get('type'), 'multiline': element.get('tag') == 'textarea',
@@ -548,7 +557,8 @@ class Orchestrator:
                     'max_length': element.get('max_length'),
                 })
                 if not draft:
-                    return fallback()
+                    return failed('An LLM is required to generate personalised answers to open-ended application questions.',
+                                  'LLM_CONFIGURATION_REQUIRED')
                 value = draft['answer']
                 if choices and not option_for(value, [{'label': c, 'value': c} for c in choices]):
                     return None
@@ -558,11 +568,11 @@ class Orchestrator:
                     return None
                 evidence = [f for f in facts if f['id'] in draft['facts_used']]
                 return derived(question, value, evidence, 'AI inference from your general professional profile. Review wording and assumptions before submitting.', draft['confidence'])
-            except (ValueError, TimeoutError):
-                return fallback()
-            except Exception:
+            except (ValueError, TimeoutError) as exc:
+                return failed(str(exc)[:500])
+            except Exception as exc:
                 # A provider outage must not prevent deterministic fields being filled.
-                return fallback()
+                return failed('The answer provider failed (' + type(exc).__name__ + '). Retry after checking LLM settings.')
         return reason
 
     async def show_browser_question(self, run_id, application, result, facts):

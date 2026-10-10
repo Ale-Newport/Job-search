@@ -139,8 +139,8 @@ def test_compound_motivation_does_not_omit_separate_visa_request(knowledge):
         },
     )
     assert result["canonical_intents"] == ["MOTIVATION", "VISA"]
-    assert "Student visa" in result["answer"]
-    assert result["confidence_level"] == "GENERATED"
+    assert result["answer"] is None
+    assert "Student visa" in result["components"][1]["answer"]
 
 
 def test_requested_project_example_is_prose_even_when_question_names_skill(knowledge):
@@ -148,6 +148,6 @@ def test_requested_project_example_is_prose_even_when_question_names_skill(knowl
         "Describe a project you developed with Python.", {"tag": "textarea"}
     )
     assert result["canonical_intent"] == "PROJECT"
-    assert len(result["answer"].split()) > 3
-    assert result["confidence_level"] == "GENERATED"
+    assert result["answer"] is None
+    assert result["root_cause"] == "LLM_SETUP_REQUIRED"
     assert result["requires_review"]

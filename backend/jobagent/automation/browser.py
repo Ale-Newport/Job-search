@@ -58,6 +58,30 @@ def is_submit(element: dict) -> bool:
     return not PROGRESS.match(label) and (explicit == "submit" or bool(SUBMIT.search(label)))
 
 
+def application_input_elements(snapshot: dict) -> list[dict]:
+    fields = [e for e in snapshot.get('elements', [])
+              if any(op in e.get('operations', []) for op in ('TYPE_TEXT', 'SELECT', 'CHECK', 'UPLOAD'))
+              and not e.get('auxiliary_control')
+              and e.get('type') != 'search'
+              and not re.fullmatch(r'\s*(?:job\s*search|search (?:jobs|roles))(?:\s+(?:input|field|query))?\s*',
+                                   e.get('label', ''), re.I)]
+    # Career landing pages can include floating chat/contact controls. They are
+    # not an applicant form when the page still presents job copy and external
+    # Apply links, without any applicant identity or document controls.
+    entry_links = [e for e in snapshot.get('elements', []) if e.get('tag') == 'a'
+                   and APPLICATION_ENTRY.fullmatch(e.get('label', '').strip())
+                   and e.get('form_id', 'page') == 'page']
+    applicant_fields = [e for e in fields if 'UPLOAD' in e.get('operations', [])
+                        or re.search(r'\b(?:full|first|last|preferred) name\b|\be-?mail\b', e.get('label', ''), re.I)]
+    has_job_copy = any(frame.get('job_context', {}).get('sections') or
+                       (frame.get('job_context', {}).get('title') and
+                        re.search(r'\bjob description\b|\bcompany description\b|\bresponsibilities\b|\bqualifications\b',
+                                  frame.get('text', ''), re.I)) for frame in snapshot.get('frames', []))
+    if entry_links and has_job_copy and not applicant_fields and not snapshot.get('application_started'):
+        return []
+    return fields
+
+
 def is_application_entry(element: dict, snapshot: dict) -> bool:
     """Recognise entry navigation before candidate fields or a final review.
 
@@ -69,8 +93,7 @@ def is_application_entry(element: dict, snapshot: dict) -> bool:
             or confirmation_evidence(snapshot) or element.get('form_id', 'page') != 'page'
             or element.get('navigation_parent_id')
             or not APPLICATION_ENTRY.fullmatch(element.get('label', '').strip())
-            or any(any(op in e.get('operations', []) for op in ('TYPE_TEXT', 'SELECT', 'CHECK', 'UPLOAD'))
-                   for e in snapshot.get('elements', []))):
+            or application_input_elements(snapshot)):
         return False
     if element.get('tag') == 'a':
         return ('OPEN_TAB' in element.get('operations', [])
@@ -89,6 +112,10 @@ def application_entry_target(snapshot: dict) -> dict | None:
         return entries[0]
     if entries and all(e.get('tag') == 'a' and e.get('href') == entries[0].get('href') for e in entries):
         return entries[0]  # Repeated header/footer links to the same entry page.
+    repeated = [e for e in entries if e.get('tag') == 'a'
+                and sum(peer.get('href') == e.get('href') for peer in entries) > 1]
+    if repeated and len({e['href'] for e in repeated}) == 1:
+        return repeated[0]
     return None
 
 
@@ -583,8 +610,11 @@ class BrowserSession:
                         else:
                             raise InvalidDecision("No supported observed clear operation exists for this control.")
                     elif op == Operation.SELECT:
-                        option = next((o for o in element["options"] if o["value"] == value and not o["disabled"]), None)
-                        if option is None:
+                        values = value if isinstance(value, list) else [value]
+                        if isinstance(value, list) and not element.get("multiple"):
+                            raise InvalidDecision("This observed dropdown accepts a single value.")
+                        if not values or any(not any(o["value"] == item and not o["disabled"]
+                                                    for o in element["options"]) for item in values):
                             raise InvalidDecision("Only an observed enabled dropdown option may be selected.")
                         await node.select_option(value=value)
                     elif op in {Operation.CHECK, Operation.UNCHECK}:

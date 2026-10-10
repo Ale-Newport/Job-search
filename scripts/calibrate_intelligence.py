@@ -17,6 +17,7 @@ from jobagent.intelligence.engine import CandidateEngine
 from jobagent.application_profile import application_knowledge
 from jobagent.automation.reasoning import conditional_state
 from jobagent.automation.answers import selected_choice_matches, normalize
+from jobagent.intelligence.formatting import choice
 
 
 class DryRunBrowser(BrowserManager):
@@ -71,6 +72,20 @@ def audit_fields(snapshot, adapter, intelligence, result, job):
         elif field["role"] == "checkbox":
             value = "Yes" if field.get("checked") else ""
         match = bool(expected is not None and value and selected_choice_matches(question, str(expected), str(value)))
+        if field.get('multiple'):
+            if field.get('tag') == 'select':
+                selected = [o['label'] for o in field['options'] if o['value'] in field.get('selected_values', [])]
+            else:
+                selected = [e['label'] for e in snapshot['elements'] if e.get('group') == field.get('group')
+                            and e.get('document_id') == field.get('document_id')
+                            and e.get('form_id') == field.get('form_id') and e.get('checked')]
+            wanted = (answer or reasoning).get('form_value')
+            value = selected
+            match = bool(isinstance(wanted, list) and len(wanted) == len(selected) and all(
+                choice(v, [{'label': actual, 'value': actual} for actual in selected], question=question)
+                for v in wanted))
+        if (answer or reasoning).get('leave_blank') and not value:
+            match = True
         fields.append(
             {
                 "question": question,

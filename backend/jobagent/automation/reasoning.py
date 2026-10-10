@@ -178,13 +178,8 @@ def profile_resolution(question, facts, *, element=None, policies=None, hints=No
         r"(?:when|earliest|how soon).*(?:start|join|available)|(?:start|joining|availability) date", text
     ):
         if element.get("type") == "date":
-            return derived(
-                question,
-                month + "-01",
-                sources,
-                "Only the month is confirmed. Day 1 is a proposed placeholder that must be reviewed.",
-                0.65,
-            )
+            return {**direct, "reason": "The form requires an exact day; only the availability month is verified.",
+                    "root_cause": "MISSING_EXACT_START_DAY"}
         if element.get("type") == "month":
             return derived(question, month, sources, "Confirmed earliest start month.")
         return derived(

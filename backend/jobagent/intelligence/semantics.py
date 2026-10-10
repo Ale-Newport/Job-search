@@ -21,7 +21,7 @@ REASONABLE_ADJUSTMENTS GDPR CONSENT CONFLICT_OF_INTEREST PREVIOUS_EMPLOYMENT EMP
 PORTFOLIO GITHUB LINKEDIN PUBLICATIONS RESEARCH OPEN_SOURCE AI_USAGE LLM_USAGE CLOUD DATA MACHINE_LEARNING
 SOFTWARE_ENGINEERING ACADEMIC_RESULT ADDITIONAL_CONTEXT COVER_LETTER OTHER""".split()
 )
-ONTOLOGY.update({"HYPOTHETICAL", "NOT_ON_RESUME", "ROLE_PREFERENCE", "PRODUCT_PREFERENCE", "CONFLICT",
+ONTOLOGY.update({"HYPOTHETICAL", "NOT_ON_RESUME", "ROLE_PREFERENCE", "PRODUCT_PREFERENCE", "CONFLICT", "STUDY_YEAR",
                  "CAREER_INTEREST", "PROFILE_SUMMARY", "OFFER_DEADLINE", "NAME_PRONUNCIATION", "ROLE_CONFIRMATION"})
 
 # International names describe education levels, never particular institutions.
@@ -45,7 +45,7 @@ def education_level(value):
 # Concepts and modifiers are independent: no question -> answer lookup.
 CONCEPTS = [
     ("OFFER_DEADLINE", r"offer.*(?:deadline|expire|expiration)|(?:deadline|expiry).*offer"),
-    ("NAME_PRONUNCIATION", r"pronunciat|pronounce.*name|name.*phonetic"),
+    ("NAME_PRONUNCIATION", r"pronunciat|pronounc.*name|name.*(?:phonetic|pronounc)"),
     ("NOTICE_PERIOD", r"(?<!privacy )(?<!gdpr )notice|contractual.*(?:leave|resign)"),
     ("SPONSORSHIP", r"sponsor"),
     ("VISA", r"visa|immigration|evisa"),
@@ -58,7 +58,8 @@ CONCEPTS = [
         "GRADE",
         r"classification|honou?rs|weighted|degree.*(?:average|percentage)|academic result|numeric percentage|\bgrade\b|\bmarks\b",
     ),
-    ("GRADUATION", r"\bgraduat|(?:finish|complete|end).*stud(?:y|ies)|(?:master|msc).*(?:finish|complete|end)|(?:course|programme?|degree) completion|completion (?:date|month|year)"),
+    ("STUDY_YEAR", r"(?:what|which|current|academic).*year (?:of|in) (?:your |my |the |a )?(?:stud(?:y|ies)|degree|course|programme?)|(?:stud(?:y|ies)|academic|course|degree) year(?: are|$)"),
+    ("GRADUATION", r"\bgraduat|(?:finish|complete|end).*stud(?:y|ies)|(?:master|msc).*(?:finish|complete|end)|(?:course|programme?|degree) completion|completion (?:date|month|year)|(?:what year|when|date|month).{0,35}(?:stud(?:y|ies)|course|programme?|degree).{0,35}(?:finish|complete|end|conclud)"),
     ("START_DATE", r"(?:when|date|how soon|how early).*\b(?:start|join|commenc|available)|(?:start|commencement|joining) date|(?:expected|anticipated|earliest|preferred|planned) (?:employment )?(?:start|joining)|\bavailability\b|\bavailable (?:from|to start|for work)\b"),
     ("REASONABLE_ADJUSTMENTS", r"adjustment|accommodation.*(?:recruit|interview|process)"),
     ("CRIMINAL_HISTORY", r"criminal|convict|arrest"),
@@ -105,7 +106,7 @@ CONCEPTS = [
     ("WORK_EXPERIENCE", r"(?:current|recent|previous|latest).*(?:employer|company)|employer name"),
     ("EDUCATION", r"(?:university|institution|school|college) name"),
     ("IDENTITY", r"\bname\b|surname|date of birth|\bage\b"),
-    ("LOCATION", r"locat|based|live|residen|\bcity\b|\btown\b|\bcountry\b|\bregion\b"),
+    ("LOCATION", r"locat|based|liv(?:e|ing)|residen|\bcity\b|\btown\b|\bcountry\b|\bregion\b"),
     ("LANGUAGE", r"english|spanish|language.*(?:proficien|speak|fluent|native|skill)|(?:speak|fluent|native).*language|mother tongue|spoken languages|which languages|what languages"),
     ("MODULE", r"module|coursework"),
     ("DEGREE", r"degree|qualification|discipline|field of study|major|subject"),
@@ -175,6 +176,12 @@ def interpret(question, field=None):
         intent = "PROFILE_SUMMARY"
     if re.search(r"(?:programming|coding) languages", text):
         intent = "PROGRAMMING_LANGUAGE"
+    coding_details = bool(re.search(r"coding|programming|software", text) and re.search(
+        r"(?:provide|give|include).*(?:details|examples|evidence)|describe.*(?:experience|skills|background)|demonstrate.*(?:coding|programming|skills)", text))
+    if coding_details and intent in {"GITHUB", "PORTFOLIO", "SKILL", "PROGRAMMING_LANGUAGE", "PROJECT", "WORK_EXPERIENCE"}:
+        # Optional portfolio links are supporting evidence for the requested
+        # explanation, not a replacement for the explanation itself.
+        intent = "WORK_EXPERIENCE"
     requested_languages = [language for language in sorted(HUMAN_LANGUAGES) if re.search(r"\b" + language + r"\b", text)]
     if requested_languages and re.search(r"speak|fluen|proficien|native|language|working knowledge|conversational", text) and intent in {"OTHER", "SKILL", "LANGUAGE"}:
         intent = "LANGUAGE"
@@ -182,6 +189,8 @@ def interpret(question, field=None):
         intent = next((i for i, p in CONCEPTS if re.search(p, context)), "OTHER")
     if re.search(r"gdpr|privacy|terms|consent|notetaker|note taker|transcrib|transcription|future (?:job|recruit|opportunit).*contact|receive.*(?:future|recruit|marketing)", text):
         intent = "CONSENT"
+    elif intent == "HYPOTHETICAL" and re.search(r"\b(?:will|would|do) you (?:need|require).{0,35}sponsor", text):
+        intent = "SPONSORSHIP"
     elif re.search(r"authori[sz].*work|work.*authori[sz]|right to work", text) and re.search(
         r"permanent|unrestricted", text
     ):
@@ -237,8 +246,12 @@ def interpret(question, field=None):
     qualifier = "current" if re.search(r"current|now|present", text) else "unspecified"
     if re.search(r"future|ever|later|any point", text):
         qualifier = "now_or_future" if re.search(r"now|current", text) else "future"
-    if re.search(r"permanent|unrestricted|indefinite", text):
+    if intent == "WORK_AUTHORIZATION" and re.search(r"permanent|unrestricted|indefinite", text):
         qualifier = "permanent"
+    if intent == "SPONSORSHIP" and re.search(r"\bif\b.*(?:offered|offer).*\b(?:would|will)\b|after (?:completing|graduating|your internship)", text):
+        qualifier = "future"
+    if intent == "LOCATION" and re.search(r"\bwill\b|during (?:this|the|your) (?:internship|placement|role)|future|after graduat", text):
+        qualifier = "future"
     if intent == "WORK_AUTHORIZATION":
         if re.search(r"full time|fulltime|(?:35|40) hours", text):
             qualifier = "full_time"
@@ -303,6 +316,10 @@ def interpret(question, field=None):
             else "consent"
         )
     boolean = bool(re.match(r"(?:are|is|am|have|has|do|does|can|could|will|would)\b", text))
+    if intent == "SPONSORSHIP" and re.search(r"\b(?:will|would|do) you (?:need|require)\b", text):
+        boolean = True
+    if coding_details and intent == "WORK_EXPERIENCE":
+        boolean = False
     output = "YES_NO" if boolean else "LONG_TEXT" if field.get("tag") == "textarea" else "SHORT_TEXT"
     if field.get("type") in {"date", "month", "number", "email", "tel", "url", "file"}:
         output = {"month": "MONTH_YEAR", "number": "NUMBER", "tel": "PHONE"}.get(field["type"], field["type"].upper())

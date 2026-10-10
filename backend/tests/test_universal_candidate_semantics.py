@@ -108,6 +108,53 @@ def test_question_fact_semantics(verified_db, noun, intent, expected, frame):
         assert result["fact_ids"] or result["rules_used"]
 
 
+@pytest.mark.parametrize("question", ["What year of your studies are you in?", "Which year of your degree are you in?", "Current academic year of study"])
+def test_active_study_year_uses_current_postgraduate_start(verified_db, question):
+    result = CandidateEngine(verified_db, as_of="2026-10-10").answer_question(question,
+        {"tag": "select", "options": [{"label": f"Year {i}", "value": str(i)} for i in range(1, 5)]})
+    assert result['canonical_intent'] == 'STUDY_YEAR'
+    assert result['answer'] == 'Year 1'
+
+
+def test_course_finish_checkbox_group_selects_one_verified_year(verified_db):
+    result = CandidateEngine(verified_db, as_of="2026-10-10").answer_question('What year does your course finish?',
+        {'role': 'checkbox', 'type': 'checkbox', 'multiple': True,
+         'options': [{'label': str(year), 'value': str(year)} for year in range(2027, 2031)]})
+    assert result['canonical_intent'] == 'GRADUATION'
+    assert result['form_value'] == ['2027']
+
+
+def test_future_location_does_not_reuse_current_city(verified_db):
+    result = CandidateEngine(verified_db).answer_question('Where will you be living during this internship?',
+        {'tag': 'textarea'}, {'id': 'specific-internship', 'country': 'United Kingdom'})
+    assert result['answer'] is None
+    assert result['root_cause'] == 'MISSING_VERIFIED_RESIDENCE_PLAN'
+
+
+def test_coding_explanation_is_not_an_optional_github_link(verified_db):
+    question = 'Do you have prior coding experience? If so, please provide details about languages, projects or experiences that demonstrate your coding skills. Github or portfolio links welcomed.'
+    result = CandidateEngine(verified_db).answer_question(question, {'tag': 'textarea'})
+    assert result['canonical_intent'] == 'WORK_EXPERIENCE'
+    assert result['answer'] is None
+
+
+def test_conditional_future_sponsorship_preserves_exact_qualifier(verified_db):
+    result = CandidateEngine(verified_db).answer_question('If you are offered a permanent graduate role after completing your internship, would you require visa sponsorship to work in the UK?',
+        {'options': [{'label': 'Yes'}, {'label': 'No'}]}, {'country': 'United Kingdom'})
+    assert result['canonical_intent'] == 'SPONSORSHIP'
+    assert result['semantic']['qualifier'] == 'future'
+    assert result['answer'] is None
+
+
+def test_legacy_month_availability_does_not_invent_day():
+    from jobagent.automation.reasoning import profile_resolution
+    result = profile_resolution('When can you start?',
+        [{'id': 'month', 'key': 'earliest_start_month', 'value': '2027-09', 'verification_status': 'verified', 'locked': 1}],
+        element={'type': 'date'})
+    assert result['answer'] is None
+    assert result['root_cause'] == 'MISSING_EXACT_START_DAY'
+
+
 FORMATS = {"YYYY": "2027", "MM/YYYY": "09/2027", "MM/YY": "09/27", "YYYY-MM": "2027-09",
            "Month Year": "September 2027", "Month/Year": "09/2027"}
 DATE_QUESTIONS = ["Anticipated start date", "Earliest joining date", "Expected graduation", "Master graduation date",

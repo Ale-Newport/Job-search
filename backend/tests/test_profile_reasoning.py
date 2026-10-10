@@ -38,7 +38,7 @@ def test_general_months_produce_different_answers_without_saved_questions(facts)
     assert profile_resolution("Can you start in August 2027?", facts)["answer"] == "No"
     assert profile_resolution("Can you start in October 2027?", facts)["answer"] == "Yes"
     day = profile_resolution("Earliest start date", facts, element={"type": "date"})
-    assert day["answer"] == "2027-09-01" and "placeholder" in day["reason"] and not day["verified"]
+    assert day["answer"] is None and day['root_cause'] == 'MISSING_EXACT_START_DAY'
 
 
 def test_notice_is_not_misrepresented_as_immediate_or_rounded_duration(facts):

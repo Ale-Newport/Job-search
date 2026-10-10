@@ -285,6 +285,8 @@ def adapt(value, semantic, field):
     contract = infer_format(question, field)
     if isinstance(value, bool):
         value = "Yes" if value else "No"
+    if contract == "MULTIPLE_CHOICE" and not isinstance(value, list):
+        value = [value]
     if isinstance(value, list):
         if contract == "MULTIPLE_CHOICE":
             selected = [choice(str(item), field["options"], question=question) for item in value]

@@ -115,7 +115,7 @@ class CandidateEngine:
         intent = result["canonical_intent"]
         # Legacy question-memory does not encode school level or legal
         # jurisdiction. It cannot override these precise missing concepts.
-        if (semantic.get("education_level") in {"primary", "secondary"} and intent in {"EDUCATION", "DEGREE", "GRADUATION"}) or intent in {"WORK_AUTHORIZATION", "SPONSORSHIP", "VISA", "ROLE_CONFIRMATION"}:
+        if (semantic.get("education_level") in {"primary", "secondary"} and intent in {"EDUCATION", "DEGREE", "GRADUATION"}) or intent in {"WORK_AUTHORIZATION", "SPONSORSHIP", "VISA", "ROLE_CONFIRMATION", "STUDY_YEAR"} or (intent == "LOCATION" and semantic.get("qualifier") == "future"):
             return result
         concept = result.get("disclosure_concept") or (
             semantic.get("attribute") if intent in {"IDENTITY", "CONTACT", "ADDRESS", "LOCATION"} else intent.lower()
@@ -344,13 +344,22 @@ class CandidateEngine:
                     key = "nationality_country"
                 answer = person(key)
         elif intent == "LOCATION":
-            answer = person(s["attribute"])
+            if s["qualifier"] == "future":
+                plan = k.get_policy("future_residence", job)
+                if not plan or not {"id", "job_id", "application_id"}.intersection(plan["scope"]):
+                    out.update(reason="MISSING_VERIFIED_RESIDENCE_PLAN", root_cause="MISSING_VERIFIED_RESIDENCE_PLAN",
+                               missing_fact={"concept": "future_residence", "job_id": job.get("job_id", job.get("id"))})
+                else:
+                    answer = use_policy("future_residence")
+                    confidence = "POLICY"
+            else:
+                answer = person(s["attribute"])
             if answer and s["attribute"] == "city" and field.get("role") == "combobox" and not field.get("options"):
                 country = person("country")
                 if country:
                     answer = f"{answer}, {country}"
                     rules.append("geocoder_city_country_disambiguation")
-            if s["boolean"]:
+            if s["boolean"] and s["qualifier"] != "future":
                 city = person("city")
                 country = person("country")
                 mentioned = [x for x in (city, country) if x and normalize(x) in text]
@@ -359,6 +368,26 @@ class CandidateEngine:
             answer = person("name_pronunciation")
             if answer is None:
                 out.update(reason="MISSING_NAME_PRONUNCIATION", root_cause="MISSING_NAME_PRONUNCIATION")
+        elif intent == "STUDY_YEAR":
+            e = education(s["selector"])
+            if e:
+                study_year = read(e, "study_year") or read(e, "year_of_study")
+                if study_year is None:
+                    start = read(e, "start_date")
+                    if start and len(str(start)) >= 7:
+                        start_date = date.fromisoformat(start + "-01" if len(start) == 7 else start)
+                        # Month precision cannot establish which side of a
+                        # later anniversary date a student currently occupies.
+                        ambiguous_anniversary = len(start) == 7 and k.today.year > start_date.year and k.today.month == start_date.month
+                        if start_date <= k.today and not ambiguous_anniversary:
+                            study_year = k.today.year - start_date.year + 1 - ((k.today.month, k.today.day) < (start_date.month, start_date.day))
+                            confidence = "DERIVED_HIGH"
+                            rules.append("study_year_from_verified_active_study_start")
+                if study_year is not None:
+                    option = choice(str(study_year), field.get("options", [])) or choice(f"Year {study_year}", field.get("options", []))
+                    answer = option["label"] if option else study_year if field.get("type") == "number" else f"Year {float(study_year):g}"
+            if answer is None:
+                out.update(reason="MISSING_CURRENT_STUDY_YEAR", root_cause="MISSING_CURRENT_STUDY_YEAR")
         elif intent == "ROLE_CONFIRMATION":
             related = field.get("_related_answers") or job.get("related_answers") or []
             preferences = [row for row in related if isinstance(row, dict) and (row.get("canonical_intent") or row.get("intent")) == "ROLE_PREFERENCE" and row.get("answer")

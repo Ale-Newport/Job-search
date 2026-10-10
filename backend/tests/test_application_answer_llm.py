@@ -9,7 +9,7 @@ from jobagent.application_answer_llm import (ANSWER_SCHEMA, SCORE_NAMES, Applica
                                             AnswerValidationError, ConfigurationError, ProviderError)
 from jobagent.db import Database, now, uid
 from jobagent.intelligence.answer_evidence import (AnswerEvidenceValidator, ApplicationConsistencyReviewer,
-                                                 CandidateFactRetriever, content_words, requirements)
+                                                 CandidateFactRetriever, content_words, reconcile_claim_evidence, requirements)
 from jobagent.intelligence.store import entity, ingest_fact
 
 
@@ -279,6 +279,66 @@ async def test_hypothetical_company_preferences_do_not_require_employer_claims(d
     answer = await llm.generate(settings() | {'text_quality_review': False}, "If Palantir didn't exist, what kind of work would excite you?",
                                 {'company': 'Palantir'}, question_id='hypothetical')
     assert answer['state'] == 'ANSWER_VALIDATED'
+
+
+def test_same_entity_implementation_citations_are_reconciled_without_new_prose():
+    facts = [
+        {'id': 'architecture', 'key': 'public_architecture_tradeoffs', 'entity': 'Three Body Problem', 'category': 'project',
+         'value': 'Numerical stability is observable through energy and momentum diagnostics.'},
+        {'id': 'implementation', 'key': 'public_implementation_details', 'entity': 'Three Body Problem', 'category': 'project',
+         'value': 'Interactive gravitational simulation in JavaScript. Uses a velocity-Verlet integrator and gravitational softening.'},
+        {'id': 'another-project', 'key': 'story', 'entity': 'Another Project', 'category': 'project',
+         'value': 'I built Cassandra and Chromium integrations with 99.6% accuracy.'},
+    ]
+    answer = 'I implemented a velocity-Verlet integrator and gravitational softening in an interactive JavaScript gravitational simulation.'
+    generated = complete({'question_id': 'q', 'intent': 'CHALLENGE', 'verified_facts': facts}, answer=answer, fid='architecture')
+    assert reconcile_claim_evidence(generated, facts) == ['implementation']
+    assert generated['answer'] == answer
+    assert generated['facts_used'] == ['architecture', 'implementation']
+    assert generated['claims'][0]['fact_ids'] == ['architecture', 'implementation']
+    assert not AnswerEvidenceValidator().validate(generated, facts, 'q', 'CHALLENGE', {})
+    generated['answer'] += ' I integrated Cassandra and achieved 99.6% accuracy.'
+    generated['claims'][0]['text'] = generated['answer']
+    assert reconcile_claim_evidence(generated, facts) == []
+    assert 'another-project' not in generated['facts_used']
+    assert any('number 99.6%' in issue for issue in AnswerEvidenceValidator().validate(generated, facts, 'q', 'CHALLENGE', {}))
+
+
+def test_telegraphic_interest_claims_are_subjective_but_named_metadata_is_checked():
+    fact = {'id': 'interests', 'key': 'professional_interests', 'category': 'person', 'value': 'AI, machine learning and backend engineering.'}
+    answer = 'I would enjoy developing useful AI applications and backend systems that support real-world work.'
+    generated = complete({'question_id': 'q', 'intent': 'HYPOTHETICAL', 'verified_facts': [fact]}, answer=answer, fid='interests')
+    generated['claims'] = [{'text': 'Excited about developing useful AI applications and backend systems.', 'fact_ids': ['interests']}]
+    assert not AnswerEvidenceValidator().validate(generated, [fact], 'q', 'HYPOTHETICAL', {})
+    generated['claims'][0]['text'] = 'Passionate about software tools such as Cassandra or Chromium.'
+    assert any('named detail' in issue for issue in AnswerEvidenceValidator().validate(generated, [fact], 'q', 'HYPOTHETICAL', {}))
+
+
+async def test_invented_named_employer_is_rejected_even_in_hypothetical_answer(db, evidence):
+    def handler(request):
+        payload = request_payload(request)
+        answer = 'I would be excited about DataSage. DataSage focuses on healthcare analytics and develops predictive models for hospitals.'
+        generated = complete(payload, answer=answer, fid=evidence)
+        generated['claims'] = []
+        return response_for(request, generated)
+    llm = ApplicationAnswerLLM(db, None, transport=httpx.MockTransport(handler))
+    with pytest.raises(AnswerValidationError, match='factual employer assertions'):
+        await llm.generate(settings() | {'text_quality_review': False}, "If Palantir didn't exist, what kind of work would excite you?",
+                           {'company': 'Palantir'}, question_id='hypothetical')
+
+
+async def test_length_regeneration_uses_actual_count_and_keeps_schema_metadata_scoped(db, evidence):
+    calls = []
+    def handler(request):
+        payload = request_payload(request)
+        calls.append(payload)
+        return response_for(request, complete(payload, fid=evidence))
+    llm = ApplicationAnswerLLM(db, None, transport=httpx.MockTransport(handler))
+    with pytest.raises(AnswerValidationError, match='min_words'):
+        await llm.generate(settings() | {'text_quality_review': False}, 'Describe your project. (Approx. 200 words)', {}, question_id='long')
+    assert len(calls) == 3
+    assert 'prior draft contains 11 words' in calls[1]['length_revision']
+    assert calls[1]['previous_draft']['answer'] == calls[0]['verified_facts'][0]['value']
 
 
 @pytest.mark.parametrize('question,expected', [

@@ -265,6 +265,45 @@ def numeric_claims(text):
     return values
 
 
+def reconcile_claim_evidence(generated, facts):
+    """Restore omitted citations only from the same supplied verified entity.
+
+    A model may cite a project's summary but describe its implementation fact.
+    This changes provenance metadata only: it never changes prose, introduces
+    other entities, or makes a claim valid unless that detail exists in evidence.
+    """
+    known = {fact['id']: fact for fact in facts}
+    restored = []
+    for claim in generated.get('claims', []):
+        identifiers = claim.get('fact_ids', [])
+        if not identifiers or any(identifier not in known for identifier in identifiers):
+            continue
+        entity_keys = {known[identifier].get('entity_id') or known[identifier].get('entity') for identifier in identifiers}
+        if None in entity_keys or len(entity_keys) != 1:
+            continue
+        claim_terms = content_words(claim.get('text', ''))
+        claim_numbers = numeric_claims(claim.get('text', ''))
+        for _ in range(3):
+            cited = '\n'.join(str(known[identifier]['value']) for identifier in identifiers)
+            missing_terms, missing_numbers = claim_terms - content_words(cited), claim_numbers - numeric_claims(cited)
+            candidates = []
+            for fact in facts:
+                if fact['id'] in identifiers or (fact.get('entity_id') or fact.get('entity')) not in entity_keys:
+                    continue
+                score = len(missing_terms & content_words(fact['value'])) + 3 * len(missing_numbers & numeric_claims(fact['value']))
+                if score:
+                    candidates.append((score, fact['id']))
+            if not candidates:
+                break
+            identifier = max(candidates)[1]
+            identifiers.append(identifier)
+            restored.append(identifier)
+        claim['fact_ids'] = identifiers
+    generated['facts_used'] = list(dict.fromkeys([*generated.get('facts_used', []),
+        *(identifier for claim in generated.get('claims', []) for identifier in claim.get('fact_ids', []))]))
+    return list(dict.fromkeys(restored))
+
+
 def entailment_issues(answer, claims, known, used):
     issues = []
     source = '\n'.join(str(known[x]['value']) for x in used if x in known)
@@ -281,6 +320,7 @@ def entailment_issues(answer, claims, known, used):
         # Allow normal paraphrases, while refusing a claim whose substantive
         # detail is mostly absent from its cited source.
         subjective = bool(re.search(r'\b(?:I (?:am|would be) (?:interested|drawn|excited)|I (?:want|hope|prefer)|'
+                                   r'(?:excited|interested|passionate|drawn)\s+(?:about|in|to)|'
                                    r'(?:my|this) (?:background|interest|experience).{0,35}\balign|'
                                    r'\bopportunity to|\bchance to)\b', claim.get('text', ''), re.I))
         historical = bool(re.search(r'\b(?:built|developed|deployed|implemented|managed|led|resolved|increased|reduced|achieved)\b', claim.get('text', ''), re.I))
@@ -289,6 +329,9 @@ def entailment_issues(answer, claims, known, used):
         reflected = words & content_words(answer)
         if len(words) >= 4 and len(reflected) / len(words) < .35:
             issues.append('UNSUPPORTED_LLM_CLAIM: evidence claim is not reflected in the actual answer')
+        named_details = re.findall(r'\b[A-Z][A-Za-z0-9+#.-]*\b', claim.get('text', ''))[1:]
+        if any(word.casefold() not in answer.casefold() for word in named_details):
+            issues.append('UNSUPPORTED_LLM_CLAIM: a named detail in evidence claims is not present in the actual answer')
     return issues
 
 

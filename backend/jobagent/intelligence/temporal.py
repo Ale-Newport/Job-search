@@ -46,7 +46,13 @@ def requested_date(text):
         except ValueError:
             return None
     for month in range(1, 13):
-        m = re.search(r"\b" + calendar.month_name[month].lower() + r"\s+(20\d\d)\b", text.lower())
+        m = re.search(r"\b(?:" + calendar.month_name[month].lower() + "|" + calendar.month_abbr[month].lower() + r")\s+(20\d\d)\b", text.lower())
         if m:
             return date(int(m[1]), month, 1), "month"
+    match = re.search(r"\b(20\d\d)-(0[1-9]|1[0-2])\b(?!-\d)", text)
+    if match:
+        return date(int(match[1]), int(match[2]), 1), "month"
+    match = re.search(r"\b(0[1-9]|1[0-2])/(20\d\d)\b", text)
+    if match:
+        return date(int(match[2]), int(match[1]), 1), "month"
     return None

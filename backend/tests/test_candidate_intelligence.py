@@ -55,6 +55,7 @@ def knowledge(tmp_path_factory):
             portfolio="https://example.test/portfolio",
             github="https://example.test/github",
             employment_contract_active=False,
+            earliest_full_time_start_date="2027-09-28",
             professional_interests="AI and software engineering",
         ),
     )
@@ -365,7 +366,7 @@ def test_enum_numeric_and_disclosure_format(knowledge):
 
 
 def test_contextual_story_and_no_unsupported_claims(knowledge):
-    x = CandidateEngine(knowledge, as_of="2026-10-03")
+    x = CandidateEngine(knowledge, as_of="2026-10-03", allow_extractive_narratives=True)
     a = x.answer_question("Describe a project", {"tag": "textarea"}, {"title": "Machine Learning AI Engineer"})
     b = x.answer_question("Describe a project", {"tag": "textarea"}, {"title": "Backend Engineer"})
     assert "vision" in a["answer"] and "API" in b["answer"]
@@ -491,7 +492,7 @@ def test_structured_star_without_saved_prose(tmp_path):
             evidence={},
             verified=True,
         )
-    r = CandidateEngine(db).answer_question("Describe ownership of a product", {"tag": "textarea"})
+    r = CandidateEngine(db, allow_extractive_narratives=True).answer_question("Describe ownership of a product", {"tag": "textarea"})
     assert "main developer" in r["answer"] and "captions" in r["answer"] and len(r["facts_used"]) == 5
 
 

@@ -285,10 +285,17 @@ def sync_profile_fact(db, key, value, confirmed):
     people = db.query("SELECT id FROM knowledge_entities WHERE kind='person'")
     if len(people) != 1:
         return
+    original_key = key
+    key = {"earliest_start_month": "earliest_full_time_start_date", "availability": "earliest_full_time_start_date"}.get(key, key)
     keys = {
         "full_name",
         "first_name",
         "last_name",
+        "preferred_name",
+        "name_pronunciation",
+        "city",
+        "country",
+        "earliest_full_time_start_date",
         "email",
         "phone",
         "location",
@@ -328,7 +335,7 @@ def sync_profile_fact(db, key, value, confirmed):
         key,
         value,
         value_type="text",
-        source="application_profile:" + key,
+        source="application_profile:" + original_key,
         evidence={"source": "Explicit profile edit"},
         verified=confirmed,
         priority=100,

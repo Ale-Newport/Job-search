@@ -21,7 +21,7 @@ import httpx
 from .intelligence.answer_evidence import (AnswerEvidenceValidator, ApplicationConsistencyReviewer,
                                            CandidateFactRetriever, digest, missing_historical_event,
                                            reconcile_claim_evidence, requirements)
-from .usage import Reservation, price_config
+from .usage import Reservation
 
 logger = logging.getLogger('meridian.answers')
 PROMPT_VERSION = 'application-answer-v2'
@@ -204,8 +204,10 @@ def relevant_excerpt(text, question, limit):
 
 
 class ApplicationAnswerLLM:
-    def __init__(self, db, secret_store, *, transport=None):
+    def __init__(self, db, secret_store, *, transport=None, usage_db=None):
         self.db, self.secrets, self.transport = db, secret_store, transport
+        # QA profile copies must reserve against the same ledger as live use.
+        self.usage_db = usage_db if usage_db is not None else db
         self._semaphore = asyncio.Semaphore(2)
         self._concurrency = 2
         self._active = 0
@@ -228,15 +230,52 @@ class ApplicationAnswerLLM:
             raise ConfigurationError('Connect this provider API key through the app; it is saved securely in macOS Keychain')
         return key
 
+    def _billing(self, settings, provider, local):
+        if local:
+            return {'input_cost_per_million': 0, 'output_cost_per_million': 0}, 0
+        budget = settings.get('monthly_budget', 0)
+        if isinstance(budget, bool) or not isinstance(budget, (int, float)) or not math.isfinite(budget) or budget <= 0:
+            raise ConfigurationError('Set a positive monthly AI spending cap before using a cloud answer model. A zero cap disables remote calls, including connection tests.')
+        if self.usage_db is not self.db:
+            row = self.usage_db.one("SELECT value FROM settings WHERE key='monthly_budget'")
+            try:
+                live_budget = json.loads(row['value']) if row else 0
+            except (ValueError, TypeError) as exc:
+                raise ConfigurationError('The shared live monthly AI spending cap is invalid. Set a positive authorized cap in live settings.') from exc
+            if isinstance(live_budget, bool) or not isinstance(live_budget, (int, float)) or not math.isfinite(live_budget) or live_budget <= 0:
+                raise ConfigurationError('The shared live monthly AI spending cap is zero. Set a positive authorized cap in live settings before running cloud calibration.')
+            budget = min(budget, live_budget)
+        row = self.db.one('SELECT config FROM integrations WHERE provider=?', (provider,))
+        try:
+            config = json.loads(row['config']) if row else {}
+        except (ValueError, TypeError) as exc:
+            raise ConfigurationError('Configure current input and output token prices bound to the selected cloud answer model.') from exc
+        model_prices = config.get('answer_model_prices', {}) if isinstance(config, dict) else {}
+        model = settings.get('text_model', '')
+        fallback = settings.get('text_fallback_model', '')
+        rate_keys = ('input_cost_per_million', 'output_cost_per_million')
+        for selected in dict.fromkeys([model, *([fallback] if fallback else [])]):
+            prices = model_prices.get(selected) if isinstance(model_prices, dict) else None
+            if not isinstance(prices, dict) or any(isinstance(prices.get(key), bool) or not isinstance(prices.get(key), (int, float))
+                                                  or not math.isfinite(prices[key]) or prices[key] < 0 for key in rate_keys):
+                role = 'fallback' if selected == fallback and selected != model else 'selected'
+                raise ConfigurationError(f'Configure current input and output token prices for the exact {role} cloud answer model. Rates saved for another model or generic provider rates cannot price it.')
+            if sum(prices[key] for key in rate_keys) <= 0:
+                raise ConfigurationError('Cloud token rates cannot both be zero. Enter each selected model’s current paid token rates so the authorized spending cap can be enforced; local inference can use zero rates.')
+        return {key: model_prices[model][key] for key in rate_keys}, float(budget)
+
     async def status(self, settings):
         provider = settings.get('text_provider', 'none')
         result = {'provider': provider, 'model': settings.get('text_model', ''),
                   'endpoint': settings.get('text_base_url') or PROVIDERS.get(provider, ''),
                   'configured': False, 'key_present': False, 'setup_required': True,
+                  'billing_ready': False,
                   'message': SETUP_MESSAGE, 'prompt_version': PROMPT_VERSION}
         try:
             p, _, local = provider_config(settings)
             result['key_present'] = bool(await self._key(p, local)) if not local else False
+            self._billing(settings, p, local)
+            result['billing_ready'] = True
             result['configured'] = bool(settings.get('text_model')) and (local or result['key_present'])
             result['setup_required'] = not result['configured']
             result['message'] = 'Application answer LLM configured; test the connection to verify availability.' if result['configured'] else 'Select a discovered model and test the connection.'
@@ -244,7 +283,7 @@ class ApplicationAnswerLLM:
             result['message'] = str(exc)
         result['local'] = await self.detect_ollama()
         from datetime import datetime, timezone
-        row = self.db.one('SELECT value FROM settings WHERE key=?', ('ai_usage:' + datetime.now(timezone.utc).strftime('%Y-%m'),))
+        row = self.usage_db.one('SELECT value FROM settings WHERE key=?', ('ai_usage:' + datetime.now(timezone.utc).strftime('%Y-%m'),))
         result['usage'] = json.loads(row['value']) if row else {'cost': 0, 'calls': 0, 'input_tokens': 0, 'output_tokens': 0}
         return result
 
@@ -302,6 +341,7 @@ class ApplicationAnswerLLM:
 
     async def _request(self, settings, system, payload, schema):
         provider, base, local = provider_config(settings)
+        prices, budget = self._billing(settings, provider, local)
         model = str(settings.get('text_model') or '').strip()
         if not model:
             raise ConfigurationError('Select an available application answer model and test the connection')
@@ -351,11 +391,10 @@ class ApplicationAnswerLLM:
                 body['thinking'] = {'type': 'disabled'}
             if provider == 'gemini':
                 headers = {'Authorization': f'Bearer {key}'}
-        prices = {'input_cost_per_million': 0, 'output_cost_per_million': 0} if local else price_config(self.db, provider)
         upper = ((len(json.dumps(body).encode()) + 1000) * prices['input_cost_per_million'] + maximum * prices['output_cost_per_million']) / 1_000_000
         total_cost = 0
         for attempt in range(retries + 1):
-            reservation = Reservation(self.db, upper, float(settings.get('monthly_budget', 0)), provider)
+            reservation = Reservation(self.usage_db, upper, budget, provider)
             try:
                 async with httpx.AsyncClient(timeout=timeout, trust_env=False, follow_redirects=False, **({'transport': self.transport} if self.transport else {})) as client:
                     response = await client.post(url, headers=headers, json=body)

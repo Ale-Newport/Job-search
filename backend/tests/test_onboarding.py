@@ -141,7 +141,7 @@ def test_text_connection_probe_uses_synthetic_facts_and_provider_specific_mode(
     )
     client.put(
         "/api/integrations/openai-compatible",
-        json={"config": {"input_cost_per_million": 0.3, "output_cost_per_million": 1.2}, "secret": "test-only-key"},
+        json={"config": {"answer_model_prices": {"sample-model": {"input_cost_per_million": 0.3, "output_cost_per_million": 1.2}}}, "secret": "test-only-key"},
     )
     client.patch(
         "/api/settings",

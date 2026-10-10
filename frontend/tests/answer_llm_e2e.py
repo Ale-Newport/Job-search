@@ -15,7 +15,7 @@ import tempfile
 from threading import Thread
 from urllib.parse import urlparse
 
-from playwright.async_api import async_playwright
+from playwright.async_api import async_playwright, expect
 
 
 class SyntheticProvider(BaseHTTPRequestHandler):
@@ -34,7 +34,7 @@ class SyntheticProvider(BaseHTTPRequestHandler):
         self.wfile.write(body)
 
     def do_GET(self):
-        self.reply(200, {'data': [{'id': 'synthetic-ui-model', 'object': 'model'}]})
+        self.reply(200, {'data': [{'id': name, 'object': 'model'} for name in ('synthetic-ui-model', 'synthetic-ui-fallback')]})
 
     def do_POST(self):
         payload = json.loads(self.rfile.read(int(self.headers['Content-Length'])))
@@ -67,8 +67,11 @@ async def main():
             health = await page.request.get(args.backend_url + '/api/health', headers=token)
             assert health.ok
             assert 'answer-ui-qa' in (await health.json())['data_dir'], 'Refusing to modify a non-QA workspace'
-            reset = await page.request.patch(args.backend_url + '/api/settings', headers=token, data={'text_provider': 'none', 'text_model': '', 'text_base_url': ''})
+            reset = await page.request.patch(args.backend_url + '/api/settings', headers=token, data={'text_provider': 'none', 'text_model': '', 'text_fallback_model': '', 'text_base_url': '', 'monthly_budget': 0})
             assert reset.ok
+            legacy_prices = {'input_cost_per_million': 9, 'output_cost_per_million': 10, 'answer_model_prices': {}}
+            seed = await page.request.put(args.backend_url + '/api/integrations/openai-compatible', headers=token, data={'config': legacy_prices})
+            assert seed.ok
 
             async def local_proxy(route):
                 request = route.request
@@ -86,12 +89,14 @@ async def main():
             await panel.get_by_text('Answer model setup required', exact=True).wait_for()
             await panel.get_by_text('An LLM is required to generate personalised answers to open-ended application questions.', exact=True).wait_for()
             await panel.get_by_label('Answer provider').select_option('openai-compatible')
+            assert await panel.get_by_label('Input price per million tokens (USD)', exact=True).input_value() == '', 'Legacy provider rates leaked into model pricing'
+            assert await panel.get_by_label('Output price per million tokens (USD)', exact=True).input_value() == ''
             await panel.get_by_label('Provider endpoint', exact=True).fill(f'http://127.0.0.1:{provider.server_port}/v1')
             await panel.get_by_label('API key', exact=True).fill('synthetic-ui-secret')
             await panel.get_by_role('button', name='Save and discover models', exact=True).click()
-            await panel.get_by_text('1 available models discovered. Select a model and save the configuration.', exact=True).wait_for()
+            await panel.get_by_text('2 available models discovered. Select a model and save the configuration.', exact=True).wait_for()
             assert await panel.get_by_label('API key', exact=True).input_value() == ''
-            assert await panel.locator('datalist option').get_attribute('value') == 'synthetic-ui-model'
+            assert await panel.locator('datalist option').all_text_contents() == ['synthetic-ui-model', 'synthetic-ui-fallback']
             await panel.get_by_label('Answer model', exact=True).fill('synthetic-ui-model')
             await panel.get_by_label('Temperature', exact=True).fill('0.3')
             await panel.get_by_label('Maximum output tokens', exact=True).fill('2400')
@@ -108,6 +113,9 @@ async def main():
             assert config['text_model'] == 'synthetic-ui-model' and config['text_temperature'] == 0.3
             assert config['text_max_output_tokens'] == 2400 and config['text_retry_attempts'] == 1
             integrations = await (await page.request.get(args.backend_url + '/api/integrations', headers=token)).json()
+            provider_config = next(i['config'] for i in integrations['items'] if i['provider'] == 'openai-compatible')
+            assert provider_config['answer_model_prices']['synthetic-ui-model'] == {'input_cost_per_million': .1, 'output_cost_per_million': .2}
+            assert provider_config['input_cost_per_million'] == 9 and provider_config['output_cost_per_million'] == 10, 'Legacy provider prices changed'
             assert 'synthetic-ui-secret' not in json.dumps(integrations), 'Provider response exposed a credential'
             assert 'synthetic-ui-secret' not in await page.locator('body').inner_text()
             assert not await page.evaluate('Object.values(localStorage).some(v => v.includes("synthetic-ui-secret"))')
@@ -115,6 +123,41 @@ async def main():
             prompt = json.dumps(SyntheticProvider.calls[-1])
             assert 'connection-probe' in prompt and 'Sample Candidate' in prompt
             assert 'Alejandro Newport' not in prompt, 'Synthetic connection probe leaked candidate information'
+
+            print('Checking exact primary and fallback model pricing', flush=True)
+            call_count = len(SyntheticProvider.calls)
+            await panel.get_by_label('Answer model', exact=True).fill('synthetic-ui-unpriced')
+            assert await panel.get_by_label('Input price per million tokens (USD)', exact=True).input_value() == ''
+            assert await panel.get_by_label('Output price per million tokens (USD)', exact=True).input_value() == ''
+            await panel.get_by_role('button', name='Save and test connection', exact=True).click()
+            await panel.get_by_text('Enter current input and output token prices for the primary model.', exact=False).wait_for()
+            assert len(SyntheticProvider.calls) == call_count, 'Unpriced model triggered inference'
+            await panel.get_by_label('Answer model', exact=True).fill('synthetic-ui-model')
+            assert await panel.get_by_label('Input price per million tokens (USD)', exact=True).input_value() == '0.1'
+            assert await panel.get_by_label('Output price per million tokens (USD)', exact=True).input_value() == '0.2'
+            await panel.get_by_label('Fallback answer model', exact=True).fill('synthetic-ui-fallback')
+            assert await panel.get_by_label('Fallback input price per million tokens (USD)', exact=True).input_value() == ''
+            await panel.get_by_role('button', name='Save and test connection', exact=True).click()
+            await panel.get_by_text('Enter separate current input and output token prices for the fallback model.', exact=False).wait_for()
+            assert len(SyntheticProvider.calls) == call_count, 'Unpriced fallback triggered inference'
+            await panel.get_by_label('Fallback input price per million tokens (USD)', exact=True).fill('0.5')
+            await panel.get_by_label('Fallback output price per million tokens (USD)', exact=True).fill('1.1')
+            await panel.get_by_role('button', name='Save answer configuration', exact=True).click()
+            await expect(panel.get_by_role('button', name='Save answer configuration', exact=True)).to_be_enabled()
+            async def saved_prices():
+                integration_data = await (await page.request.get(args.backend_url + '/api/integrations', headers=token)).json()
+                return next(i['config'] for i in integration_data['items'] if i['provider'] == 'openai-compatible')
+            exact_prices = (await saved_prices())['answer_model_prices']
+            assert exact_prices['synthetic-ui-fallback'] == {'input_cost_per_million': .5, 'output_cost_per_million': 1.1}
+            assert exact_prices['synthetic-ui-model'] == {'input_cost_per_million': .1, 'output_cost_per_million': .2}
+            await panel.get_by_label('Fallback answer model', exact=True).fill('synthetic-ui-unpriced-fallback')
+            assert await panel.get_by_label('Fallback input price per million tokens (USD)', exact=True).input_value() == ''
+            assert await panel.get_by_label('Fallback output price per million tokens (USD)', exact=True).input_value() == ''
+            await panel.get_by_label('Fallback answer model', exact=True).fill('synthetic-ui-fallback')
+            assert await panel.get_by_label('Fallback input price per million tokens (USD)', exact=True).input_value() == '0.5'
+            assert await panel.get_by_label('Fallback output price per million tokens (USD)', exact=True).input_value() == '1.1'
+            await panel.get_by_role('button', name='Save and test connection', exact=True).click()
+            await panel.get_by_text('The configured provider returned a response. Review the connection test details below.', exact=True).wait_for()
             await page.screenshot(path=str(out / 'answer-llm-configured.png'), full_page=True)
             await panel.screenshot(path=str(out / 'answer-llm-panel.png'))
 
@@ -142,7 +185,7 @@ async def main():
             await browser.close()
         assert not errors, errors
         print(json.dumps({'result': 'passed', 'provider': 'synthetic HTTP fixture; real external LLM not tested',
-                          'checked': ['provider/key setup', 'saved-config model discovery', 'model and generation settings persistence', 'secret not exposed in response/DOM/localStorage', 'synthetic connection prompt privacy', 'failed API connection remains explicit', 'missing secondary education inspector', 'desktop and compact screenshots'], 'screenshots': str(out)}, indent=2))
+                          'checked': ['provider/key setup', 'saved-config model discovery', 'model and generation settings persistence', 'exact primary/fallback model prices saved independently', 'model changes clear unsaved rates and restore saved exact rates', 'unpriced primary/fallback rejected before inference', 'legacy provider rates retained without reuse', 'secret not exposed in response/DOM/localStorage', 'synthetic connection prompt privacy', 'failed API connection remains explicit', 'missing secondary education inspector', 'desktop and compact screenshots'], 'screenshots': str(out)}, indent=2))
     finally:
         provider.shutdown()
         provider.server_close()

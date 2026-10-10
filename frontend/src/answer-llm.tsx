@@ -21,6 +21,31 @@ const providers = [
   { id: "openai-compatible", name: "Custom OpenAI-compatible endpoint" },
 ];
 
+const rateKeys = [
+  "input_cost_per_million",
+  "output_cost_per_million",
+] as const;
+
+function modelPrices(config: Data, model: unknown): Data {
+  const saved = config.answer_model_prices?.[String(model || "").trim()];
+  return Object.fromEntries(rateKeys.map((key) => [key, saved?.[key] ?? ""]));
+}
+
+function validPrices(prices: Data): boolean {
+  return (
+    rateKeys.every((key) => {
+      const price = prices[key];
+      return (
+        price !== "" &&
+        price !== null &&
+        typeof price !== "boolean" &&
+        Number.isFinite(Number(price)) &&
+        Number(price) >= 0
+      );
+    }) && rateKeys.reduce((sum, key) => sum + Number(prices[key]), 0) > 0
+  );
+}
+
 export function AnswerLLMStatusCard({ ctx }: { ctx: AppContext }) {
   const r = useResource<AnswerLLMStatus>("/ai/answers/status", ctx.refresh);
   return (
@@ -122,12 +147,15 @@ function AnswerLLMForm({
     monthly_budget: settings.monthly_budget ?? 0,
   });
   const [secret, setSecret] = useState("");
-  const initialPrices =
+  const initialConfig =
     integrations.find((i) => i.provider === values.text_provider)?.config || {};
-  const [prices, setPrices] = useState<Data>({
-    input_cost_per_million: initialPrices.input_cost_per_million ?? "",
-    output_cost_per_million: initialPrices.output_cost_per_million ?? "",
-  });
+  const [savedConfig, setSavedConfig] = useState<Data>(initialConfig);
+  const [prices, setPrices] = useState<Data>(
+    modelPrices(initialConfig, values.text_model),
+  );
+  const [fallbackPrices, setFallbackPrices] = useState<Data>(
+    modelPrices(initialConfig, values.text_fallback_model),
+  );
   const [models, setModels] = useState<Array<{ id: string; label?: string }>>(
     [],
   );
@@ -138,9 +166,13 @@ function AnswerLLMForm({
   const provider = values.text_provider;
   const remote = provider !== "none" && provider !== "ollama";
   const change = (key: string, value: unknown) => {
+    if (key === "text_model") setPrices(modelPrices(savedConfig, value));
+    if (key === "text_fallback_model")
+      setFallbackPrices(modelPrices(savedConfig, value));
     setValues((v) => ({ ...v, [key]: value }));
     setResult(null);
     setMessage("");
+    setError("");
   };
   function selectProvider(next: string, model = "") {
     const config = integrations.find((i) => i.provider === next)?.config || {};
@@ -148,12 +180,12 @@ function AnswerLLMForm({
       ...v,
       text_provider: next,
       text_model: model,
+      text_fallback_model: "",
       text_base_url: "",
     }));
-    setPrices({
-      input_cost_per_million: config.input_cost_per_million ?? "",
-      output_cost_per_million: config.output_cost_per_million ?? "",
-    });
+    setSavedConfig(config);
+    setPrices(modelPrices(config, model));
+    setFallbackPrices(modelPrices(config, ""));
     setSecret("");
     setModels([]);
     setResult(null);
@@ -161,10 +193,12 @@ function AnswerLLMForm({
     setError("");
   }
   async function persist(requireModel: boolean) {
+    const model = String(values.text_model).trim();
+    const fallback = String(values.text_fallback_model).trim();
     if (
       requireModel &&
       provider !== "none" &&
-      !String(values.text_model).trim()
+      !model
     )
       throw new Error(
         "Discover models or enter a supported model identifier before saving.",
@@ -179,31 +213,49 @@ function AnswerLLMForm({
     if (
       remote &&
       requireModel &&
-      Object.values(prices).some(
-        (price) =>
-          price === "" || !Number.isFinite(Number(price)) || Number(price) < 0,
-      )
+      !validPrices(prices)
     )
       throw new Error(
-        "Enter the provider's current input and output token prices so the monthly budget can be enforced.",
+        "Enter current input and output token prices for the primary model. At least one rate must be positive.",
       );
+    if (remote && requireModel && fallback && !validPrices(fallbackPrices))
+      throw new Error(
+        "Enter separate current input and output token prices for the fallback model. At least one rate must be positive.",
+      );
+    if (
+      remote &&
+      fallback === model &&
+      fallback &&
+      validPrices(prices) &&
+      validPrices(fallbackPrices) &&
+      rateKeys.some((key) => Number(prices[key]) !== Number(fallbackPrices[key]))
+    )
+      throw new Error("Primary and fallback rates for the same model must match.");
     if (provider !== "none" && (secret.trim() || remote)) {
-      const previous =
-        integrations.find((i) => i.provider === provider)?.config || {};
-      const knownPrices = Object.fromEntries(
-        Object.entries(prices)
-          .filter(([, price]) => price !== "")
-          .map(([key, price]) => [key, Number(price)]),
-      );
+      const exactPrices = { ...savedConfig.answer_model_prices };
+      if (remote && model && validPrices(prices))
+        exactPrices[model] = Object.fromEntries(
+          rateKeys.map((key) => [key, Number(prices[key])]),
+        );
+      if (remote && fallback && validPrices(fallbackPrices))
+        exactPrices[fallback] = Object.fromEntries(
+          rateKeys.map((key) => [key, Number(fallbackPrices[key])]),
+        );
+      const config = {
+        ...savedConfig,
+        ...(remote ? { answer_model_prices: exactPrices } : {}),
+      };
       await api(`/integrations/${provider}`, "PUT", {
-        config: { ...previous, ...knownPrices },
+        config,
         ...(secret.trim() ? { secret: secret.trim() } : {}),
       });
+      setSavedConfig(config);
       setSecret("");
     }
     await api("/settings", "PATCH", {
       ...values,
-      text_model: String(values.text_model).trim(),
+      text_model: model,
+      text_fallback_model: fallback,
       text_base_url: String(values.text_base_url).trim(),
     });
     reload();
@@ -522,8 +574,8 @@ function AnswerLLMForm({
                         }
                       />
                       <small>
-                        Zero blocks paid remote inference. This limit is shared
-                        with other remote AI usage.
+                        A positive cap is required for cloud calls. Connection
+                        tests count toward this shared cap; zero disables them.
                       </small>
                     </label>
                     {(["input", "output"] as const).map((direction) => (
@@ -548,10 +600,40 @@ function AnswerLLMForm({
                           }
                         />
                         <small>
-                          Use the selected model's current published rate.
+                          Current published rate for the exact primary model.
+                          Changing models loads its saved rates or clears these
+                          fields.
                         </small>
                       </label>
                     ))}
+                    {String(values.text_fallback_model).trim() &&
+                      (["input", "output"] as const).map((direction) => (
+                        <label className="field" key={`fallback-${direction}`}>
+                          <span>
+                            Fallback {direction} price per million tokens (USD)
+                          </span>
+                          <input
+                            aria-label={`Fallback ${direction} price per million tokens (USD)`}
+                            type="number"
+                            min={0}
+                            step="any"
+                            value={fallbackPrices[`${direction}_cost_per_million`]}
+                            onChange={(e) =>
+                              setFallbackPrices((p) => ({
+                                ...p,
+                                [`${direction}_cost_per_million`]:
+                                  e.target.value === ""
+                                    ? ""
+                                    : Number(e.target.value),
+                              }))
+                            }
+                          />
+                          <small>
+                            Current published rate for the exact fallback model.
+                            Required before cloud testing or generation.
+                          </small>
+                        </label>
+                      ))}
                   </>
                 )}
               </>

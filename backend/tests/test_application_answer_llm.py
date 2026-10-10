@@ -74,11 +74,15 @@ def settings(provider='ollama'):
             **({'text_base_url': 'https://compatible.example/v1'} if provider == 'openai-compatible' else {})}
 
 
+def model_prices(input_rate=1, output_rate=2, model='discovered-model'):
+    return {'answer_model_prices': {model: {'input_cost_per_million': input_rate, 'output_cost_per_million': output_rate}}}
+
+
 @pytest.mark.parametrize('provider', ['openai', 'anthropic', 'gemini', 'ollama', 'openai-compatible'])
 async def test_native_provider_contracts_exact_question_and_independent_review(db, evidence, provider):
     calls = []
     db.execute('INSERT INTO integrations(id,provider,config,status) VALUES(?,?,?,?)',
-               (uid(), provider, json.dumps({'input_cost_per_million': 1, 'output_cost_per_million': 2}), 'configured'))
+               (uid(), provider, json.dumps(model_prices()), 'configured'))
     exact = 'Explain a project you built. (One sentence)  '
     def handler(request):
         payload = request_payload(request)
@@ -112,12 +116,185 @@ async def test_no_provider_never_returns_generic_narrative(db, evidence):
 
 async def test_missing_key_and_insecure_endpoint_fail_explicitly(db, evidence):
     llm = ApplicationAnswerLLM(db, None)
+    db.execute('INSERT INTO integrations(id,provider,config,status) VALUES(?,?,?,?)',
+               (uid(), 'openai', json.dumps(model_prices()), 'configured'))
     with pytest.raises(ConfigurationError, match='Keychain'):
         await llm._request(settings('openai'), 'system', {}, ANSWER_SCHEMA)
     with pytest.raises(ConfigurationError, match='HTTPS'):
         await llm.models(settings('openai-compatible') | {'text_base_url': 'http://remote.example/v1'})
     with pytest.raises(ConfigurationError, match='credentials'):
         await llm.models(settings('openai-compatible') | {'text_base_url': 'https://user:key@remote.example/v1'})
+
+
+@pytest.mark.parametrize('prices', [None, {'input_cost_per_million': 0, 'output_cost_per_million': 0},
+                                  {'input_cost_per_million': 1, 'output_cost_per_million': 2}])
+async def test_zero_remote_cap_blocks_before_credentials_or_transport(db, prices):
+    class ForbiddenKeys:
+        def get(self, _name):
+            pytest.fail('A zero cloud cap must be rejected before Keychain access')
+    if prices is not None:
+        db.execute('INSERT INTO integrations(id,provider,config,status) VALUES(?,?,?,?)',
+                   (uid(), 'openai', json.dumps({'answer_model_prices': {'discovered-model': prices}}), 'configured'))
+    def handler(_request):
+        pytest.fail('No remote request is authorized by a zero spending cap')
+    llm = ApplicationAnswerLLM(db, ForbiddenKeys(), transport=httpx.MockTransport(handler))
+    with pytest.raises(ConfigurationError, match='positive monthly AI spending cap'):
+        await llm._request(settings('openai') | {'monthly_budget': 0}, 'system', {}, ANSWER_SCHEMA)
+
+
+@pytest.mark.parametrize('prices,message', [(None, 'current input and output token prices'),
+    ({'input_cost_per_million': 0, 'output_cost_per_million': 0}, 'cannot both be zero')])
+async def test_paid_cloud_requires_configured_nonzero_rates_before_credentials(db, prices, message):
+    class ForbiddenKeys:
+        def get(self, _name):
+            pytest.fail('Pricing setup must be completed before reading credentials')
+    if prices is not None:
+        db.execute('INSERT INTO integrations(id,provider,config,status) VALUES(?,?,?,?)',
+                   (uid(), 'openai', json.dumps({'answer_model_prices': {'discovered-model': prices}}), 'configured'))
+    llm = ApplicationAnswerLLM(db, ForbiddenKeys())
+    with pytest.raises(ConfigurationError, match=message):
+        await llm._request(settings('openai'), 'system', {}, ANSWER_SCHEMA)
+
+
+@pytest.mark.parametrize('budget,prices,message,ready', [
+    (0, {'input_cost_per_million': 1, 'output_cost_per_million': 2}, 'positive monthly AI spending cap', False),
+    (5, None, 'current input and output token prices', False),
+    (5, {'input_cost_per_million': 0, 'output_cost_per_million': 0}, 'cannot both be zero', False),
+    (5, {'input_cost_per_million': 1, 'output_cost_per_million': 2}, 'configured', True),
+])
+async def test_cloud_status_requires_billing_setup_but_preserves_key_presence(db, budget, prices, message, ready):
+    if prices is not None:
+        db.execute('INSERT INTO integrations(id,provider,config,status) VALUES(?,?,?,?)',
+                   (uid(), 'openai', json.dumps({'answer_model_prices': {'discovered-model': prices}}), 'configured'))
+    llm = ApplicationAnswerLLM(db, Keys(), transport=httpx.MockTransport(lambda _request: httpx.Response(200, json={'models': []})))
+    status = await llm.status(settings('openai') | {'monthly_budget': budget})
+    assert status['key_present'] is True
+    assert status['billing_ready'] is ready
+    assert status['configured'] is ready
+    assert status['setup_required'] is not ready
+    assert message in status['message']
+
+
+async def test_unbilled_model_discovery_remains_available_with_zero_cap(db):
+    llm = ApplicationAnswerLLM(db, Keys(), transport=httpx.MockTransport(
+        lambda _request: httpx.Response(200, json={'data': [{'id': 'discovered-model'}]})))
+    discovered = await llm.models(settings('openai') | {'monthly_budget': 0})
+    assert discovered['items'] == [{'id': 'discovered-model', 'label': 'discovered-model'}]
+    assert not db.one("SELECT value FROM settings WHERE key LIKE 'ai_usage:%'")
+
+
+@pytest.mark.parametrize('config', [
+    {'input_cost_per_million': 1, 'output_cost_per_million': 2},
+    model_prices(model='different-model'),
+])
+async def test_answer_cloud_prices_must_match_exact_model_without_legacy_fallback(db, config):
+    db.execute('INSERT INTO integrations(id,provider,config,status) VALUES(?,?,?,?)',
+               (uid(), 'openai', json.dumps(config), 'configured'))
+    class ForbiddenKeys:
+        def get(self, _name):
+            pytest.fail('Unbound model rates must block before credentials are read')
+    llm = ApplicationAnswerLLM(db, ForbiddenKeys())
+    with pytest.raises(ConfigurationError, match='exact selected cloud answer model'):
+        await llm._request(settings('openai'), 'system', {}, ANSWER_SCHEMA)
+
+
+async def test_unpriced_cloud_fallback_is_blocked_and_uses_its_own_rates_when_bound(db):
+    config = model_prices()
+    db.execute('INSERT INTO integrations(id,provider,config,status) VALUES(?,?,?,?)',
+               (uid(), 'openai', json.dumps(config), 'configured'))
+    configured = settings('openai') | {'text_fallback_model': 'stronger-model'}
+    llm = ApplicationAnswerLLM(db, None)
+    with pytest.raises(ConfigurationError, match='exact fallback cloud answer model'):
+        await llm._request(configured, 'system', {}, ANSWER_SCHEMA)
+    config['answer_model_prices']['stronger-model'] = {'input_cost_per_million': 10, 'output_cost_per_million': 20}
+    db.execute("UPDATE integrations SET config=? WHERE provider='openai'", (json.dumps(config),))
+    primary_prices, _ = llm._billing(configured, 'openai', False)
+    fallback_prices, _ = llm._billing(configured | {'text_model': 'stronger-model'}, 'openai', False)
+    assert primary_prices == {'input_cost_per_million': 1, 'output_cost_per_million': 2}
+    assert fallback_prices == {'input_cost_per_million': 10, 'output_cost_per_million': 20}
+
+
+@pytest.mark.parametrize('provider,base', [('ollama', 'http://127.0.0.1:11434/v1'),
+                                         ('openai-compatible', 'http://127.0.0.1:8123/v1')])
+async def test_explicit_loopback_inference_is_free_with_zero_cap(db, evidence, provider, base):
+    def handler(request):
+        return response_for(request, complete(request_payload(request), fid=evidence))
+    llm = ApplicationAnswerLLM(db, None, transport=httpx.MockTransport(handler))
+    answer = await llm.generate(settings(provider) | {'text_base_url': base, 'monthly_budget': 0, 'text_quality_review': False},
+                                'Describe your project.', {}, question_id='local')
+    assert answer['state'] == 'ANSWER_VALIDATED' and answer['cost'] == 0
+
+
+async def test_qa_profile_copies_share_live_usage_and_cannot_reset_cap(tmp_path):
+    live = Database(tmp_path / 'live.sqlite3')
+    live.execute('INSERT INTO settings(key,value) VALUES(?,?)', ('monthly_budget', '0.3'))
+    clones = [Database(tmp_path / f'qa-{index}.sqlite3') for index in range(2)]
+    for clone in clones:
+        clone.execute('INSERT INTO integrations(id,provider,config,status) VALUES(?,?,?,?)',
+                      (uid(), 'openai', json.dumps(model_prices(0, 1000)), 'configured'))
+    calls = []
+    def handler(request):
+        payload = request_payload(request)
+        calls.append(payload)
+        reply = response_for(request, complete(payload, fid='fact'))
+        body = json.loads(reply.content)
+        body['usage'] = {'input_tokens': 15, 'output_tokens': 200}
+        return httpx.Response(200, json=body)
+    configured = settings('openai') | {'monthly_budget': .3, 'text_max_output_tokens': 256}
+    payload = {'question_id': 'q', 'intent': 'PROJECT', 'verified_facts': [{'id': 'fact'}]}
+    services = [ApplicationAnswerLLM(clone, Keys(), transport=httpx.MockTransport(handler), usage_db=live) for clone in clones]
+    await services[0]._request(configured, 'system', payload, ANSWER_SCHEMA)
+    with pytest.raises(ValueError, match='budget would be exceeded'):
+        await services[1]._request(configured, 'system', payload, ANSWER_SCHEMA)
+    assert len(calls) == 1
+    ledger = json.loads(live.one("SELECT value FROM settings WHERE key LIKE 'ai_usage:%'")['value'])
+    assert ledger['cost'] == pytest.approx(.2)
+    assert ledger['calls'] == 1
+    assert all(not clone.one("SELECT value FROM settings WHERE key LIKE 'ai_usage:%'") for clone in clones)
+    live.execute("UPDATE settings SET value='0' WHERE key='monthly_budget'")
+    with pytest.raises(ConfigurationError, match='shared live monthly AI spending cap is zero'):
+        await services[1]._request(configured, 'system', payload, ANSWER_SCHEMA)
+
+
+def test_calibration_copies_current_nonsecret_configuration_but_shares_ledger(tmp_path):
+    from importlib.util import module_from_spec, spec_from_file_location
+    from pathlib import Path
+    spec = spec_from_file_location('calibrate_answer_llm', Path(__file__).parents[2] / 'scripts/calibrate_answer_llm.py')
+    module = module_from_spec(spec)
+    spec.loader.exec_module(module)
+    live = Database(tmp_path / 'live.sqlite3')
+    clone = Database(tmp_path / 'candidate-copy.sqlite3')
+    for key, value in {'text_provider': 'openai', 'text_model': 'selected-cloud-model', 'monthly_budget': 5}.items():
+        live.execute('INSERT OR REPLACE INTO settings(key,value) VALUES(?,?)', (key, json.dumps(value)))
+    live.execute('INSERT INTO integrations(id,provider,config,status) VALUES(?,?,?,?)',
+                 (uid(), 'openai', json.dumps({'input_cost_per_million': 1, 'output_cost_per_million': 2,
+                                               'answer_model_prices': {'selected-cloud-model': {'input_cost_per_million': 1, 'output_cost_per_million': 2}},
+                                               'account_label': 'irrelevant-config'}), 'configured'))
+    live.execute("INSERT INTO settings(key,value) VALUES('ai_usage:2099-01','{\"cost\":4}')")
+    configured = module.configure_from_live(clone, live)
+    assert configured['text_provider'] == 'openai' and configured['text_model'] == 'selected-cloud-model'
+    assert configured['monthly_budget'] == 5
+    assert json.loads(clone.one("SELECT config FROM integrations WHERE provider='openai'")['config']) == {
+        'input_cost_per_million': 1, 'output_cost_per_million': 2,
+        'answer_model_prices': {'selected-cloud-model': {'input_cost_per_million': 1, 'output_cost_per_million': 2}}}
+    assert not clone.one("SELECT value FROM settings WHERE key LIKE 'ai_usage:%'")
+
+
+@pytest.mark.parametrize('script', ['calibrate_answer_llm', 'regress_application_answers'])
+async def test_remote_qa_scripts_require_shared_ledger_before_any_external_work(tmp_path, monkeypatch, script):
+    from importlib import import_module
+    from pathlib import Path
+    from types import SimpleNamespace
+    scripts = Path(__file__).parents[2] / 'scripts'
+    monkeypatch.syspath_prepend(str(scripts))
+    module = import_module(script)
+    source = Database(tmp_path / 'profile-copy.sqlite3')
+    source.execute('INSERT INTO settings(key,value) VALUES(?,?)', ('text_provider', '"openai"'))
+    args = SimpleNamespace(database=source.path, output=tmp_path / 'report', allow_remote=True, usage_database=None,
+                           job=None, url='https://example.test/application', company='Example', title='Engineer',
+                           location='London', fill=True, headless=True)
+    with pytest.raises(ValueError, match='shared live database'):
+        await module.run(args)
 
 
 @pytest.mark.parametrize('failure', ['wrong_id', 'invented_number', 'unsupported_reviewer', 'malformed_schema', 'api_failure'])
@@ -426,7 +603,7 @@ def test_llm_setup_api_secure_credentials_models_probe_and_settings(tmp_path, mo
         assert client.patch('/api/settings', json={'text_retry_attempts': 6}).status_code == 422
         assert client.patch('/api/settings', json={'text_timeout_seconds': 0}).status_code == 422
         assert client.patch('/api/settings', json={'text_max_output_tokens': True}).status_code == 422
-        assert client.put('/api/integrations/openai-compatible', json={'secret': 'private-key', 'config': {'input_cost_per_million': 1, 'output_cost_per_million': 2}}).status_code == 200
+        assert client.put('/api/integrations/openai-compatible', json={'secret': 'private-key', 'config': model_prices()}).status_code == 200
         assert client.patch('/api/settings', json={'text_provider': 'openai-compatible', 'text_model': 'discovered-model', 'text_base_url': 'https://compatible.example/v1', 'monthly_budget': 10}).status_code == 200
         status = client.get('/api/ai/answers/status').json()
         assert status['configured'] and status['key_present']

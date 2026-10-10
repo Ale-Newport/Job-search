@@ -15,9 +15,10 @@ from jobagent.automation.job_context import prepare_job_context
 from jobagent.core import get_settings
 from jobagent.db import Database
 from jobagent.intelligence.engine import CandidateEngine
-from jobagent.application_answer_llm import ApplicationAnswerLLM
+from jobagent.application_answer_llm import ApplicationAnswerLLM, provider_config
 from jobagent.security import SecretStore
 from calibrate_intelligence import DryRunBrowser, audit_fields
+from calibrate_answer_llm import calibration_usage, configure_from_live
 
 
 async def run(args):
@@ -25,6 +26,13 @@ async def run(args):
         raise ValueError('Calibration requires a separate database copy')
     args.output.mkdir(parents=True, exist_ok=True)
     db = Database(args.database)
+    usage_db = db
+    if args.usage_database:
+        usage_path = args.usage_database.resolve()
+        if not usage_path.is_file() or usage_path == args.database.resolve():
+            raise ValueError('--usage-database must point at the existing shared live database, not this QA profile copy')
+        usage_db = Database(usage_path)
+        configure_from_live(db, usage_db)
     job = db.one("SELECT * FROM jobs WHERE id=?", (args.job,)) if args.job else {}
     job = {**(job or {}), "id": args.job or "answer-regression", "application_id": "answer-regression",
            "application_url": args.url, "url": args.url,
@@ -32,7 +40,12 @@ async def run(args):
            "title": args.title or (job or {}).get("title", ""),
            "location": args.location or (job or {}).get("location", "")}
     settings = get_settings(db)
-    engine = CandidateEngine(db, settings=settings, answer_llm=ApplicationAnswerLLM(db, SecretStore()))
+    remote = settings.get('text_provider', 'none') != 'none' and not provider_config(settings)[2]
+    if args.fill and remote and not args.allow_remote:
+        raise ValueError('Remote answer generation requires explicit --allow-remote authorization')
+    if args.fill and remote and not args.usage_database:
+        raise ValueError('Remote fill QA requires --usage-database pointing at the shared live database so profile copies cannot reset aggregate spending')
+    engine = CandidateEngine(db, settings=settings, answer_llm=ApplicationAnswerLLM(db, SecretStore(), usage_db=usage_db))
     browser = DryRunBrowser(args.output)
     def progress(step):
         summary = {k: step.get(k) for k in ('operation', 'label', 'executed', 'form_state')}
@@ -41,7 +54,9 @@ async def run(args):
         (args.output / 'progress.json').write_text(json.dumps(summary, indent=2))
         print(json.dumps({k: v for k, v in summary.items() if k != 'diagnostics'}), flush=True)
     browser.on_step = progress
-    record = {"job": job, "submitted": False, "inspection_only": not args.fill}
+    record = {"job": job, "submitted": False, "inspection_only": not args.fill,
+              "usage_ledger": str(args.usage_database.resolve()) if args.usage_database else str(args.database.resolve()),
+              "usage_before": calibration_usage(usage_db)}
     try:
         await browser.start(headless=args.headless, channel="chrome")
         await browser.open(args.url)
@@ -82,6 +97,7 @@ async def run(args):
         record["failure"] = type(exc).__name__ + ": " + str(exc)[:1000]
     finally:
         await browser.close()
+        record['usage_after'] = calibration_usage(usage_db)
         (args.output / "audit.json").write_text(json.dumps(record, indent=2))
     print(json.dumps({"status": record.get("result", {}).get("status"),
                       "controls": len(record.get("initial_fields", [])),
@@ -101,4 +117,6 @@ if __name__ == "__main__":
     parser.add_argument("--location")
     parser.add_argument("--fill", action="store_true")
     parser.add_argument("--headless", action="store_true")
+    parser.add_argument("--allow-remote", action="store_true")
+    parser.add_argument("--usage-database", type=Path, help="Existing live database supplying current nonsecret model settings and the shared monthly usage ledger")
     asyncio.run(run(parser.parse_args()))

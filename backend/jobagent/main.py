@@ -613,6 +613,22 @@ def create_app(data_dir: Path | None = None, token: str | None = None, secret_st
         record_ai_probe(app.state.db, "text", result)
         return result
 
+    @app.get("/api/ai/answers/status")
+    async def answer_llm_status():
+        from .core import get_settings
+
+        return await app.state.text_ai.answer_llm.status(get_settings(app.state.db))
+
+    @app.get("/api/ai/answers/models")
+    async def answer_llm_models():
+        from .core import get_settings
+
+        return await app.state.text_ai.answer_llm.models(get_settings(app.state.db))
+
+    @app.post("/api/ai/answers/test")
+    async def answer_llm_test():
+        return await text_ai_test()
+
     async def ensure_text_runtime():
         from .core import get_settings
 
@@ -623,8 +639,14 @@ def create_app(data_dir: Path | None = None, token: str | None = None, secret_st
             and settings.get("text_base_url", "").rstrip("/")
             in ("", "http://127.0.0.1:11434/v1", "http://localhost:11434/v1")
         ):
+            # Use an already running local service without taking ownership or
+            # signalling it. Discovery checks the configured model dynamically.
+            detected = await app.state.text_ai.answer_llm.detect_ollama()
+            if detected.get("available") and settings.get("text_model") in detected.get("models", []):
+                return
             state = await app.state.ollama_runtime.start()
-            if not state.get("ready"):
+            detected = await app.state.text_ai.answer_llm.detect_ollama()
+            if not detected.get("available") or settings.get("text_model") not in detected.get("models", []):
                 raise ValueError(state.get("error") or "Download the configured local text model before using it")
 
     @app.get("/api/ai/text/local/status")
@@ -682,6 +704,7 @@ def create_app(data_dir: Path | None = None, token: str | None = None, secret_st
             or app.state.mail.lock.locked()
             or discovery_busy(app.state.db)
             or app.state.text_ai.lock.locked()
+            or app.state.text_ai.answer_llm.locked()
             or app.state.active_requests > 1
         ):
             raise ValueError("Pause automation and wait for active work before restoring")

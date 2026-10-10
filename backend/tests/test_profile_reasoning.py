@@ -161,21 +161,35 @@ def test_new_general_availability_supersedes_old_notice_answer_and_skip(tmp_path
     assert profile_resolution('Notice period',knowledge)['answer']=='2 weeks'
 
 
-async def test_inference_excludes_employer_context_and_rejects_contaminated_draft(tmp_path, monkeypatch):
+async def test_inference_preserves_employer_context_and_rejects_contaminated_draft(tmp_path, monkeypatch):
     import json
     import httpx
     from jobagent.text_ai import TextService
-    db=Database(tmp_path/'draft.sqlite')
-    write_profile(db,'general_context','I am using AI coding assistance to develop a local job-search application.',True)
-    identifier=db.one("select id from facts where key='general_context'")['id']
+    from jobagent.application_answer_llm import SCORE_NAMES
+    db = Database(tmp_path / 'draft.sqlite')
+    write_profile(db, 'general_context', 'I am using AI coding assistance to develop a local job-search application.', True)
+    identifier = db.one("select id from facts where key='general_context'")['id']
     def respond(request):
-        content=json.loads(request.content)
-        assert json.loads(content['messages'][1]['content'])['job']=={}
-        return httpx.Response(200,json={'choices':[{'message':{'content':json.dumps({'answer':'At Trainline, I am currently using AI to develop an app.','facts_used':[identifier],'confidence':.99})}}]})
-    original=httpx.AsyncClient
-    monkeypatch.setattr(httpx,'AsyncClient',lambda **kwargs:original(transport=httpx.MockTransport(respond),**kwargs))
-    with pytest.raises(ValueError,match='application destination'):
-        await TextService(db,None).infer_field({'text_provider':'ollama','text_model':'fixture'},'How are you using AI?',{'company':'Trainline'},[identifier],{'multiline':True})
+        content = json.loads(request.content)
+        payload = json.loads(content['messages'][1]['content'])
+        assert payload['job']['company'] == 'Trainline'
+        if 'generated_answer' in payload:
+            result = {'question_id': payload['question_id'], 'passed': False,
+                      'scores': {name: .95 for name in SCORE_NAMES},
+                      'unsupported_claims': ['The application destination Trainline is not a verified employer'],
+                      'issues': [], 'reason': 'Invented employer'}
+        else:
+            answer = 'At Trainline, I am currently using AI to develop an app.'
+            result = {'question_id': payload['question_id'], 'intent': payload['intent'], 'answer': answer,
+                      'facts_used': [identifier], 'selected_options': [], 'selected_roles': [], 'company_claims': [], 'claims': [{'text': answer, 'fact_ids': [identifier]}],
+                      'evidence_quality': 'HIGH', 'word_count': len(answer.split()), 'follows_instructions': True,
+                      'answers_question': True, 'unsupported_claims': [], 'requires_human_input': False, 'missing_facts': []}
+        return httpx.Response(200, json={'message': {'content': json.dumps(result)}})
+    original = httpx.AsyncClient
+    monkeypatch.setattr(httpx, 'AsyncClient', lambda **kwargs: original(transport=httpx.MockTransport(respond), **kwargs))
+    with pytest.raises(ValueError, match='application destination'):
+        await TextService(db, None).infer_field({'text_provider': 'ollama', 'text_model': 'fixture'}, 'How are you using AI?',
+                                              {'company': 'Trainline'}, [identifier], {'multiline': True})
 
 
 def test_extractive_fallback_never_invents_an_answer_to_a_specific_unknown():

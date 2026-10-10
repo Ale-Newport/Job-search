@@ -109,35 +109,32 @@ def test_browser_memory_defaults_to_one_application_and_can_be_edited(db):
 
 async def test_text_draft_rejects_invented_current_employment(db, monkeypatch):
     import httpx
+    import json
     from jobagent.text_ai import TextService
-
-    reply = {
-        "answer": "Currently, as an Engineer at Example, I work on AI.",
-        "facts_used": ["past"],
-        "confidence": 0.95,
-    }
-    transport = httpx.MockTransport(
-        lambda request: httpx.Response(
-            200, json={"choices": [{"message": {"content": __import__("json").dumps(reply)}}]}
-        )
-    )
+    from jobagent.application_answer_llm import SCORE_NAMES
+    write_profile(db, 'general_context', 'I built Python tools at Example from January 2023 to June 2024.', True)
+    identifier = db.one("SELECT id FROM facts WHERE key='general_context'")['id']
+    reply = {'answer': 'Currently, as an Engineer at Example, I work on AI.'}
+    def handler(request):
+        payload = json.loads(json.loads(request.content)['messages'][-1]['content'])
+        if 'generated_answer' in payload:
+            generated = {'question_id': payload['question_id'], 'passed': True,
+                         'scores': {name: .95 for name in SCORE_NAMES}, 'unsupported_claims': [], 'issues': [], 'reason': 'Grounded'}
+        else:
+            generated = {'question_id': payload['question_id'], 'intent': payload['intent'], 'answer': reply['answer'],
+                         'facts_used': [identifier], 'selected_options': [], 'selected_roles': [], 'company_claims': [], 'claims': [{'text': reply['answer'], 'fact_ids': [identifier]}],
+                         'evidence_quality': 'HIGH', 'word_count': len(reply['answer'].split()), 'follows_instructions': True,
+                         'answers_question': True, 'unsupported_claims': [], 'requires_human_input': False, 'missing_facts': []}
+        return httpx.Response(200, json={'message': {'content': json.dumps(generated)}})
     original = httpx.AsyncClient
-    monkeypatch.setattr(httpx, "AsyncClient", lambda **kwargs: original(transport=transport, **kwargs))
+    monkeypatch.setattr(httpx, 'AsyncClient', lambda **kwargs: original(transport=httpx.MockTransport(handler), **kwargs))
     service = TextService(db, None)
-    settings = {"text_provider": "ollama", "text_model": "fixture", "text_base_url": "http://127.0.0.1:11434/v1"}
-    evidence = [
-        {
-            "id": "past",
-            "category": "experience",
-            "key": "Engineer at Example",
-            "value": "Engineer at Example, January 2023 - June 2024. Built Python tools.",
-        }
-    ]
-    with pytest.raises(ValueError, match="current employment"):
-        await service._draft(settings, "How are you using AI?", {}, [], _probe_facts=evidence)
-    reply["answer"] = "I built Python tools at Example from January 2023 to June 2024."
-    draft = await service._draft(settings, "How are you using AI?", {}, [], _probe_facts=evidence)
-    assert draft["requires_review"] is True
+    settings = {'text_provider': 'ollama', 'text_model': 'fixture', 'text_base_url': 'http://127.0.0.1:11434/v1'}
+    with pytest.raises(ValueError, match='current employment'):
+        await service.infer_field(settings, 'Describe how you have used Python for software projects.', {}, [identifier], {'multiline': True})
+    reply['answer'] = 'I built Python tools at Example from January 2023 to June 2024.'
+    draft = await service.infer_field(settings, 'Describe how you have used Python for software projects.', {}, [identifier], {'multiline': True})
+    assert draft['requires_review'] is True
 
 
 def test_cleared_override_blocks_old_cv_and_summaries_follow_verified_sources(db):

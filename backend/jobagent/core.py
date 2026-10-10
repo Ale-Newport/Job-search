@@ -75,6 +75,15 @@ DEFAULT_SETTINGS = {
     "text_provider": "none",
     "text_base_url": "",
     "text_model": "",
+    "text_temperature": 0.2,
+    "text_temperature_supported": True,
+    "text_max_output_tokens": 2200,
+    "text_context_tokens": 16384,
+    "text_timeout_seconds": 90,
+    "text_retry_attempts": 2,
+    "text_concurrency": 2,
+    "text_quality_review": True,
+    "text_fallback_model": "",
     "monthly_budget": 0,
     "notifications_enabled": True,
     "email_poll_minutes": 10,
@@ -1141,7 +1150,7 @@ async def application_update(application_id: str, payload: ApplicationPatch, req
 
 
 class AnswerPayload(Payload):
-    question: str = Field(min_length=1, max_length=2000)
+    question: str = Field(min_length=1, max_length=20000)
     answer: str = Field(min_length=1, max_length=20000)
     fact_ids: list[str] = Field(default_factory=list)
     verified: bool = True
@@ -1369,6 +1378,17 @@ async def settings_patch(payload: dict, request: Request):
     if len(dumps(payload)) > 100000:
         raise HTTPException(422, "Settings payload is too large")
     for key, value in payload.items():
+        if key in {"text_max_output_tokens", "text_context_tokens", "text_timeout_seconds", "text_retry_attempts", "text_concurrency"}:
+            bounds = {"text_max_output_tokens": (256, 32000), "text_timeout_seconds": (5, 300),
+                      "text_context_tokens": (4096, 131072),
+                      "text_retry_attempts": (0, 5), "text_concurrency": (1, 6)}
+            lo, hi = bounds[key]
+            if isinstance(value, bool) or not isinstance(value, int) or not lo <= value <= hi:
+                raise HTTPException(422, f"{key} must be an integer between {lo} and {hi}")
+        if key == "text_temperature" and (isinstance(value, bool) or not isinstance(value, (int, float)) or not 0 <= value <= 2):
+            raise HTTPException(422, "text_temperature must be between 0 and 2")
+        if key in {"text_model", "text_fallback_model"} and value and not re.fullmatch(r"[A-Za-z0-9_./:@+-]{1,200}", str(value)):
+            raise HTTPException(422, "Invalid application answer model identifier")
         if key in ('application_concurrency', 'worker_watchdog_seconds', 'worker_progress_seconds'):
             bounds = {'application_concurrency': (1, 6), 'worker_watchdog_seconds': (5, 120), 'worker_progress_seconds': (30, 900)}
             lo, hi = bounds[key]
@@ -1468,10 +1488,12 @@ def intelligence_fact_put(fact_id: str, payload: ApplicationProfilePayload, requ
 @router.post('/intelligence/answer')
 async def intelligence_answer(payload: dict, request: Request):
     from .intelligence.engine import CandidateEngine
-    question=str(payload.get('question','')).strip()
-    if not question or len(question)>4000:
-        raise HTTPException(422,'Enter a question of up to 4000 characters')
-    engine=CandidateEngine(get_db(request),settings=get_settings(get_db(request)))
+    question=str(payload.get('question',''))
+    if not question.strip() or len(question)>20000:
+        raise HTTPException(422,'Enter the exact question of up to 20000 characters')
+    text_service = getattr(request.app.state, 'text_ai', None)
+    engine=CandidateEngine(get_db(request),settings=get_settings(get_db(request)),
+                           answer_llm=text_service.answer_llm if text_service else None)
     return await engine.answer(question,payload.get('field',{}),payload.get('job',{}))
 
 

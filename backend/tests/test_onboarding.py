@@ -117,6 +117,14 @@ def test_empty_search_click_is_not_a_successful_source_run(workspace):
     assert steps(client)["search_run"] == "complete"
 
 
+def structured_probe(payload, answer='Sample Candidate'):
+    return {'question_id': payload['question_id'], 'intent': payload['intent'], 'answer': answer,
+            'facts_used': ['connection-probe'], 'selected_options': [], 'selected_roles': [], 'company_claims': [],
+            'claims': [{'text': answer, 'fact_ids': ['connection-probe']}], 'evidence_quality': 'HIGH',
+            'word_count': len(answer.split()), 'follows_instructions': True, 'answers_question': True,
+            'unsupported_claims': [], 'requires_human_input': False, 'missing_facts': []}
+
+
 @pytest.mark.parametrize("hostname,disable_thinking", [("api.deepseek.com", True), ("api.example.test", False)])
 def test_text_connection_probe_uses_synthetic_facts_and_provider_specific_mode(
     workspace, monkeypatch, hostname, disable_thinking
@@ -150,11 +158,8 @@ def test_text_connection_probe_uses_synthetic_facts_and_provider_specific_mode(
         body = json.loads(request.content)
         captured.append(body)
         assert b"Private Candidate" not in request.content
-        result = {
-            "answer": "Sample Candidate is the test candidate.",
-            "facts_used": ["connection-probe"],
-            "confidence": 1,
-        }
+        payload = json.loads(body['messages'][-1]['content'])
+        result = structured_probe(payload, 'Sample Candidate is the test candidate.')
         return httpx.Response(
             200,
             json={
@@ -181,8 +186,8 @@ def test_text_connection_probe_uses_synthetic_facts_and_provider_specific_mode(
         {"facts_used": "connection-probe"},
         {"facts_used": [None]},
         {"answer": "   "},
-        {"confidence": float("nan")},
-        {"confidence": "certain"},
+        {"word_count": float("nan")},
+        {"word_count": "certain"},
     ],
 )
 def test_malformed_model_evidence_is_rejected_without_completing_setup(workspace, monkeypatch, invalid):
@@ -190,8 +195,9 @@ def test_malformed_model_evidence_is_rejected_without_completing_setup(workspace
     client.patch("/api/settings", json={"text_provider": "ollama", "text_model": "fixture"})
 
     def handler(request):
-        result = {"answer": "Sample Candidate", "facts_used": ["connection-probe"], "confidence": 1} | invalid
-        return httpx.Response(200, json={"choices": [{"message": {"content": json.dumps(result)}}]})
+        payload = json.loads(json.loads(request.content)['messages'][-1]['content'])
+        result = structured_probe(payload) | invalid
+        return httpx.Response(200, json={'message': {'content': json.dumps(result)}})
 
     actual_client = httpx.AsyncClient
     monkeypatch.setattr(
@@ -205,8 +211,7 @@ def test_malformed_model_evidence_is_rejected_without_completing_setup(workspace
     assert steps(client)["ai"] != "complete"
 
 
-@pytest.mark.parametrize("invented_motivation", [False, True])
-def test_cover_letter_uses_facts_only_and_rejects_unsupported_motivation(workspace, monkeypatch, invented_motivation):
+def test_cover_letter_uses_selected_facts_without_unneeded_model(workspace, monkeypatch):
     _app, client = workspace
     fact = client.post(
         "/api/facts",
@@ -238,17 +243,9 @@ def test_cover_letter_uses_facts_only_and_rejects_unsupported_motivation(workspa
     client.patch("/api/settings", json={"text_provider": "ollama", "text_model": "fixture"})
 
     def handler(request):
-        body = json.loads(request.content)
-        candidate_context = json.loads(body["messages"][1]["content"])
-        assert "description" not in candidate_context["job"]
-        assert "Kubernetes" not in request.content.decode()
-        assert "cover letter" not in candidate_context["question"].lower()
-        result = {
-            "answer": "I built a Python CSV validator." + (" I am excited to join." if invented_motivation else ""),
-            "facts_used": [fact["id"]],
-            "confidence": 1,
-        }
-        return httpx.Response(200, json={"choices": [{"message": {"content": json.dumps(result)}}]})
+        if request.method == 'GET':
+            return httpx.Response(404)
+        raise AssertionError('Selected factual cover letter composition does not call a model')
 
     actual_client = httpx.AsyncClient
     monkeypatch.setattr(
@@ -260,12 +257,10 @@ def test_cover_letter_uses_facts_only_and_rejects_unsupported_motivation(workspa
         "/api/ai/draft",
         json={"job_id": job["id"], "question": "Write a cover letter", "fact_ids": [fact["id"], name["id"]]},
     )
-    if invented_motivation:
-        assert response.status_code == 400
-        assert "rejected" in response.json()["detail"]
-    else:
-        assert response.status_code == 200, response.text
-        assert response.json()["answer"].startswith("Dear hiring team,")
-        assert response.json()["answer"].endswith("Sample Candidate")
-        assert response.json()["facts_used"] == [fact["id"], name["id"]]
-        assert response.json()["requires_review"] is True
+    assert response.status_code == 200, response.text
+    assert response.json()['answer'].startswith('Dear hiring team,')
+    assert response.json()['answer'].endswith('Sample Candidate')
+    assert set(response.json()['facts_used']) == {fact['id'], name['id']}
+    assert response.json()['requires_review'] is True
+    assert 'Kubernetes' not in response.json()['answer']
+    assert 'passionate' not in response.json()['answer']

@@ -34,10 +34,6 @@ def review_observed_facts(snapshot, adapter, intelligence, job):
         if condition and condition['applies'] is not True:
             continue
         field = {**resolution_element(element, elements), '_condition': condition or {}}
-        if element.get('role') == 'combobox' and element.get('selected_text') and not field.get('options'):
-            # The observed selected label is an enum contract to verify, not
-            # evidence that it is true. The candidate facts must still entail it.
-            field['options'] = [{'label': element['selected_text'], 'value': element['selected_text']}]
         expected = intelligence.answer_question(question, field, job)
         if expected.get('root_cause') in {'ASYNC_GENERATION_REQUIRED', 'LLM_SETUP_REQUIRED'}:
             # Professional experience explanations receive their independent

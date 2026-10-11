@@ -40,7 +40,15 @@ def radio_group(element, elements):
 
 
 def resolution_element(element, elements):
-    """Present native radio choices to the same enum resolver used by selects."""
+    """Present observed choices to the same factual enum resolver used by selects."""
+    if (element.get('role') == 'combobox' and element.get('tag') != 'select'
+            and not element.get('expanded') and element.get('selected_text')
+            and not element.get('options')):
+        # Closed custom menus omit their options. An independently observed
+        # selected label is still a contract to verify against candidate facts,
+        # not evidence that the label is true. Never use editable search text.
+        label = element['selected_text']
+        return {**element, 'options': [{'label': label, 'value': label}]}
     if element.get("role") == "checkbox" and element.get("multiple"):
         return {**element, "options": [
             {"label": peer["label"], "value": peer.get("value") or peer["label"],

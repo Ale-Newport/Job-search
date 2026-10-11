@@ -1,6 +1,7 @@
 import pytest
 
 from jobagent.automation.adapters.base import ATSAdapter
+from jobagent.automation.consent import resolution_element
 from jobagent.db import Database
 from jobagent.intelligence.engine import CandidateEngine
 from jobagent.intelligence.form_consistency import review_observed_facts
@@ -10,7 +11,8 @@ from jobagent.intelligence.store import entity, ingest_fact
 @pytest.fixture
 def engine(tmp_path):
     db = Database(tmp_path / 'consistent.sqlite3')
-    records = [('person', 'Test Candidate', {'earliest_full_time_start_date': '2027-09', 'current_company': ''}),
+    records = [('person', 'Test Candidate', {'earliest_full_time_start_date': '2027-09', 'current_company': '',
+                                            'city': 'London', 'country': 'United Kingdom'}),
                ('education', 'School', {'institution': 'School', 'level': 'secondary', 'status': 'completed', 'end_date': '2023-06'}),
                ('education', 'University', {'institution': 'University', 'level': 'master', 'status': 'studying',
                                            'start_date': '2026-09', 'end_date': '2027-09', 'rank': 2}),
@@ -61,3 +63,28 @@ def test_observed_temporary_status_is_entailed_by_facts_not_by_the_selected_labe
     result = review_observed_facts({'elements': [field]}, ATSAdapter(), engine, {'country': 'United Kingdom'})
     assert result['passed'] is passed
     assert result['checked_fields'] == 1
+
+
+@pytest.mark.parametrize('selected,expanded,options', [
+    ('Observed selection', False, ['Observed selection']),
+    ('Observed selection', True, []),
+    ('', False, []),
+])
+def test_only_closed_observed_selection_supplies_missing_enum_contract(selected, expanded, options):
+    field = {'role': 'combobox', 'tag': 'input', 'selected_text': selected,
+             'value': 'Unverified search text', 'expanded': expanded, 'options': []}
+    resolved = resolution_element(field, [field])
+    assert [option['label'] for option in resolved['options']] == options
+    assert field['options'] == []
+
+
+@pytest.mark.parametrize('label,expected', [
+    ('London, England, United Kingdom', 'London, England, United Kingdom'),
+    ('London, Ontario, Canada', None),
+])
+def test_closed_geocoder_contract_keeps_verified_country_disambiguation(engine, label, expected):
+    field = {'role': 'combobox', 'tag': 'input', 'selected_text': label,
+             'value': '', 'expanded': False, 'options': []}
+    resolved = engine.answer_question('Location (City)', resolution_element(field, [field]), {})
+    assert resolved['answer'] == expected
+    assert resolved['root_cause'] == (None if expected else 'BAD_ENUM_MAPPING')

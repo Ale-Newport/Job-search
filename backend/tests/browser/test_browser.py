@@ -307,21 +307,29 @@ async def test_dynamic_work_status_re_evaluates_facts_after_observing_menu(brows
     for key, value in {'country': 'United Kingdom', 'route': 'Student', 'current_right_to_work': True}.items():
         ingest_fact(db, eid, key, value, value_type='boolean' if isinstance(value, bool) else 'text',
                     verified=True, source='Independent evidence', evidence={})
+    ingest_fact(db, entity(db, 'person', 'Synthetic candidate'), 'email', 'alex@example.test',
+                verified=True, source='Independent evidence', evidence={})
     await browser.open(fixture_server + '/generic.html')
     await browser.page.evaluate("""() => {
-      const form=document.querySelector('form');form.innerHTML='';window.searches=0;
+      const form=document.querySelector('form');form.innerHTML='';window.searches=0;window.selections=0;
+      const control=document.createElement('div');control.className='select__control';form.append(control);
       const widget=document.createElement('input');widget.name='work-status';
       widget.setAttribute('role','combobox');widget.setAttribute('aria-label','Right to Work status');
-      widget.setAttribute('aria-expanded','false');widget.required=true;form.append(widget);
+      widget.setAttribute('aria-expanded','false');widget.setAttribute('aria-required','true');control.append(widget);
       const labels=['I have a visa which gives me the permanent right to work',
                     'I have a visa which gives me temporary right to work'];
       function open(){widget.setAttribute('aria-expanded','true');
         document.querySelectorAll('[role=option]').forEach(o=>o.remove());
         for(const label of labels){if(widget.value && !label.includes(widget.value))continue;
           const option=document.createElement('div');option.setAttribute('role','option');option.textContent=label;
-          form.append(option);option.onclick=()=>{widget.value=label;widget.setAttribute('aria-expanded','false');
+          form.append(option);option.onclick=()=>{window.selections++;widget.value='';
+            control.querySelector('.select__single-value')?.remove();
+            const selected=document.createElement('div');selected.className='select__single-value';
+            selected.textContent=label;control.prepend(selected);widget.setAttribute('aria-expanded','false');
             document.querySelectorAll('[role=option]').forEach(o=>o.remove())};}}
       widget.onclick=open;widget.oninput=()=>{window.searches++;open()};
+      const email=document.createElement('input');email.name='email';email.type='email';
+      email.setAttribute('aria-label','Email');email.required=true;form.append(email);
       const submit=document.createElement('button');submit.type='submit';submit.textContent='Submit';form.append(submit);
     }""")
     browser._active_application_id = 'work-status'
@@ -330,6 +338,8 @@ async def test_dynamic_work_status_re_evaluates_facts_after_observing_menu(brows
     assert any(a['answer'] == 'I have a visa which gives me temporary right to work' for a in result['answers']), result
     assert result['consistency_review']['passed'], result
     assert await browser.page.evaluate('window.searches') == 0
+    assert await browser.page.evaluate('window.selections') == 1
+    assert await browser.page.locator('[name=email]').input_value() == 'alex@example.test'
     assert await browser.page.evaluate('window.submissions') == 0
 
 

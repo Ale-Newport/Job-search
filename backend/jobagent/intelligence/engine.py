@@ -361,7 +361,7 @@ class CandidateEngine:
                     confidence = "POLICY"
             else:
                 answer = person(s["attribute"])
-            if answer and s["attribute"] == "city" and field.get("role") == "combobox" and not field.get("options"):
+            if answer and s["attribute"] == "city" and field.get("role") == "combobox":
                 country = person("country")
                 if country:
                     answer = f"{answer}, {country}"

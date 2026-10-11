@@ -99,6 +99,9 @@ async def test_failed_connection_keeps_a_report_without_claiming_genuine_calls(t
     source.execute("INSERT INTO jobs(id,title,company,location,url,canonical_url,identity_key,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?)",
                    ("sample", "Software Engineer, New Grad", "Palantir", "London", "https://example.invalid/job",
                     "https://example.invalid/job", "sample", now(), now()))
+    source.execute("INSERT INTO jobs(id,title,company,location,url,canonical_url,identity_key,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?)",
+                   ("newer-vacancy", "Software Engineer, New Grad", "Palantir", "London", "https://example.invalid/other",
+                    "https://example.invalid/other", "newer-vacancy", "2030-01-01", "2030-01-01"))
 
     async def unavailable(url):
         return None
@@ -113,10 +116,11 @@ async def test_failed_connection_keeps_a_report_without_claiming_genuine_calls(t
     monkeypatch.setattr(answers, "CompanyResearch", lambda path: SimpleNamespace(source=unavailable))
     monkeypatch.setattr(answers, "SecretStore", lambda: None)
     monkeypatch.setattr(answers, "ApplicationAnswerLLM", FailedProbe)
-    args = SimpleNamespace(database=source.path, output=tmp_path / "report", allow_remote=False, usage_database=None)
+    args = SimpleNamespace(database=source.path, output=tmp_path / "report", job="sample", allow_remote=False, usage_database=None)
     with pytest.raises(ValueError, match="Credential access unavailable"):
         await answers.run(args)
     report = json.loads((args.output / "real-llm-regression.json").read_text())
     assert report["genuine_provider_calls"] is False
+    assert report["job"]["id"] == "sample"
     assert report["answers"] == [] and report["no_form_fill_or_submission"] is True
     assert report["connection_error"]["error"] == "Credential access unavailable"

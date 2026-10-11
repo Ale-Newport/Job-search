@@ -92,8 +92,7 @@ async def run(args):
     if not local and not args.usage_database:
         raise ValueError('Remote calibration requires --usage-database pointing at the shared live database so QA copies cannot reset aggregate spending')
     llm = ApplicationAnswerLLM(db, SecretStore(), usage_db=usage_db)
-    jobs = db.query("SELECT * FROM jobs WHERE company LIKE '%Palantir%' AND title LIKE '%Software Engineer%' ORDER BY created_at DESC")
-    job = next((j for j in jobs if 'new grad' in j['title'].lower() and 'london' in j['location'].lower()), jobs[0] if jobs else None)
+    job = db.one('SELECT * FROM jobs WHERE id=?', (args.job,))
     if not job:
         raise ValueError('The calibration database does not contain the exact target job')
     job = dict(job)
@@ -110,6 +109,7 @@ async def run(args):
     job['company_context'] = [source for source in sources if source]
     report_path = output / 'real-llm-regression.json'
     report = {'genuine_provider_calls': False, 'provider': settings['text_provider'], 'model': settings['text_model'],
+              'job': {key: job.get(key) for key in ('id', 'title', 'company', 'location', 'url', 'application_url')},
               'usage_ledger': str(Path(args.usage_database).resolve()) if args.usage_database else str(output / 'llm-calibration.sqlite3'),
               'usage_before': calibration_usage(usage_db),
               'research_sources': [s['url'] for s in job['company_context']], 'unavailable_research': [url for url, s in zip(urls, sources) if not s],
@@ -157,6 +157,7 @@ def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--database', required=True)
     parser.add_argument('--output', required=True)
+    parser.add_argument('--job', required=True, help='Exact stored target job ID; matching titles never substitute another vacancy')
     parser.add_argument('--allow-remote', action='store_true')
     parser.add_argument('--usage-database', help='Existing live database whose nonsecret provider settings and shared monthly usage ledger are used')
     asyncio.run(run(parser.parse_args(argv)))

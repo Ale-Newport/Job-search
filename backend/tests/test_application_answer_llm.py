@@ -786,6 +786,23 @@ async def test_length_regeneration_uses_actual_count_and_keeps_schema_metadata_s
     assert calls[1]['previous_draft']['answer'] == calls[0]['verified_facts'][0]['value']
 
 
+async def test_length_regeneration_shortens_overlong_prose_using_observed_count(db, evidence):
+    calls = []
+    def handler(request):
+        payload = request_payload(request)
+        calls.append(payload)
+        sentence = next(f['value'] for f in payload['verified_facts'] if f['id'] == evidence)
+        generated = complete(payload, answer=' '.join([sentence] * (22 if len(calls) == 1 else 18)), fid=evidence)
+        generated['word_count'] = 200  # Self-reported length must not override prose.
+        return response_for(request, generated)
+    llm = ApplicationAnswerLLM(db, None, transport=httpx.MockTransport(handler))
+    answer = await llm.generate(settings() | {'text_quality_review': False}, 'Describe your project. (Approx. 200 words)', {}, question_id='long')
+    assert len(calls) == 2 and answer['word_count'] == 198
+    assert '242 whitespace-separated words' in calls[1]['length_revision']
+    assert 'Shorten' in calls[1]['length_revision'] and 'do not expand or truncate' in calls[1]['length_revision']
+    assert calls[1]['question_id'] == 'long' and calls[1]['output_requirements']['max_words'] == 220
+
+
 @pytest.mark.parametrize('question,expected', [
     ('Explain this in approximately 200 words', {'min_words': 180, 'max_words': 220}),
     ('Under 150 words', {'max_words': 149}),

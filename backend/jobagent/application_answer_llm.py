@@ -27,7 +27,7 @@ from .intelligence.professional_context import (contains_private_candidate_data,
 from .usage import Reservation
 
 logger = logging.getLogger('meridian.answers')
-PROMPT_VERSION = 'application-answer-v8'
+PROMPT_VERSION = 'application-answer-v9'
 PROVIDERS = {
     'openai': 'https://api.openai.com/v1',
     'anthropic': 'https://api.anthropic.com/v1',
@@ -201,6 +201,7 @@ Do not invent a named company or its products. Prefer a type of employer when no
 Keep unsupported metrics, technologies, employers, awards, outcomes, visa claims and autobiographical detail out.
 For technical stories compare the available evidence and choose a concrete problem with strongest support;
 never invent a bug, tradeoff, personal responsibility or lesson absent from evidence. No generic fallback.
+Sole authorship does not establish personal testing or validation methods. Do not add those by inference.
 Prefer an example with verified implementation, architecture and contribution facts over a broad one-line
 story. Explain the documented engineering problem and implementation in enough detail to answer the question.
 The technical_evidence_index highlights recorded design tradeoffs and implementation, ordered by explicit

@@ -151,3 +151,14 @@ def test_named_project_and_hyphenated_pathfinding_keep_actual_implementation_sup
     assert generated['claims'][0]['fact_ids'] == ['author', 'code']
     assert not AnswerEvidenceValidator().validate(generated, facts, 'q', 'CHALLENGE', {})
     assert content_words('maze-generation and pathfinding') == content_words('maze generation and search')
+
+
+@pytest.mark.parametrize('tail', [
+    'I was the sole author, so I had to design the architecture and verify the behavior of each algorithm myself.',
+    'Coordinating these different traversal strategies in one interface required careful handling of state updates and animation timing.',
+])
+def test_authorship_and_animation_controls_do_not_prove_personal_validation_methods(tail):
+    fact = {'id': 'p', 'entity': 'Labyrinth', 'category': 'project',
+            'value': 'Sole author. Canvas search animation supports speed control, pause, single stepping and visited/frontier overlays.'}
+    issues = prose_claim_issues('I built Labyrinth. ' + tail, {'p': fact}, ['p'])
+    assert any('undocumented historical method' in issue for issue in issues)

@@ -313,9 +313,11 @@ def prose_claim_issues(answer, known, used):
         # Inspect factual methods in the prose even if the model omitted them
         # from its claims index. Subjective future preferences are excluded.
         historical_method = re.search(
-            r"\b(?:I|we)\s+(?:(?:had|needed) to\s+)?(?:built|developed|implemented|used|trained|"
-            r"iterated|adjusted|augmented|optimized|tested|validated|integrated|designed|created|deployed)\b|"
-            r"\b(?:This(?: (?:project|system|pipeline|challenge))?|It|The (?:project|system|pipeline|challenge))\s+(?:required|taught|reinforced)\b",
+            r"\b(?:I|we)\s+(?:(?:had|needed) to\s+)?(?:built|build|develop(?:ed)?|implement(?:ed)?|used|use|train(?:ed)?|"
+            r"iterat(?:ed|e)|adjust(?:ed)?|augment(?:ed)?|optimiz(?:ed|e)|test(?:ed)?|validat(?:ed|e)|integrat(?:ed|e)|"
+            r"design(?:ed)?|creat(?:ed|e)|deploy(?:ed)?|verif(?:ied|y))\b|"
+            r"\b(?:This(?: (?:project|system|pipeline|challenge))?|It|The (?:project|system|pipeline|challenge))\s+(?:required|taught|reinforced)\b|"
+            r"\brequired\s+(?:careful|handling|testing|validation|verification|me to|us to)\b",
             sentence, re.I)
         # Check the performed action separately from a relative reflection.
         # Other incident/guarantee checks still inspect the entire sentence.

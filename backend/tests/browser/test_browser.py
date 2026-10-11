@@ -298,6 +298,41 @@ async def test_editable_dropdown_reads_equivalent_visible_label_before_filtering
     assert await browser.page.evaluate('window.submissions')==0
 
 
+async def test_dynamic_work_status_re_evaluates_facts_after_observing_menu(browser, fixture_server, tmp_path):
+    from jobagent.db import Database
+    from jobagent.intelligence.engine import CandidateEngine
+    from jobagent.intelligence.store import entity, ingest_fact
+    db = Database(tmp_path / 'status.sqlite3')
+    eid = entity(db, 'immigration', 'Confirmed synthetic UK Student route')
+    for key, value in {'country': 'United Kingdom', 'route': 'Student', 'current_right_to_work': True}.items():
+        ingest_fact(db, eid, key, value, value_type='boolean' if isinstance(value, bool) else 'text',
+                    verified=True, source='Independent evidence', evidence={})
+    await browser.open(fixture_server + '/generic.html')
+    await browser.page.evaluate("""() => {
+      const form=document.querySelector('form');form.innerHTML='';window.searches=0;
+      const widget=document.createElement('input');widget.name='work-status';
+      widget.setAttribute('role','combobox');widget.setAttribute('aria-label','Right to Work status');
+      widget.setAttribute('aria-expanded','false');widget.required=true;form.append(widget);
+      const labels=['I have a visa which gives me the permanent right to work',
+                    'I have a visa which gives me temporary right to work'];
+      function open(){widget.setAttribute('aria-expanded','true');
+        document.querySelectorAll('[role=option]').forEach(o=>o.remove());
+        for(const label of labels){if(widget.value && !label.includes(widget.value))continue;
+          const option=document.createElement('div');option.setAttribute('role','option');option.textContent=label;
+          form.append(option);option.onclick=()=>{widget.value=label;widget.setAttribute('aria-expanded','false');
+            document.querySelectorAll('[role=option]').forEach(o=>o.remove())};}}
+      widget.onclick=open;widget.oninput=()=>{window.searches++;open()};
+      const submit=document.createElement('button');submit.type='submit';submit.textContent='Submit';form.append(submit);
+    }""")
+    browser._active_application_id = 'work-status'
+    result = await browser.fill_application({'id': 'work-status', 'url': fixture_server + '/generic.html'},
+        [], [], 'REVIEW', {'_candidate_engine': CandidateEngine(db), '_job_context': {'country': 'United Kingdom'}})
+    assert any(a['answer'] == 'I have a visa which gives me temporary right to work' for a in result['answers']), result
+    assert result['consistency_review']['passed'], result
+    assert await browser.page.evaluate('window.searches') == 0
+    assert await browser.page.evaluate('window.submissions') == 0
+
+
 async def test_laya_failure_in_ambiguous_navigation_requires_human(browser, fixture_server, candidate):
     class OfflineEngine:
         async def decide(self, snapshot, goal):

@@ -331,6 +331,17 @@ class BrowserManager(BrowserSession):
                             (not current.get('listbox_ids') or e.get('listbox_id') in current['listbox_ids'])]
                         visible_choice = enum_choice(resolution['answer'], visible_options,
                             question=resolution['question'], disclosure_concept=resolution.get('disclosure_concept'))
+                        if visible_options and not visible_choice and settings.get('_candidate_engine'):
+                            from ..intelligence.engine import NARRATIVE_INTENTS
+                            if resolution.get('canonical_intent') not in NARRATIVE_INTENTS | {'OTHER', None}:
+                                # Dynamic widgets expose their actual answer
+                                # contract only after opening. Re-evaluate
+                                # facts before filtering away those choices.
+                                refined = await resolve({**current, 'options': visible_options})
+                                if refined.get('answer') is not None and not refined.get('leave_blank'):
+                                    resolution = pending_dropdown['resolution'] = refined
+                                    visible_choice = enum_choice(resolution['answer'], visible_options,
+                                        question=resolution['question'], disclosure_concept=resolution.get('disclosure_concept'))
                         search = current if 'TYPE_TEXT' in current['operations'] else next((e for e in snapshot['elements']
                             if e['document_id'] == current['document_id'] and e['node_id'] == current.get('dropdown_search_id')
                             and 'TYPE_TEXT' in e['operations']), None)

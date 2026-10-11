@@ -47,3 +47,17 @@ def test_experience_narrative_is_not_mistaken_for_a_current_employer_fact(engine
              'operations': ['TYPE_TEXT'], 'value': 'A separately validated professional narrative.'}
     result = review_observed_facts({'elements': [field]}, ATSAdapter(), engine, {})
     assert result == {'passed': True, 'issues': [], 'checked_fields': 0}
+
+
+@pytest.mark.parametrize('suffix,passed', [('', True), (' without restrictions', False), (' for full-time work', False)])
+def test_observed_temporary_status_is_entailed_by_facts_not_by_the_selected_label(engine, suffix, passed):
+    eid = entity(engine.db, 'immigration', 'UK')
+    ingest_fact(engine.db, eid, 'route', 'Student', verified=True, source='Confirmed synthetic route', evidence={})
+    engine = CandidateEngine(engine.db)
+    label = 'I have a visa which gives me temporary right to work' + suffix
+    field = {'document_id': 'd', 'node_id': 1, 'form_id': 'f', 'role': 'combobox', 'tag': 'input',
+             'type': 'text', 'label': 'Please confirm your Right to Work status', 'operations': ['CLICK', 'TYPE_TEXT'],
+             'selected_text': label, 'value': label, 'options': []}
+    result = review_observed_facts({'elements': [field]}, ATSAdapter(), engine, {'country': 'United Kingdom'})
+    assert result['passed'] is passed
+    assert result['checked_fields'] == 1

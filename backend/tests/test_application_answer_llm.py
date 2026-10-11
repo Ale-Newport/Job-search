@@ -862,7 +862,9 @@ async def test_length_regeneration_shortens_overlong_prose_using_observed_count(
         payload = request_payload(request)
         calls.append(payload)
         sentence = next(f['value'] for f in payload['verified_facts'] if f['id'] == evidence)
-        generated = complete(payload, answer=' '.join([sentence] * (22 if len(calls) == 1 else 18)), fid=evidence)
+        system = json.loads(request.content)['messages'][0]['content']
+        corrected = '242 whitespace-separated words' in system and 'Shorten' in system
+        generated = complete(payload, answer=' '.join([sentence] * (18 if corrected else 22)), fid=evidence)
         generated['word_count'] = 200  # Self-reported length must not override prose.
         return response_for(request, generated)
     llm = ApplicationAnswerLLM(db, None, transport=httpx.MockTransport(handler))

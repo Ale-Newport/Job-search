@@ -26,7 +26,7 @@ from .intelligence.professional_context import (contains_private_candidate_data,
 from .usage import Reservation
 
 logger = logging.getLogger('meridian.answers')
-PROMPT_VERSION = 'application-answer-v4'
+PROMPT_VERSION = 'application-answer-v5'
 PROVIDERS = {
     'openai': 'https://api.openai.com/v1',
     'anthropic': 'https://api.anthropic.com/v1',
@@ -687,9 +687,12 @@ class ApplicationAnswerLLM:
                     request = json.loads(context.payload_json)
                     if feedback:
                         request['revision_requirements'] = feedback
-                        if any('not reflected in' in issue or 'not present in the actual answer' in issue for issue in feedback):
+                        if any('not reflected in' in issue or 'not present in the actual answer' in issue
+                               or 'claim contains detail absent from cited evidence' in issue for issue in feedback):
                             request['claim_alignment_revision'] = ('Reconstruct claims and company_claims only after writing the final answer. '
                                 'Copy its supported factual clauses verbatim, cite only their supporting sources, and delete unused source inventories. '
+                                'Exclude subjective alignment and future aspirations from historical claims. An explicit statement of candidate interests '
+                                'must cite the interest fact itself, not infer a factual claim from a project citation. '
                                 'Do not expand the answer to include details from unused metadata.')
                         if any('implementation guarantee' in issue or 'undocumented causal method' in issue for issue in feedback):
                             request['mechanism_revision'] = ('Describe only the documented components and how they interact. '
@@ -721,8 +724,13 @@ class ApplicationAnswerLLM:
                             f'{output_requirements["max_words"]}-word maximum. Count the actual answer text before returning word_count; '
                             'metadata is not part of the answer length. Develop relevant supported reasoning within this budget without inventing history.')
                         if target >= 120:
-                            paragraphs = max(3, round(prompt_target / 50))
+                            paragraphs = max(2, round(prompt_target / 65))
                             generation_system += f' Plan approximately {paragraphs} short paragraphs of {round(prompt_target / paragraphs)} words each. Both the minimum and maximum apply to the actual prose; do not add filler or unverifiable achievements.'
+                    # Derived correction instructions belong in the system
+                    # message, not solely among a large catalogue of source data.
+                    for revision_key in ('length_revision', 'claim_alignment_revision', 'mechanism_revision'):
+                        if request.get(revision_key):
+                            generation_system += '\nRequired correction for this revision: ' + request[revision_key]
                     call_settings = dict(settings)
                     if attempt and settings.get('text_fallback_model'):
                         call_settings['text_model'] = settings['text_fallback_model']

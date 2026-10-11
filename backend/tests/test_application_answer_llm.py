@@ -249,7 +249,7 @@ async def test_complete_professional_context_is_forwarded_to_generation_and_revi
     professional_ids = set()
     for index in range(50):
         area = entity(db, 'skill', f'Specialist area {index}')
-        professional_ids.add(ingest_fact(db, area, 'name', f'Compiler engineering topic {index}',
+        professional_ids.add(ingest_fact(db, area, 'name', f'Compiler engineering topic {index}. ' + 'Parser and compiler implementation details. ' * 40,
                                        source='user', evidence={}, verified=True))
     person = entity(db, 'person', 'Alex Example')
     ingest_fact(db, person, 'full_name', 'Alex Example', source='user', evidence={}, verified=True, sensitivity='personal')
@@ -278,12 +278,38 @@ async def test_complete_professional_context_is_forwarded_to_generation_and_revi
         assert payload['context_mode'] == ('complete_professional' if full_profile else 'question_retrieval')
         if full_profile:
             assert professional_ids <= sent and len(sent) > 32
+            assert len(json.dumps(payload, ensure_ascii=False).encode()) > 65000
             assert payload['uploaded_resume']['id'] == 'cv-version'
             assert 'Stockfish' in payload['uploaded_resume']['text']
         else:
             assert len(sent) <= 32 and payload['uploaded_resume'] is None
         serialized = json.dumps(payload)
         assert all(value not in serialized for value in ('Alex Example', 'private-cv@example', '7700'))
+
+
+@pytest.mark.parametrize('full_profile, padding_size, permitted', [(False, 70000, False), (True, 70000, True), (True, 1048576, False)])
+async def test_full_profile_transport_limit_retains_bounded_preflight_before_credentials(db, evidence, full_profile, padding_size, permitted):
+    db.execute('INSERT INTO integrations(id,provider,config,status) VALUES(?,?,?,?)',
+               (uid(), 'openai-compatible', json.dumps(model_prices()), 'configured'))
+    calls = []
+    class CountingKeys(Keys):
+        def get(self, name):
+            calls.append('credential')
+            return super().get(name)
+    def handler(request):
+        calls.append('transport')
+        return response_for(request, complete(request_payload(request), fid=evidence))
+    payload = {'question_id': 'full-context-boundary', 'intent': 'PROJECT', 'padding': 'x' * padding_size,
+               'verified_facts': [{'id': evidence, 'value': 'I built a chess computer vision system using Python and Stockfish.'}]}
+    llm = ApplicationAnswerLLM(db, CountingKeys(), transport=httpx.MockTransport(handler))
+    configured = settings('openai-compatible') | {'text_full_professional_context': full_profile}
+    if permitted:
+        generated, _usage = await llm._request(configured, 'Return a supported project answer.', payload, ANSWER_SCHEMA)
+        assert generated['answer'] and calls == ['credential', 'transport']
+    else:
+        with pytest.raises(ConfigurationError, match='Question context exceeds'):
+            await llm._request(configured, 'Return a supported project answer.', payload, ANSWER_SCHEMA)
+        assert calls == []
 
 
 async def test_no_provider_never_returns_generic_narrative(db, evidence):

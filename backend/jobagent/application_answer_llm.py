@@ -418,14 +418,17 @@ class ApplicationAnswerLLM:
             raise ConfigurationError('Select an available application answer model and test the connection')
         if not re.fullmatch(r'[A-Za-z0-9_./:@+-]{1,200}', model):
             raise ConfigurationError('Invalid LLM model identifier')
-        key = await self._key(provider, local)
         timeout = float(settings.get('text_timeout_seconds', 90))
         retries = int(settings.get('text_retry_attempts', 2))
         maximum = int(settings.get('text_max_output_tokens', 2200))
         temperature = float(settings.get('text_temperature', .2))
         content = json.dumps(payload, ensure_ascii=False)
-        if len(content.encode()) > 65000:
-            raise ConfigurationError('Question context exceeds 65 KB; select less evidence without truncating the question')
+        complete_profile = settings.get('text_full_professional_context') is True
+        maximum_context = 1048576 if complete_profile else 65000
+        if len(content.encode()) > maximum_context:
+            limit = '1 MiB for complete professional context' if complete_profile else '65 KB'
+            raise ConfigurationError(f'Question context exceeds {limit}; select less evidence without truncating the question')
+        key = await self._key(provider, local)
         headers = self._headers(provider, key)
         if provider == 'openai':
             url = base + '/responses'

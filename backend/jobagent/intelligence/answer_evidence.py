@@ -227,6 +227,112 @@ SUBSTANTIVE_SOURCE_ALIASES = {
     'architecture_ownership': r'\bwhole system\b|\bfull pipeline\b|\bsole author\b',
 }
 
+# Claims supplied by the generator are an index, not a complete description of
+# its prose. Check consequential historical assertions in the answer itself.
+INCIDENT_DETAILS = {
+    'race_condition': r'\brace conditions?\b|\bdata races?\b',
+    'deadlock': r'\bdeadlocks?\b',
+    'interleaving_failure': r'\b(?:specific|certain|particular) interleavings?\b',
+    'memory_leak': r'\bmemory leaks?\b',
+    'crash': r'\bcrash(?:ed|es|ing)?\b',
+    'outage': r'\boutages?\b',
+    'bug': r'\bbugs?\b|\bregressions?\b|misconfigur',
+}
+DIAGNOSTIC_ACTION = r'debug(?:ged|ging)?|diagnos(?:ed|ing)|trac(?:ed|ing)|investigat(?:ed|ing)|reproduc(?:ed|ing)'
+REPAIR_ACTION = r'fix(?:ed|ing)|resolv(?:ed|ing)|repair(?:ed|ing)|correct(?:ed|ing)'
+COMPLETED_ACTION = re.compile(r'\b(?:debugged|diagnosed|traced|investigated|reproduced|fixed|resolved|repaired|corrected)\b', re.I)
+PAST_IMPLEMENTATION = re.compile(r'\b(?:built|developed|implemented|processed|ensured|guaranteed|prevented|achieved|launched|delivered)\b', re.I)
+INCIDENT_OCCURRENCE = re.compile(r'\b(?:appeared|occurred|arose|happened|encountered|discovered|found|caused|failed|broke)\b', re.I)
+PAST_EVENT_ACTION = re.compile(
+    rf'\b(?:I|we)\s+(?:(?:had|needed) to|(?:was|were)|(?:ended up))\s+(?:\w+\s+){{0,3}}(?:debug|diagnose|trace|investigate|reproduce|fix|resolve|repair|correct)(?:\w*)\b|'
+    rf'\b(?:part|challenge|difficulty|task)\s+(?:was|involved)\s+(?:{DIAGNOSTIC_ACTION}|{REPAIR_ACTION})\b', re.I)
+PROSPECTIVE = re.compile(r'\b(?:I|we)\s+(?:would|will|could|might|plan to|hope to|want to)\b|\b(?:would|could|might)\s+(?:be|need|require|help|allow)\b', re.I)
+IMPLEMENTATION_GUARANTEES = {
+    'atomicity': r'\batomic(?:ally|ity)?\b|\ball[- ]or[- ]nothing\b',
+    'linearizability': r'\blinearizab(?:le|ility)\b',
+    'serializability': r'\bserializab(?:le|ility)\b',
+    'race_free': r'\brace[- ]free\b|\bwithout (?:any )?(?:data )?races?\b',
+    'corruption_prevention': r'\bwithout corrupting\b|\bprevent(?:ed|s|ing)? (?:data |shared[- ]state )?corruption\b',
+    'thread_safety': r'\b(?:ensur(?:e|ed|es|ing)|guarantee(?:d|s)?|made|kept)\b.{0,45}\bthread[- ]safe(?:ty)?\b|\b(?:is|was|were|are) thread[- ]safe\b',
+}
+GUARANTEE_SOURCE_ALIASES = {
+    'atomicity': r'\b(?:same lock|single lock|critical section)\b.{0,100}\b(?:orders?|matching)\b.{0,100}\bprice (?:updates?|ticks?)\b|'
+                 r'\b(?:orders?|matching)\b.{0,100}\bprice (?:updates?|ticks?)\b.{0,100}\b(?:same lock|single lock|critical section)\b',
+}
+
+
+def prospective_statement(sentence):
+    # A conditional does not erase an actual past incident: "I debugged a race
+    # that occurred if two threads..." remains a historical assertion.
+    return bool(PROSPECTIVE.search(sentence)) and not (COMPLETED_ACTION.search(sentence) or
+        PAST_EVENT_ACTION.search(sentence) or PAST_IMPLEMENTATION.search(sentence))
+
+
+def prose_claim_issues(answer, known, used):
+    """Check omitted incident, guarantee and causal claims against local evidence."""
+    issues = []
+    grouped = {}
+    names = {}
+    for identifier in used:
+        fact = known.get(identifier, {})
+        if fact.get('category') not in {'project', 'experience', 'education'}:
+            continue
+        entity = fact.get('entity_id') or fact.get('entity')
+        if entity:
+            grouped.setdefault(entity, []).append(fact)
+            names[entity] = re.sub(r'\W+', '', str(fact.get('entity', '')).casefold())
+    active = set(grouped) if len(grouped) == 1 else set()
+    for sentence in re.split(r'(?<!\d)[.!?](?:\s+|$)|\n+', answer):
+        if not sentence.strip():
+            continue
+        normalized = re.sub(r'\W+', '', sentence.casefold())
+        mentioned = {entity for entity, name in names.items() if name and name in normalized}
+        if mentioned:
+            active = mentioned
+        local_facts = [fact for entity in active for fact in grouped[entity]]
+        source = '\n'.join(str(fact['value']) for fact in local_facts)
+        if prospective_statement(sentence):
+            continue
+        details = {name: pattern for name, pattern in INCIDENT_DETAILS.items() if re.search(pattern, sentence, re.I)}
+        completed = bool(COMPLETED_ACTION.search(sentence) or PAST_EVENT_ACTION.search(sentence))
+        occurred = bool(details and INCIDENT_OCCURRENCE.search(sentence))
+        if completed or occurred:
+            # Components, ownership and generic discussion of concurrency do
+            # not establish an actual debugging episode or repair action.
+            incident_facts = [str(fact['value']) for fact in local_facts if not prospective_statement(str(fact['value'])) and (
+                COMPLETED_ACTION.search(str(fact['value'])) or PAST_EVENT_ACTION.search(str(fact['value'])) or
+                (any(re.search(pattern, str(fact['value']), re.I) for pattern in INCIDENT_DETAILS.values()) and
+                 (INCIDENT_OCCURRENCE.search(str(fact['value'])) or re.search(rf'\b(?:{DIAGNOSTIC_ACTION}|{REPAIR_ACTION})\b', str(fact['value']), re.I))))]
+            incident_source = '\n'.join(incident_facts)
+            if not incident_source:
+                issues.append('UNSUPPORTED_LLM_CLAIM: actual answer invents an undocumented debugging incident or personal repair action')
+            else:
+                for name, pattern in details.items():
+                    if not re.search(pattern, incident_source, re.I):
+                        issues.append('UNSUPPORTED_LLM_CLAIM: actual answer adds undocumented incident detail ' + name)
+                for action, pattern in [('diagnostic', r'debug(?:ged|ging)?|diagnos(?:ed|ing)|investigat(?:ed|ing)'),
+                                        ('tracing', r'trac(?:ed|ing)'), ('reproduction', r'reproduc(?:ed|ing)'),
+                                        ('repair', REPAIR_ACTION)]:
+                    if re.search(rf'\b(?:{pattern})\b', sentence, re.I) and not re.search(rf'\b(?:{pattern})\b', incident_source, re.I):
+                        issues.append('UNSUPPORTED_LLM_CLAIM: actual answer adds an undocumented personal ' + action + ' action')
+        for name, pattern in IMPLEMENTATION_GUARANTEES.items():
+            source_pattern = pattern + '|' + GUARANTEE_SOURCE_ALIASES[name] if name in GUARANTEE_SOURCE_ALIASES else pattern
+            if re.search(pattern, sentence, re.I) and not re.search(source_pattern, source, re.I):
+                issues.append('UNSUPPORTED_LLM_CLAIM: actual answer asserts an undocumented implementation guarantee ' + name)
+        distributive = re.search(r'\beach\b.{0,50}\b(?:thread|trader|worker|process|client|user)\b.{0,65}\b(?:its|their) own\b', sentence, re.I)
+        if distributive and not re.search(r'\beach\b.{0,50}\b(?:thread|trader|worker|process|client|user)\b.{0,65}\b(?:its|their) own\b|\bper[- ](?:thread|trader|worker|process|client|user)\b|\bone\b.{0,35}\bper (?:thread|trader|worker|process|client|user)\b', source, re.I):
+            issues.append('UNSUPPORTED_LLM_CLAIM: actual answer adds undocumented per-actor resource ownership')
+        method = re.search(r'\b[Bb]y\s+([^,;.!?]+)[,;]\s*', sentence)
+        if method and re.search(r'\b(?:launched|delivered|achieved|increased|reduced|improved|completed|finished|saved|enabled)\b', sentence[method.end():], re.I):
+            method_words = {'set' if word == 'sett' else word for word in content_words(method[1])} - {'clear', 'careful', 'carefully'}
+            source_words = {'set' if word == 'sett' else word for word in content_words(source)}
+            leadership = {'lead', 'coordinat', 'manag'}
+            if re.search(r'\b(?:lead|led|leading|coordinat\w*|manag\w*)\b', method[1], re.I) and re.search(r'\b(?:lead|led|leading|coordinat\w*|manag\w*)\b', source, re.I):
+                method_words -= leadership
+            if method_words - source_words:
+                issues.append('UNSUPPORTED_LLM_CLAIM: actual answer attributes an outcome to an undocumented causal method')
+    return issues
+
 
 def content_words(text):
     stop = set('i a an the my me we our to of in on at for as and or with that this it is was were had have has '
@@ -312,11 +418,13 @@ def reconcile_claim_evidence(generated, facts):
 
 
 def entailment_issues(answer, claims, known, used):
-    issues = []
+    issues = prose_claim_issues(answer, known, used)
     source = '\n'.join(str(known[x]['value']) for x in used if x in known)
+    historical_sentences = '\n'.join(sentence for sentence in re.split(r'(?<!\d)[.!?](?:\s+|$)', answer)
+                                     if not prospective_statement(sentence))
     for name, pattern in SUBSTANTIVE.items():
         source_pattern = pattern + '|' + SUBSTANTIVE_SOURCE_ALIASES[name] if name in SUBSTANTIVE_SOURCE_ALIASES else pattern
-        if re.search(pattern, answer, re.I) and not re.search(source_pattern, source, re.I):
+        if re.search(pattern, historical_sentences, re.I) and not re.search(source_pattern, source, re.I):
             issues.append('UNSUPPORTED_LLM_CLAIM: unsupported historical detail ' + name)
     for claim in claims if isinstance(claims, list) else []:
         if not isinstance(claim, dict):

@@ -333,6 +333,30 @@ def test_settings_rules_and_validation(client):
     assert client.patch("/api/settings", json={"custom": {"nested": [{"api_key": "never-store"}]}}).status_code == 422
 
 
+def test_full_professional_context_defaults_off_and_persists_boolean_choice(client, db):
+    key = "text_full_professional_context"
+    assert client.get("/api/settings").json()[key] is False
+    for value in (True, False):
+        response = client.patch("/api/settings", json={key: value})
+        assert response.status_code == 200
+        assert response.json()[key] is value
+        assert client.get("/api/settings").json()[key] is value
+        assert json.loads(db.one("SELECT value FROM settings WHERE key=?", (key,))["value"]) is value
+    db.execute("DELETE FROM settings WHERE key=?", (key,))
+    assert client.get("/api/settings").json()[key] is False
+
+
+@pytest.mark.parametrize("invalid", ["true", "false", 1, 0, None, [], {}])
+def test_full_professional_context_rejects_implicit_opt_in_atomically(client, invalid):
+    key = "text_full_professional_context"
+    assert client.patch("/api/settings", json={key: True}).status_code == 200
+    response = client.patch("/api/settings", json={"monthly_budget": 10, key: invalid})
+    assert response.status_code == 422
+    settings = client.get("/api/settings").json()
+    assert settings[key] is True
+    assert settings["monthly_budget"] == 0
+
+
 def test_selected_cv_replacement_preserves_history_and_blocks_after_submit(client, db, tmp_path):
     posting = job(db)
     first = import_document(db, tmp_path, b"First CV text", "first.txt")["version"]

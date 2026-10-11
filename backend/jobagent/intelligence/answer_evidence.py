@@ -82,7 +82,8 @@ class CandidateFactRetriever:
         self.db = db
         self.knowledge = knowledge or Knowledge(db)
 
-    def retrieve(self, question, intent, allowed_ids=None, limit=32, resume=None):
+    def retrieve(self, question, intent, allowed_ids=None, limit=32, resume=None, complete_profile=False):
+        """Rank eligible current facts, optionally returning the entire safe pool."""
         allowed = set(allowed_ids) if allowed_ids is not None else None
         candidates = []
         authoritative = {f['id'] for kind in {e['kind'] for e in self.knowledge.entities.values()}
@@ -91,7 +92,7 @@ class CandidateFactRetriever:
             if f['id'] not in authoritative or f.get('sensitivity') not in ('professional', 'public', None):
                 continue
             entity = self.knowledge.entities[f['entity_id']]
-            if entity['kind'] not in {'person', 'project', 'experience', 'education', 'skill'}:
+            if entity['kind'] not in {'person', 'project', 'experience', 'education', 'skill', 'language'}:
                 continue
             if entity['kind'] == 'person' and f['concept'] in PRIVATE_CONCEPTS:
                 continue
@@ -101,7 +102,11 @@ class CandidateFactRetriever:
         for f in self.db.query("SELECT * FROM facts WHERE category!='knowledge' AND (verification_status='verified' OR locked=1)"):
             if f['verification_status'] != 'verified':
                 continue
-            if f['category'] in {'contact', 'identity', 'demographic', 'sensitive', 'legal', 'work_authorization', 'salary'}:
+            if f['category'] in {'contact', 'identity', 'personal', 'demographic', 'sensitive', 'legal', 'work_authorization', 'salary'}:
+                continue
+            if f['category'] == 'language' and self.knowledge.records('language'):
+                # A current structured language profile supersedes the old CV
+                # language list, including languages removed by user correction.
                 continue
             if f['category'] == 'application_answer' or (f['category'] == 'application_profile' and f['key'] not in {
                 'preferred_roles', 'professional_interests', 'career_preferences', 'career_goals', 'engineering_preferences',
@@ -129,7 +134,10 @@ class CandidateFactRetriever:
                 {key: fact.get(key) for key in ('value', 'key', 'entity', 'source')}
             ):
                 continue
-            text = json.dumps(fact, ensure_ascii=False).casefold()
+            # Rank professional content, not opaque IDs or metadata names such
+            # as "revision", which accidentally matches the "vision" theme.
+            text = json.dumps({key: fact.get(key) for key in ('key', 'value', 'entity', 'category')},
+                              ensure_ascii=False).casefold()
             overlap = len(question_tokens & set(TOKENS.findall(text)))
             score = overlap * 3 + len(re.findall(theme, text, re.I))
             if fact['key'] in {'story', 'challenge', 'approach', 'outcome', 'achievement'}:
@@ -142,9 +150,14 @@ class CandidateFactRetriever:
                 score += 8
             if intent == 'NOT_ON_RESUME' and resume and fact.get('entity'):
                 score += -50 if fact['entity'].casefold() in resume['text'].casefold() else 16
-            if score > 0 or fact['category'] in {'experience', 'project'}:
+            if complete_profile or score > 0 or fact['category'] in {'experience', 'project'}:
                 ranked.append((score, fact))
         ranked.sort(key=lambda item: (-item[0], item[1]['id']))
+        if complete_profile:
+            complete = [fact for _, fact in ranked]
+            if len(json.dumps(complete, ensure_ascii=False)) > 250000:
+                raise ValueError('Complete professional profile context exceeds 250000 characters; select explicit allowed_ids to narrow the evidence. No facts were silently truncated.')
+            return complete
         # Keep an example's implementation and contribution together. Selecting
         # one fact from dozens of skill entities loses the evidence needed for a
         # concrete story, even when those details are available in the profile.
@@ -378,6 +391,21 @@ def numeric_claims(text):
     return values
 
 
+def factual_numeric_claims(text, cited_facts):
+    """An exact cited entity label is identity, not an outcome metric.
+
+    Versions outside that exact label, or additional numbers elsewhere in the
+    prose, still require value-level evidence from the cited facts.
+    """
+    text = str(text)
+    for fact in cited_facts:
+        name = fact.get('entity')
+        if isinstance(name, str) and numeric_claims(name):
+            pattern = r'(?<![A-Za-z0-9])' + re.escape(name) + r'(?![A-Za-z0-9]|\.[0-9]|[-+][A-Za-z0-9])'
+            text = re.sub(pattern, ' ', text, flags=re.I)
+    return numeric_claims(text)
+
+
 def reconcile_claim_evidence(generated, facts):
     """Restore omitted citations only from the same supplied verified entity.
 
@@ -395,10 +423,11 @@ def reconcile_claim_evidence(generated, facts):
         if None in entity_keys or len(entity_keys) != 1:
             continue
         claim_terms = content_words(claim.get('text', ''))
-        claim_numbers = numeric_claims(claim.get('text', ''))
+        claim_numbers = factual_numeric_claims(claim.get('text', ''), [known[identifier] for identifier in identifiers])
         for _ in range(3):
             cited = '\n'.join(str(known[identifier]['value']) for identifier in identifiers)
-            missing_terms, missing_numbers = claim_terms - content_words(cited), claim_numbers - numeric_claims(cited)
+            missing_terms = claim_terms - content_words(cited)
+            missing_numbers = claim_numbers - factual_numeric_claims(cited, [known[identifier] for identifier in identifiers])
             candidates = []
             for fact in facts:
                 if fact['id'] in identifiers or (fact.get('entity_id') or fact.get('entity')) not in entity_keys:
@@ -486,7 +515,8 @@ class AnswerEvidenceValidator:
             elif len(selections) != len(set(selections)) or len(selections) < output_requirements.get('min_selections', 1) or len(selections) > output_requirements.get('max_selections', len(labels)):
                 issues.append('INSTRUCTION_COMPLIANCE: wrong number of selected options')
         source = '\n'.join(str(known[x]['value']) for x in used).casefold()
-        for number, unit in numeric_claims(answer) - numeric_claims(source):
+        cited_facts = [known[x] for x in used]
+        for number, unit in factual_numeric_claims(answer, cited_facts) - factual_numeric_claims(source, cited_facts):
             issues.append(f'UNSUPPORTED_LLM_CLAIM: number {number}{unit} is absent from cited evidence')
         used_entities = {known[x].get('entity') for x in used if x in known and known[x].get('entity')
                          and known[x].get('category') in {'project', 'experience'}}
@@ -498,7 +528,8 @@ class AnswerEvidenceValidator:
             if not metric_entities:
                 continue
             local_source = '\n'.join(str(known[x]['value']) for x in used if x in known and known[x].get('entity') in metric_entities)
-            if numeric_claims(sentence) - numeric_claims(local_source):
+            local_facts = [known[x] for x in used if x in known and known[x].get('entity') in metric_entities]
+            if factual_numeric_claims(sentence, local_facts) - factual_numeric_claims(local_source, local_facts):
                 issues.append('UNSUPPORTED_LLM_CLAIM: a metric is attributed to an entity absent from its cited evidence')
         current = any((f['key'] == 'current_company' or (f['category'] == 'experience' and f['key'] == 'ongoing'))
                       and f['value'] not in (False, 'false') for f in facts)
@@ -544,7 +575,8 @@ class AnswerEvidenceValidator:
                     issues.append('UNSUPPORTED_LLM_CLAIM: factual claim has invalid evidence')
                 else:
                     claim_source = '\n'.join(str(known[x]['value']) for x in claim['fact_ids'] if x in known)
-                    if numeric_claims(claim['text']) - numeric_claims(claim_source):
+                    claim_facts = [known[x] for x in claim['fact_ids'] if x in known]
+                    if factual_numeric_claims(claim['text'], claim_facts) - factual_numeric_claims(claim_source, claim_facts):
                         issues.append('UNSUPPORTED_LLM_CLAIM: a factual claim contains a metric absent from its own cited evidence')
         issues.extend(entailment_issues(answer, claims, known, used))
         return list(dict.fromkeys(issues))

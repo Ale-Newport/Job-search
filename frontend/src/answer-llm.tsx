@@ -114,6 +114,7 @@ export function ApplicationAnswerLLMSetup({
               settings.text_retry_attempts,
               settings.text_concurrency,
               settings.text_quality_review,
+              settings.text_full_professional_context,
               settings.text_fallback_model,
               settings.monthly_budget,
               integrations.map((i) => [i.provider, i.config]),
@@ -154,6 +155,7 @@ function AnswerLLMForm({
     text_retry_attempts: settings.text_retry_attempts ?? 2,
     text_concurrency: settings.text_concurrency ?? 2,
     text_quality_review: settings.text_quality_review ?? true,
+    text_full_professional_context: settings.text_full_professional_context ?? false,
     text_fallback_model: settings.text_fallback_model || "",
     monthly_budget: settings.monthly_budget ?? 0,
   });
@@ -347,8 +349,10 @@ function AnswerLLMForm({
       <div className="info-card compact">
         <ShieldCheck size={20} />
         <p>
-          Relevant verified facts, the exact question and role context are sent
-          to the selected provider. API keys are stored in macOS Keychain.
+          {values.text_full_professional_context
+            ? "Your complete verified professional profile and professional CV text, the exact question and role context are sent to the selected provider."
+            : "Relevant verified facts, the exact question and role context are sent to the selected provider."}{" "}
+          API keys are stored in macOS Keychain.
           Connection tests use a synthetic prompt without candidate information.
         </p>
       </div>
@@ -570,6 +574,22 @@ function AnswerLLMForm({
                       change("text_quality_review", e.target.checked)
                     }
                   />
+                </label>
+                <label className="field checkbox-field">
+                  <span>Use complete professional profile</span>
+                  <input
+                    type="checkbox"
+                    checked={values.text_full_professional_context}
+                    onChange={(e) =>
+                      change("text_full_professional_context", e.target.checked)
+                    }
+                  />
+                  <small>
+                    Send all current verified professional facts and professional
+                    CV text for each narrative answer. Contact, demographic and
+                    legal data stay excluded. Larger prompts use more tokens;
+                    cloud calls count toward the shared monthly cap.
+                  </small>
                 </label>
                 {remote && (
                   <>

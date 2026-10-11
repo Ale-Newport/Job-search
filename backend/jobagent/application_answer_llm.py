@@ -26,7 +26,7 @@ from .intelligence.professional_context import (contains_private_candidate_data,
 from .usage import Reservation
 
 logger = logging.getLogger('meridian.answers')
-PROMPT_VERSION = 'application-answer-v3'
+PROMPT_VERSION = 'application-answer-v4'
 PROVIDERS = {
     'openai': 'https://api.openai.com/v1',
     'anthropic': 'https://api.anthropic.com/v1',
@@ -151,9 +151,9 @@ ANSWER_SCHEMA = object_schema({
     'answer': {'type': ['string', 'null']}, 'facts_used': {'type': 'array', 'items': {'type': 'string'}},
     'selected_options': {'type': 'array', 'items': {'type': 'string'}},
     'selected_roles': {'type': 'array', 'items': {'type': 'string'}},
-    'company_claims': {'type': 'array', 'items': object_schema({'text': {'type': 'string'},
+    'company_claims': {'type': 'array', 'description': 'Factual employer clauses copied from the final answer, never unused source summaries.', 'items': object_schema({'text': {'type': 'string', 'description': 'One short factual clause actually stated in the final answer.'},
                           'source_urls': {'type': 'array', 'items': {'type': 'string'}}})},
-    'claims': {'type': 'array', 'items': object_schema({'text': {'type': 'string'}, 'fact_ids': {'type': 'array', 'items': {'type': 'string'}}})},
+    'claims': {'type': 'array', 'description': 'Build after writing the answer; cite its factual clauses, not an inventory of supplied facts.', 'items': object_schema({'text': {'type': 'string', 'description': 'One short factual clause copied verbatim from the final answer; exclude details not stated there.'}, 'fact_ids': {'type': 'array', 'items': {'type': 'string'}}})},
     'evidence_quality': {'type': 'string', 'enum': ['HIGH', 'MEDIUM', 'LOW', 'NONE']},
     'word_count': {'type': 'integer'}, 'follows_instructions': {'type': 'boolean'},
     'answers_question': {'type': 'boolean'}, 'unsupported_claims': {'type': 'array', 'items': {'type': 'string'}},
@@ -187,6 +187,11 @@ thread-safety or atomicity guarantee. Preserve the source's granularity; indepen
 not imply one book per trader. Describe supported architecture and technical reasoning instead of
 inventing encountered failures or retrospective actions. Leadership and a delivery outcome do not
 establish an undocumented method that caused that outcome.
+Describe documented mechanisms, not hoped-for guarantees. Architecture and component separation do not
+establish corruption or race prevention, consistency, avoided bottlenecks, minimal coupling or real-time
+requirements. Do not convert an intended correctness or performance property into an achieved result.
+Explain why coordinating the documented mechanisms is challenging, without inventing a fix or optimization.
+Verified facts are authoritative; an uploaded CV may retain superseded education or language details.
 For NOT_ON_RESUME compare with exact uploaded_resume; facts must describe an achievement absent from it.
 Choose an achievement whose evidence_groups entry is absent_from_uploaded_resume=true when available.
 Never use a metric from the resume to decorate a different fact or repeat a listed project as an absent achievement.
@@ -201,10 +206,14 @@ For ROLE_PREFERENCE include exactly one selected_roles label from the question o
 Return the specified JSON object. Copy question_id and intent exactly. facts_used must contain exact relevant IDs.
 Enumerate factual candidate claims and supporting fact_ids in claims. Do not pretend self-assessment proves truth.
 Claims must describe facts actually stated in answer; do not cite an unrelated biography to justify subjective prose.
-Use short factual clauses in claims, for example "Implemented Java order books and price-time matching".
+Write the answer first, then copy short factual clauses VERBATIM from that final answer into claims.
+Each entry covers one clause and cites only its supporting IDs. Do not summarize source paragraphs,
+enumerate unused technologies, or add project/version names absent from the answer. Remove unused entries.
 Do not put subjective alignment, aspirations, company praise or future opportunities in candidate claims.
 Put factual employer/product/role assertions in company_claims with exact source_urls from job/context_sources
 or company_context. Candidate fact IDs cannot support employer claims. Never use uncited prior company knowledge.
+Build company_claims from final answer clauses too. Naming a product in an aspiration does not require
+copying its source description. Never expand the answer just to include an unused claim or source inventory.
 Do not demand user counts, revenue or quantified impact when the question does not request those metrics.
 An unquantified verified accomplishment is sufficient; choose another supported example when details are missing.
 If genuinely missing evidence prevents answering, return answer=null, requires_human_input=true, and precise
@@ -575,10 +584,11 @@ class ApplicationAnswerLLM:
             semantic = interpret(question, field)
         intent = semantic['intent']
         retriever = CandidateFactRetriever(self.db, knowledge)
-        resume = retriever.uploaded_resume(job) if intent == 'NOT_ON_RESUME' else None
+        complete_profile = settings.get('text_full_professional_context') is True
+        resume = retriever.uploaded_resume(job) if intent == 'NOT_ON_RESUME' or complete_profile else None
         if intent == 'NOT_ON_RESUME' and not resume:
             raise AnswerValidationError(['MISSING_CANDIDATE_FACT: exact CV uploaded to this application is unavailable'])
-        facts = retriever.retrieve(question, intent, fact_ids, resume=resume)
+        facts = retriever.retrieve(question, intent, fact_ids, resume=resume, complete_profile=complete_profile)
         if not facts:
             raise AnswerValidationError(['MISSING_CANDIDATE_FACT: no relevant verified professional evidence'])
         missing_event = missing_historical_event(question, intent, facts)
@@ -639,6 +649,7 @@ class ApplicationAnswerLLM:
                    'evidence_groups': list(evidence_groups.values()),
                    'job': public_job, 'company_context': company_context, 'output_requirements': output_requirements,
                    'uploaded_resume': resume, 'previous_answers': previous, 'prompt_version': PROMPT_VERSION,
+                   'context_mode': 'complete_professional' if complete_profile else 'question_retrieval',
                    'knowledge_version': retriever.knowledge.version,
                    'answer_request': {'question_id': qid, 'intent': intent, 'exact_question': question,
                                       'output_requirements': output_requirements}}
@@ -673,6 +684,15 @@ class ApplicationAnswerLLM:
                     request = json.loads(context.payload_json)
                     if feedback:
                         request['revision_requirements'] = feedback
+                        if any('not reflected in' in issue or 'not present in the actual answer' in issue for issue in feedback):
+                            request['claim_alignment_revision'] = ('Reconstruct claims and company_claims only after writing the final answer. '
+                                'Copy its supported factual clauses verbatim, cite only their supporting sources, and delete unused source inventories. '
+                                'Do not expand the answer to include details from unused metadata.')
+                        if any('implementation guarantee' in issue or 'undocumented causal method' in issue for issue in feedback):
+                            request['mechanism_revision'] = ('Describe only the documented components and how they interact. '
+                                'Do not claim corruption/race prevention, atomicity, thread safety, consistency, avoided bottlenecks, '
+                                'performance outcomes or causal methods unless explicitly recorded for that same project. '
+                                'Explain the design difficulty without turning intended properties into achieved results.')
                         needs_factual_restart = any(not issue.startswith('INSTRUCTION_COMPLIANCE:') for issue in feedback)
                         if needs_factual_restart:
                             request['regeneration_mode'] = 'Write a fresh answer from the supplied verified evidence. Discard the rejected draft; do not carry over employer names, work history, technology, incidents or results from it. Cite the exact fact containing each detail.'

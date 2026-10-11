@@ -83,6 +83,7 @@ DEFAULT_SETTINGS = {
     "text_retry_attempts": 2,
     "text_concurrency": 2,
     "text_quality_review": True,
+    "text_full_professional_context": False,
     "text_fallback_model": "",
     "monthly_budget": 0,
     "notifications_enabled": True,

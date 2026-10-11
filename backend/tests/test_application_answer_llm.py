@@ -244,6 +244,48 @@ async def test_mixed_fact_and_cv_disclosures_never_reach_any_model_payload(db, e
                    'Religion:', 'private-authorization', 'private-cv@example', '7700', 'secret-source-marker', 'private-context-marker'))
 
 
+@pytest.mark.parametrize('full_profile', [False, True])
+async def test_complete_professional_context_is_forwarded_to_generation_and_review_without_contact_data(db, evidence, full_profile):
+    professional_ids = set()
+    for index in range(50):
+        area = entity(db, 'skill', f'Specialist area {index}')
+        professional_ids.add(ingest_fact(db, area, 'name', f'Compiler engineering topic {index}',
+                                       source='user', evidence={}, verified=True))
+    person = entity(db, 'person', 'Alex Example')
+    ingest_fact(db, person, 'full_name', 'Alex Example', source='user', evidence={}, verified=True, sensitivity='personal')
+    private_id = ingest_fact(db, person, 'email', 'private-cv@example.test', source='user', evidence={}, verified=True)
+    cv = 'Alex Example\nprivate-cv@example.test\n+44 7700 900123\nExperience\nBuilt a chess computer vision system using Python and Stockfish.'
+    db.execute('INSERT INTO documents(id,name,kind,created_at,updated_at) VALUES(?,?,?,?,?)', ('cv', 'CV', 'cv', now(), now()))
+    db.execute('INSERT INTO document_versions(id,document_id,version,path,filename,mime_type,content_hash,text,approved,created_at) VALUES(?,?,?,?,?,?,?,?,?,?)',
+               ('cv-version', 'cv', 1, '/synthetic/cv.pdf', 'cv.pdf', 'application/pdf', 'synthetic-hash', cv, 1, now()))
+    calls = []
+    def handler(request):
+        payload = request_payload(request)
+        calls.append(payload)
+        if 'generated_answer' in payload:
+            generated = {'question_id': payload['question_id'], 'passed': True,
+                         'scores': {name: .95 for name in SCORE_NAMES}, 'unsupported_claims': [], 'issues': [], 'reason': 'Grounded.'}
+        else:
+            generated = complete(payload, fid=evidence)
+        return response_for(request, generated)
+    result = await ApplicationAnswerLLM(db, None, transport=httpx.MockTransport(handler)).generate(
+        settings() | {'text_full_professional_context': full_profile}, 'Describe a project you built.',
+        {'resume_version_id': 'cv-version'}, question_id='full-professional-context')
+    assert result['state'] == 'ANSWER_VALIDATED' and len(calls) == 2
+    for payload in calls:
+        sent = {fact['id'] for fact in payload['verified_facts']}
+        assert private_id not in sent
+        assert payload['context_mode'] == ('complete_professional' if full_profile else 'question_retrieval')
+        if full_profile:
+            assert professional_ids <= sent and len(sent) > 32
+            assert payload['uploaded_resume']['id'] == 'cv-version'
+            assert 'Stockfish' in payload['uploaded_resume']['text']
+        else:
+            assert len(sent) <= 32 and payload['uploaded_resume'] is None
+        serialized = json.dumps(payload)
+        assert all(value not in serialized for value in ('Alex Example', 'private-cv@example', '7700'))
+
+
 async def test_no_provider_never_returns_generic_narrative(db, evidence):
     with pytest.raises(ConfigurationError, match='An LLM is required'):
         await ApplicationAnswerLLM(db, None).generate({'text_provider': 'none'}, 'Tell us about a project', {})

@@ -108,12 +108,23 @@ async def run(args):
             'https://www.palantir.com/platforms/foundry/', 'https://www.palantir.com/platforms/apollo/']
     sources = await asyncio.gather(*(research.source(url) for url in urls))
     job['company_context'] = [source for source in sources if source]
-    report = {'genuine_provider_calls': True, 'provider': settings['text_provider'], 'model': settings['text_model'],
+    report_path = output / 'real-llm-regression.json'
+    report = {'genuine_provider_calls': False, 'provider': settings['text_provider'], 'model': settings['text_model'],
               'usage_ledger': str(Path(args.usage_database).resolve()) if args.usage_database else str(output / 'llm-calibration.sqlite3'),
               'usage_before': calibration_usage(usage_db),
               'research_sources': [s['url'] for s in job['company_context']], 'unavailable_research': [url for url, s in zip(urls, sources) if not s],
               'answers': [], 'errors': [], 'no_form_fill_or_submission': True}
-    report['connection'] = await llm.test(settings)
+    print(json.dumps({'stage': 'connecting', 'provider': settings['text_provider'], 'model': settings['text_model']}), flush=True)
+    try:
+        report['connection'] = await llm.test(settings)
+    except ValueError as exc:
+        report['connection_error'] = {'code': getattr(exc, 'code', 'UNKNOWN'), 'error': str(exc)}
+        report['usage_after'] = calibration_usage(usage_db)
+        report_path.write_text(json.dumps(report, ensure_ascii=False, indent=2))
+        raise
+    report['genuine_provider_calls'] = True
+    report_path.write_text(json.dumps(report, ensure_ascii=False, indent=2))
+    print(json.dumps({'stage': 'connected', 'latency_ms': report['connection']['latency_ms']}), flush=True)
     previous = []
     for index, question in enumerate(QUESTIONS):
         started = time.monotonic()

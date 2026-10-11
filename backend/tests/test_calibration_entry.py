@@ -3,12 +3,13 @@
 from importlib.util import module_from_spec, spec_from_file_location
 from pathlib import Path
 from types import SimpleNamespace
+import json
 
 import pytest
 
 from jobagent.calibration import answers, form, main as calibration_main
 from jobagent.calibration.browser import DryRunBrowser
-from jobagent.db import Database
+from jobagent.db import Database, now
 
 
 def sidecar_entry():
@@ -90,3 +91,32 @@ def test_signed_workflow_help_exposes_required_authorization_and_shared_ledger(m
     assert "--usage-database" in help_text
     assert "--database" in help_text and "--output" in help_text
     assert "--submit" not in help_text
+
+
+async def test_failed_connection_keeps_a_report_without_claiming_genuine_calls(tmp_path, monkeypatch):
+    source = Database(tmp_path / "profile-copy.sqlite3")
+    source.execute("INSERT INTO settings(key,value) VALUES(?,?)", ("text_provider", '"ollama"'))
+    source.execute("INSERT INTO jobs(id,title,company,location,url,canonical_url,identity_key,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?)",
+                   ("sample", "Software Engineer, New Grad", "Palantir", "London", "https://example.invalid/job",
+                    "https://example.invalid/job", "sample", now(), now()))
+
+    async def unavailable(url):
+        return None
+
+    class FailedProbe:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        async def test(self, settings):
+            raise ValueError("Credential access unavailable")
+
+    monkeypatch.setattr(answers, "CompanyResearch", lambda path: SimpleNamespace(source=unavailable))
+    monkeypatch.setattr(answers, "SecretStore", lambda: None)
+    monkeypatch.setattr(answers, "ApplicationAnswerLLM", FailedProbe)
+    args = SimpleNamespace(database=source.path, output=tmp_path / "report", allow_remote=False, usage_database=None)
+    with pytest.raises(ValueError, match="Credential access unavailable"):
+        await answers.run(args)
+    report = json.loads((args.output / "real-llm-regression.json").read_text())
+    assert report["genuine_provider_calls"] is False
+    assert report["answers"] == [] and report["no_form_fill_or_submission"] is True
+    assert report["connection_error"]["error"] == "Credential access unavailable"

@@ -6,11 +6,13 @@ import httpx
 import pytest
 
 from jobagent.application_answer_llm import (ANSWER_SCHEMA, SCORE_NAMES, ApplicationAnswerLLM,
-                                            AnswerValidationError, ConfigurationError, ProviderError)
+                                            AnswerValidationError, ConfigurationError, ProviderError,
+                                            professional_previous_answers)
 from jobagent.db import Database, now, uid
 from jobagent.intelligence.answer_evidence import (AnswerEvidenceValidator, ApplicationConsistencyReviewer,
                                                  CandidateFactRetriever, content_words, reconcile_claim_evidence, requirements)
 from jobagent.intelligence.store import entity, ingest_fact
+from jobagent.intelligence.professional_context import contains_private_candidate_data, professional_resume_text
 
 
 @pytest.fixture
@@ -121,6 +123,23 @@ async def test_prior_form_history_is_private_in_generation_regeneration_and_revi
               'answer': 'Contact me at injected@example.test'},
              {'intent': 'PROJECT', 'state': 'ANSWER_VALIDATED', 'quality': {'passed': True},
               'kind': 'gender', 'answer': 'protected-wrongly-tagged'}, 'legacy-private-value']
+    protected = {'intent': 'PROJECT', 'state': 'ANSWER_VALIDATED', 'quality': {'passed': True}}
+    prior.extend([{**protected, 'sensitivity': 'personal', 'answer': 'personal-marker'},
+                  {**protected, 'canonical_intent': 'DEMOGRAPHIC', 'answer': 'conflicting-intent-marker'},
+                  {**protected, 'canonical_intents': ['PROJECT', 'CONSENT'], 'answer': 'composite-consent-marker'},
+                  {**protected, 'answer': 'I am a woman and my religion is Catholic.'},
+                  {**protected, 'answer': 'I am a Spanish citizen.'},
+                  {**protected, 'answer': 'I am on a Student visa.'},
+                  {**protected, 'answer': 'I have ADHD.'},
+                  {**protected, 'answer': 'My phone is +44 7700 900123.'},
+                  {**protected, 'answer': 'api_key=private-credential-marker'}])
+    prior.extend([{**protected, 'answer': 'metadata-private-row', 'facts_used': [{'email': 'hidden@example.test'}]},
+                  {**protected, 'answer': 'metadata-private-row', 'evidence_entities': [{'credential': 'never-share-marker'}]},
+                  {**protected, 'answer': 'metadata-private-row', 'facts_used': ['password:secret-reference-marker']}])
+    product = {'question_id': 'product', 'canonical_intent': 'PRODUCT_PREFERENCE', 'state': 'ANSWER_VALIDATED',
+               'quality': {'passed': True}, 'answer': 'Foundry', 'selected_options': [
+                   {'label': 'Foundry', 'value': 'foundry', 'metadata': 'private-selection-metadata'}]}
+    prior.append(product)
     calls = []
     def handler(request):
         payload = request_payload(request)
@@ -139,10 +158,90 @@ async def test_prior_form_history_is_private_in_generation_regeneration_and_revi
     assert len(calls) == 3
     for payload in calls:
         assert payload['previous_answers'] == [{k: v for k, v in safe.items() if k in
-             {'question_id', 'intent', 'answer', 'selected_roles'}}]
+             {'question_id', 'intent', 'answer', 'selected_roles'}},
+             {'question_id': 'product', 'intent': 'PRODUCT_PREFERENCE', 'answer': 'Foundry', 'selected_options': ['Foundry']}]
         serialized = json.dumps(payload)
         assert all(value not in serialized for value in ('private-address', 'private-demographic-value',
-                   'injected@example', 'protected-wrongly-tagged', 'legacy-private-value', 'never-forward-metadata'))
+                   'injected@example', 'protected-wrongly-tagged', 'legacy-private-value', 'never-forward-metadata',
+                   'personal-marker', 'conflicting-intent-marker', 'composite-consent-marker', 'Catholic',
+                   'Spanish citizen', 'Student visa', 'ADHD', '7700', 'private-credential-marker', 'private-selection-metadata',
+                   'metadata-private-row', 'hidden@example', 'never-share-marker', 'secret-reference-marker'))
+
+
+@pytest.mark.parametrize('text', ['I am a Spanish citizen.', 'I am a citizen of Spain.',
+    'I am on a Student visa.', 'I have ADHD.', 'Religion: Catholic', 'My phone is 07123456789.',
+    'My gender is female.', 'I consent to sharing my information.', 'password=credential-marker',
+    'My phone +44 7700 900123. I process records.', '+44 7700 900123 records', 'Mobile: 07123456789 users'])
+def test_mixed_candidate_disclosures_are_not_professional_context(text):
+    assert contains_private_candidate_data(text)
+    assert not professional_previous_answers([{'intent': 'PROJECT', 'state': 'ANSWER_VALIDATED',
+        'quality': {'passed': True}, 'answer': 'I built accessible software. ' + text}])
+
+
+def test_professional_cv_keeps_companies_inclusive_work_and_dates():
+    body = ('Education\nCatholic University, 2020-09-01 - 2024-06-30\n'
+            'Experience\nJohn Lewis\nBuilt accessible tools for users with disabilities.\n'
+            'Projects\nhttps://github.com/example/accessible-tools\nProcessed 1000000000 events.\n')
+    private = ('John Lewis\nAddress: 12 Example Road\nDate of birth: 2000-03-20\n'
+               'Gender: male\nReligion: Catholic\nWork authorization: private-authorization\n'
+               'private-header@example.test\n+44 7700 900123\nhttps://linkedin.com/in/private-profile\n')
+    assert professional_resume_text(private + body, ['John Lewis']) == body.strip()
+
+
+def test_previous_professional_opaque_references_are_not_phone_numbers():
+    prior = {'intent': 'PROJECT', 'state': 'ANSWER_VALIDATED', 'quality': {'passed': True},
+             'answer': 'I built inclusive software tools.', 'facts_used': ['12345678-1234-1234-1234-123456789012'],
+             'evidence_entities': ['12345678-1234-1234-1234-123456789012', 'Accessible tools']}
+    assert professional_previous_answers([prior])[0]['facts_used'] == prior['facts_used']
+
+
+async def test_mixed_fact_and_cv_disclosures_never_reach_any_model_payload(db, evidence):
+    person = entity(db, 'person', 'Alex Example')
+    ingest_fact(db, person, 'full_name', 'Alex Example', source='user', evidence={}, verified=True, sensitivity='personal')
+    leaked = ingest_fact(db, person, 'professional_interests', 'Backend engineering. My religion is Catholic.',
+                        source='user', evidence={}, verified=True)
+    credential = ingest_fact(db, person, 'general_context', 'Software engineering. api_key=secret-source-marker',
+                            source='user', evidence={}, verified=True)
+    candidate = db.one('SELECT id FROM candidates LIMIT 1')['id']
+    legacy = uid()
+    db.execute('INSERT INTO facts VALUES(?,?,?,?,?,?,?,?,?,?,?)',
+               (legacy, candidate, 'experience', 'story', 'Built accessible tools for users with disabilities at Catholic University.',
+                'https://github.com/example/accessible-tools', 'verified', 0, '', '2020-09-01', '2026-10-11T14:30:00Z'))
+    unverified = uid()
+    db.execute('INSERT INTO facts VALUES(?,?,?,?,?,?,?,?,?,?,?)',
+               (unverified, candidate, 'project', 'story', 'Unverified locked private-context-marker',
+                'user', 'unverified', 1, '', now(), now()))
+    cv = ('Alex Example\nAddress: 12 Example Road\nDate of birth: 2000-03-20\nReligion: Catholic\n'
+          'Work authorization: private-authorization\nprivate-cv@example.test\n+44 7700 900123\n'
+          'Education\nSoftware degree at Catholic University, 2020-09-01 - 2024-06-30\n'
+          'Experience\nBuilt accessible tools for users with disabilities.\n'
+          'Projects\nhttps://github.com/example/accessible-tools')
+    db.execute('INSERT INTO documents(id,name,kind,created_at,updated_at) VALUES(?,?,?,?,?)', ('cv', 'CV', 'cv', now(), now()))
+    db.execute('INSERT INTO document_versions(id,document_id,version,path,filename,mime_type,content_hash,text,approved,created_at) VALUES(?,?,?,?,?,?,?,?,?,?)',
+               ('cv-version', 'cv', 1, '/synthetic/cv.pdf', 'cv.pdf', 'application/pdf', 'synthetic-hash', cv, 1, now()))
+    calls = []
+    def handler(request):
+        payload = request_payload(request)
+        calls.append(payload)
+        if 'generated_answer' in payload:
+            generated = {'question_id': payload['question_id'], 'passed': True,
+                         'scores': {name: .95 for name in SCORE_NAMES}, 'unsupported_claims': [], 'issues': [], 'reason': 'Grounded.'}
+        else:
+            generated = complete(payload, answer='I built a chess system for 9000 users.' if len(calls) == 1 else None, fid=evidence)
+        return response_for(request, generated)
+    result = await ApplicationAnswerLLM(db, None, transport=httpx.MockTransport(handler)).generate(
+        settings(), 'Tell us one thing not on your resume that you are proud of.',
+        {'resume_version_id': 'cv-version'}, question_id='professional-only')
+    assert result['state'] == 'ANSWER_VALIDATED' and len(calls) == 3
+    for payload in calls:
+        assert {leaked, credential, unverified}.isdisjoint({fact['id'] for fact in payload['verified_facts']})
+        assert legacy in {fact['id'] for fact in payload['verified_facts']}
+        assert 'Catholic University' in payload['uploaded_resume']['text']
+        assert '2020-09-01 - 2024-06-30' in payload['uploaded_resume']['text']
+        assert 'users with disabilities' in payload['uploaded_resume']['text']
+        serialized = json.dumps(payload)
+        assert all(value not in serialized for value in ('Alex Example', '12 Example Road', '2000-03-20',
+                   'Religion:', 'private-authorization', 'private-cv@example', '7700', 'secret-source-marker', 'private-context-marker'))
 
 
 async def test_no_provider_never_returns_generic_narrative(db, evidence):

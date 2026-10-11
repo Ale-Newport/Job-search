@@ -21,6 +21,8 @@ import httpx
 from .intelligence.answer_evidence import (AnswerEvidenceValidator, ApplicationConsistencyReviewer,
                                            CandidateFactRetriever, digest, missing_historical_event,
                                            reconcile_claim_evidence, requirements)
+from .intelligence.professional_context import (contains_private_candidate_data, professional_reference,
+                                               professional_resume_text)
 from .usage import Reservation
 
 logger = logging.getLogger('meridian.answers')
@@ -48,19 +50,35 @@ def professional_previous_answers(answers):
         intent = answer.get('intent') or answer.get('canonical_intent')
         state = answer.get('state') or answer.get('status')
         quality = answer.get('quality') or {}
+        intents = [answer.get('intent'), answer.get('canonical_intent'),
+                   (answer.get('semantic') or {}).get('intent') if isinstance(answer.get('semantic'), dict) else None,
+                   *(answer.get('canonical_intents') or [])]
         if (intent not in NARRATIVE_INTENTS or state not in {'ANSWER_VALIDATED', 'ANSWER_ACCEPTED_BY_FORM'}
                 or not isinstance(quality, dict) or quality.get('passed') is not True
                 or answer.get('root_cause') or answer.get('requires_human_input')
+                or answer.get('sensitivity') not in {None, 'professional', 'public'}
+                or any(value is not None and (not isinstance(value, str) or value not in NARRATIVE_INTENTS) for value in intents)
                 or answer.get('kind') in {'contact', 'identity', 'gender', 'ethnicity', 'disability',
-                                          'demographic', 'consent', 'work_authorization'}):
+                                          'demographic', 'consent', 'work_authorization', 'legal', 'sensitive',
+                                          'nationality', 'religion', 'salary', 'visa', 'sponsorship'}):
             continue
         projected = {key: answer[key] for key in ('question_id', 'exact_question', 'intent', 'answer',
                      'facts_used', 'evidence_entities', 'selected_roles', 'selected_options') if key in answer}
-        text = json.dumps({key: projected.get(key) for key in ('exact_question', 'answer', 'selected_roles', 'selected_options')}, ensure_ascii=False)
-        if re.search(r'[\w.+-]+@[\w.-]+\.[a-z]{2,}|(?:\+?\d[\d ()-]{8,}\d)|'
-                     r'\b(?:sexual orientation|transgender|ethnicity|my disability|my visa|'
-                     r'heterosexual|homosexual|bisexual|work authori[sz]ation|'
-                     r'sponsorship status|passport|national insurance)\b', text, re.I):
+        if any(not isinstance(projected[key], list) or len(projected[key]) > 32
+               or any(not professional_reference(value, entity=key == 'evidence_entities') for value in projected[key])
+               for key in ('facts_used', 'evidence_entities') if key in projected):
+            continue
+        projected['intent'] = intent
+        for key in ('selected_roles', 'selected_options'):
+            if key in projected:
+                if intent not in {'ROLE_PREFERENCE', 'PRODUCT_PREFERENCE'} or not isinstance(projected[key], list):
+                    projected.pop(key)
+                    continue
+                projected[key] = [value if isinstance(value, str) else value.get('label') or value.get('value')
+                                  for value in projected[key] if isinstance(value, (str, dict))]
+                projected[key] = [value for value in projected[key] if isinstance(value, str)]
+        if contains_private_candidate_data({key: projected.get(key) for key in
+                                            ('exact_question', 'answer', 'selected_roles', 'selected_options')}):
             continue
         safe.append(projected)
     return safe
@@ -557,10 +575,14 @@ class ApplicationAnswerLLM:
         if missing_event:
             raise AnswerValidationError([missing_event])
         if resume:
-            # Send only the resume's professional body; personal contact details
-            # are irrelevant to comparing an accomplishment's presence.
             resume = dict(resume)
-            resume['text'] = re.sub(r'[\w.+-]+@[\w.-]+\.[a-z]{2,}|(?:\+?\d[\d ()-]{8,}\d)', '[contact omitted]', resume['text'], flags=re.I)
+            identities = [row['value'] for row in retriever.knowledge.rows
+                          if row.get('concept') in {'full_name', 'first_name', 'last_name', 'preferred_name'}
+                          and retriever.knowledge.entities.get(row.get('entity_id'), {}).get('kind') == 'person']
+            identities.extend(row['name'] for row in self.db.query('SELECT name FROM candidates') if row['name'])
+            resume['text'] = professional_resume_text(resume['text'], identities)
+            if not resume['text']:
+                raise AnswerValidationError(['MISSING_CANDIDATE_FACT: uploaded CV has no professional text'])
         output_requirements = requirements(question, field)
         qid = question_id or field.get('question_id') or field.get('id') or digest([job.get('application_id', job.get('id')), field.get('target'), question])[:32]
         if not isinstance(qid, str) or not qid.strip():

@@ -8,6 +8,7 @@ from decimal import Decimal
 from difflib import SequenceMatcher
 
 from .store import Knowledge
+from .professional_context import PRIVATE_CONCEPTS, contains_private_candidate_data
 
 PRIVATE = re.compile(r"password|cookie|session|passport|national.?insurance|social.?security|bank|government.?id|api.?key", re.I)
 TOKENS = re.compile(r"[a-z][a-z0-9+#]*(?:[.-][a-z0-9+#]+)*")
@@ -92,10 +93,14 @@ class CandidateFactRetriever:
             entity = self.knowledge.entities[f['entity_id']]
             if entity['kind'] not in {'person', 'project', 'experience', 'education', 'skill'}:
                 continue
+            if entity['kind'] == 'person' and f['concept'] in PRIVATE_CONCEPTS:
+                continue
             candidates.append({'id': f['id'], 'key': f['concept'], 'value': f['value'], 'entity_id': entity['id'],
-                               'entity': entity['name'], 'category': entity['kind'], 'source': f['source'],
+                               'entity': 'Candidate' if entity['kind'] == 'person' else entity['name'], 'category': entity['kind'], 'source': f['source'],
                                'revision': f['revision']})
         for f in self.db.query("SELECT * FROM facts WHERE category!='knowledge' AND (verification_status='verified' OR locked=1)"):
+            if f['verification_status'] != 'verified':
+                continue
             if f['category'] in {'contact', 'identity', 'demographic', 'sensitive', 'legal', 'work_authorization', 'salary'}:
                 continue
             if f['category'] == 'application_answer' or (f['category'] == 'application_profile' and f['key'] not in {
@@ -120,7 +125,9 @@ class CandidateFactRetriever:
                 continue
             if PRIVATE.search(fact['key'] + ' ' + fact['category']):
                 continue
-            if fact['key'] in {'email', 'phone', 'address', 'full_name', 'nationality', 'date_of_birth'}:
+            if fact['key'] in PRIVATE_CONCEPTS or contains_private_candidate_data(
+                {key: fact.get(key) for key in ('value', 'key', 'entity', 'source')}
+            ):
                 continue
             text = json.dumps(fact, ensure_ascii=False).casefold()
             overlap = len(question_tokens & set(TOKENS.findall(text)))

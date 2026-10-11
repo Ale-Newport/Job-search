@@ -39,3 +39,11 @@ def test_observed_factual_consistency_uses_scoped_verified_knowledge(engine, que
     assert result['passed'] is passed
     assert result['checked_fields'] == 1
     assert all(value not in str(issue) for issue in result['issues'])
+
+
+def test_experience_narrative_is_not_mistaken_for_a_current_employer_fact(engine):
+    field = {'document_id': 'd', 'node_id': 1, 'form_id': 'f', 'role': 'textbox', 'type': 'textarea', 'tag': 'textarea',
+             'label': 'Do you have prior coding experience? If so, please provide details about languages, projects or experiences that demonstrate your coding skills.',
+             'operations': ['TYPE_TEXT'], 'value': 'A separately validated professional narrative.'}
+    result = review_observed_facts({'elements': [field]}, ATSAdapter(), engine, {})
+    assert result == {'passed': True, 'issues': [], 'checked_fields': 0}

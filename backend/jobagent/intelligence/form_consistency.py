@@ -35,6 +35,10 @@ def review_observed_facts(snapshot, adapter, intelligence, job):
             continue
         field = {**resolution_element(element, elements), '_condition': condition or {}}
         expected = intelligence.answer_question(question, field, job)
+        if expected.get('root_cause') in {'ASYNC_GENERATION_REQUIRED', 'LLM_SETUP_REQUIRED'}:
+            # Professional experience explanations receive their independent
+            # narrative review; current-employer facts still use this review.
+            continue
         intent = expected.get('canonical_intent')
         if intent not in FACTUAL_REVIEW_INTENTS:
             continue

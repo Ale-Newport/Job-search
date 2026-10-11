@@ -84,6 +84,30 @@ async def test_observed_clear_operations_require_supported_controls(context_brow
     assert fields["clearable"]["clear_proxy_id"] is not None
 
 
+async def test_selected_chip_is_observed_separately_from_search_text_and_multiple_chips(context_browser):
+    await context_browser.page.set_content("""
+      <label for="selected">Confirmed choice</label><div class="select__control">
+        <span class="select__multi-value__label">No</span>
+        <input id="selected" role="combobox" aria-expanded="false" value="Different search"></div>
+      <label for="search">Unselected choice</label><div class="select__control">
+        <span class="select__placeholder">No</span>
+        <input id="search" role="combobox" aria-expanded="true" value="No"></div>
+      <label for="many">Several choices</label><div class="select__control">
+        <span class="select__multi-value__label">No</span><span class="select__multi-value__label">Yes</span>
+        <input id="many" role="combobox" aria-expanded="false"></div>""")
+    fields = {e['id']: e for e in (await context_browser.observe())['elements'] if e['id']}
+    assert fields['selected']['selected_text'] == 'No'
+    assert fields['selected']['value'] == 'Different search'
+    assert fields['search']['selected_text'] == ''
+    assert fields['many']['selected_text'] == ''
+    context_browser._answer_diagnostics['scalar'] = {'status': 'ANSWER_INSERTED'}
+    resolution = {'question_id': 'scalar', 'question': 'Confirmed choice', 'answer': 'No'}
+    context_browser._accepted_answer(resolution, fields['selected'])
+    assert context_browser._answer_diagnostics['scalar']['status'] == 'ANSWER_ACCEPTED_BY_FORM'
+    context_browser._accepted_answer(resolution, fields['many'])
+    assert context_browser._answer_diagnostics['scalar']['status'] == 'ANSWER_INSERTED'
+
+
 HIDDEN_TOGGLES = """
   <style>.invisible-toggle{opacity:0;position:absolute;width:18px;height:18px}
   .option{padding:8px}label{display:inline-block;padding:5px}</style>

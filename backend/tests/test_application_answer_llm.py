@@ -1,6 +1,7 @@
 """Provider contracts, independent review, privacy and per-question isolation."""
 import asyncio
 import json
+import re
 
 import httpx
 import pytest
@@ -164,7 +165,7 @@ async def test_prior_form_history_is_private_in_generation_regeneration_and_revi
         assert all(value not in serialized for value in ('private-address', 'private-demographic-value',
                    'injected@example', 'protected-wrongly-tagged', 'legacy-private-value', 'never-forward-metadata',
                    'personal-marker', 'conflicting-intent-marker', 'composite-consent-marker', 'Catholic',
-                   'Spanish citizen', 'Student visa', 'ADHD', '7700', 'private-credential-marker', 'private-selection-metadata',
+                   'Spanish citizen', 'Student visa', 'ADHD', '7700 900123', 'private-credential-marker', 'private-selection-metadata',
                    'metadata-private-row', 'hidden@example', 'never-share-marker', 'secret-reference-marker'))
 
 
@@ -241,7 +242,7 @@ async def test_mixed_fact_and_cv_disclosures_never_reach_any_model_payload(db, e
         assert 'users with disabilities' in payload['uploaded_resume']['text']
         serialized = json.dumps(payload)
         assert all(value not in serialized for value in ('Alex Example', '12 Example Road', '2000-03-20',
-                   'Religion:', 'private-authorization', 'private-cv@example', '7700', 'secret-source-marker', 'private-context-marker'))
+                   'Religion:', 'private-authorization', 'private-cv@example', '7700 900123', 'secret-source-marker', 'private-context-marker'))
 
 
 @pytest.mark.parametrize('full_profile', [False, True])
@@ -284,7 +285,8 @@ async def test_complete_professional_context_is_forwarded_to_generation_and_revi
         else:
             assert len(sent) <= 32 and payload['uploaded_resume'] is None
         serialized = json.dumps(payload)
-        assert all(value not in serialized for value in ('Alex Example', 'private-cv@example', '7700'))
+        assert all(value not in serialized for value in ('Alex Example', 'private-cv@example', '7700 900123'))
+        assert not re.search(r'\+44\s*7700\s*900123', serialized)
 
 
 @pytest.mark.parametrize('full_profile, padding_size, permitted', [(False, 70000, False), (True, 70000, True), (True, 1048576, False)])

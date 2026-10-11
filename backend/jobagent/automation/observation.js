@@ -113,7 +113,11 @@
     return [...(node.labels || [])].find(candidate => candidate.control === node && visible(candidate)) || null;
   };
   const selectedText = node => {
-    const selection = node.closest('.select__control')?.querySelector('.select__single-value');
+    const control = node.closest('.select__control');
+    const tags = [...(control?.querySelectorAll('.select__multi-value__label') || [])];
+    // React Select can render a single factual selection as a removable chip.
+    // Search text is separate; several chips cannot prove one scalar answer.
+    const selection = control?.querySelector('.select__single-value') || (tags.length === 1 ? tags[0] : null);
     if (!selection) return '';
     const flag = selection.querySelector('.iti__flag');
     const code = [...(flag?.classList || [])].map(c => /^iti__([a-z]{2})$/.exec(c)?.[1]).find(Boolean);

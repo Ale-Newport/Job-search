@@ -27,7 +27,7 @@ from .intelligence.professional_context import (contains_private_candidate_data,
 from .usage import Reservation
 
 logger = logging.getLogger('meridian.answers')
-PROMPT_VERSION = 'application-answer-v9'
+PROMPT_VERSION = 'application-answer-v10'
 PROVIDERS = {
     'openai': 'https://api.openai.com/v1',
     'anthropic': 'https://api.anthropic.com/v1',
@@ -207,6 +207,10 @@ story. Explain the documented engineering problem and implementation in enough d
 The technical_evidence_index highlights recorded design tradeoffs and implementation, ordered by explicit
 tradeoff support. Prefer a source with a documented design decision and personal contribution over inventing
 an incident around a familiar architecture. It is source data, not additional autobiography.
+When that index is nonempty, choose one of its indexed projects with documented tradeoff evidence for a
+technical-challenge story. Stay with that single project. Select a few relevant mechanisms; do not list every
+algorithm or component. Explain the design difficulty in present-tense technical reasoning, keeping recorded
+personal actions separate. Do not infer "I had to" actions, tests, constraints or reflections from a finished design.
 Do not add familiar but undocumented concerns such as security, compliance, scalable performance,
 engagement, real-time processing, testing or iterative optimization. A reasonable explanation of why a
 documented design is difficult is allowed; a claim that the candidate fixed an undocumented issue is not.
@@ -853,7 +857,9 @@ class ApplicationAnswerLLM:
                     review = None
                     if not issues and settings.get('text_quality_review', True):
                         await self._progress(qid, intent, 'VALIDATING', attempt)
-                        review, review_usage = await self._request(call_settings, REVIEW_SYSTEM, {**request, 'generated_answer': generated}, review_schema)
+                        review_settings = {**call_settings, 'text_max_output_tokens':
+                            min(int(call_settings.get('text_max_output_tokens', 2200)), 2048)}
+                        review, review_usage = await self._request(review_settings, REVIEW_SYSTEM, {**request, 'generated_answer': generated}, review_schema)
                         total_cost += review_usage['cost']
                         scores = review.get('scores', {})
                         if review.get('question_id') != qid or review.get('passed') is not True:

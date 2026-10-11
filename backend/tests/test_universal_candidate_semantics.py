@@ -609,3 +609,35 @@ def test_profile_month_availability_edit_updates_knowledge_and_clear_does_not_fa
     write_profile(db, "earliest_start_month", "", False)
     result = CandidateEngine(db).answer_question("Anticipated start date (MM/YYYY)")
     assert result["answer"] is None and result["root_cause"] == "MISSING_CONFIRMED_AVAILABILITY"
+
+
+@pytest.mark.parametrize('current,country,extra,expected', [
+    (True, 'United Kingdom', '', True),
+    (None, 'United Kingdom', '', False),
+    (False, 'United Kingdom', '', False),
+    (True, 'Canada', '', False),
+    (True, 'United Kingdom', ' without restrictions', False),
+    (True, 'United Kingdom', ' for full-time work', False),
+    (True, 'United Kingdom', ' until 2028', False),
+])
+def test_temporary_visa_option_needs_confirmed_current_work_permission_and_scoped_route(tmp_path, current, country, extra, expected):
+    db = Database(tmp_path / 'status.sqlite3')
+    eid = entity(db, 'immigration', 'Synthetic Student permission')
+    for key, value in {'country': country, 'route': 'Student', 'current_right_to_work': current}.items():
+        if value is not None:
+            ingest_fact(db, eid, key, value, value_type='boolean' if isinstance(value, bool) else 'text',
+                        source='Independent confirmed synthetic evidence', evidence={}, verified=True)
+    label = 'I have a visa which gives me temporary right to work' + extra
+    field = {'type': 'select', 'options': [
+        {'label': "I'm a citizen or have permanent residency", 'value': 'citizen'},
+        {'label': 'I have a visa which gives me the permanent right to work', 'value': 'permanent'},
+        {'label': label, 'value': 'temporary'},
+        {'label': "I'd need the employer to sponsor my visa to work in this location", 'value': 'sponsored'},
+    ]}
+    result = CandidateEngine(db).answer_question('What is your right to work status?', field, {'country': country})
+    assert (result['answer'] == label) is expected
+    if expected:
+        assert result['confidence_level'] == 'DERIVED_HIGH'
+        assert len(result['facts_used']) >= 2
+    full_time = CandidateEngine(db).answer_question('Are you authorized to work full-time?', {}, {'country': country})
+    assert full_time['answer'] is None or full_time['answer'] == 'No'

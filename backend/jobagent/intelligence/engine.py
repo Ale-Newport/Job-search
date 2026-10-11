@@ -716,6 +716,29 @@ class CandidateEngine:
                             confidence = "POLICY"
                     facets_values.append(facet_value if isinstance(facet_value, bool) else None)
                 answer = False if False in facets_values else True if all(v is True for v in facets_values) else None
+                if answer is True and facets == ['current'] and record and country == 'United Kingdom':
+                    # This classifies an already confirmed present permission.
+                    # Student-route evidence alone cannot establish any work
+                    # permission, expiry, hours, future or full-time eligibility.
+                    route = read(record, 'route')
+                    temporary_options = []
+                    if normalize(route or '') == 'student':
+                        for option in field.get('options', []):
+                            label = option.get('label', '')
+                            option_text = normalize(label)
+                            option_semantic = interpret(label, {'type': 'radio'})
+                            if (re.search(r'\bvisa\b', option_text) and re.search(r'\btemporary\b', option_text)
+                                    and re.search(r'right to work|authori[sz].*work|permission.*work', option_text)
+                                    and not re.search(r'\d|permanent|unrestricted|full time|future|without|until|through|during|need|require', option_text)
+                                    and not set(option_semantic.get('authorization_requirements') or ['current']) - {'current'}):
+                                temporary_options.append(label)
+                    if len(temporary_options) == 1:
+                        answer = temporary_options[0]
+                        confidence = 'DERIVED_HIGH'
+                        rules.append('uk_student_time_limited_route_with_confirmed_current_work_permission')
+                        explanations.append('Confirmed current UK work permission plus the verified Student visa route; '
+                                            'route duration reference: https://www.gov.uk/student-visa. '
+                                            'This does not establish expiry, working hours or full-time eligibility.')
                 if answer is None:
                     out["missing_authorization_facets"] = [facet for facet, value in zip(facets, facets_values) if value is None]
                 elif len(facets) > 1:

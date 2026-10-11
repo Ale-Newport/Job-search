@@ -26,7 +26,7 @@ from .intelligence.professional_context import (contains_private_candidate_data,
 from .usage import Reservation
 
 logger = logging.getLogger('meridian.answers')
-PROMPT_VERSION = 'application-answer-v6'
+PROMPT_VERSION = 'application-answer-v7'
 PROVIDERS = {
     'openai': 'https://api.openai.com/v1',
     'anthropic': 'https://api.anthropic.com/v1',
@@ -82,6 +82,29 @@ def professional_previous_answers(answers):
             continue
         safe.append(projected)
     return safe
+
+
+def technical_evidence_index(facts, intent):
+    """A compact source index keeps recorded tradeoffs visible in large profiles."""
+    if intent not in {'CHALLENGE', 'TECHNICAL_CHALLENGE', 'PROBLEM_SOLVING'}:
+        return []
+    grouped = {}
+    for fact in facts:
+        if fact.get('category') not in {'project', 'experience'}:
+            continue
+        if fact['key'] in {'challenge', 'approach', 'outcome', 'contribution', 'public_architecture_tradeoffs',
+                           'public_implementation_details'}:
+            grouped.setdefault(fact.get('entity_id') or fact.get('entity'), []).append(fact)
+    candidates = []
+    for group in grouped.values():
+        if not any(f['key'] == 'contribution' for f in group):
+            continue
+        design = ' '.join(str(f['value']) for f in group if f['key'] in {'challenge', 'public_architecture_tradeoffs'})
+        tradeoffs = len(re.findall(r'trade.?off|optimality|versus|alternative|compared|\bwhile\b|\bbut\b', design, re.I))
+        detail = sum(len(str(f['value']).split()) for f in group if f['key'] == 'public_implementation_details')
+        candidates.append((tradeoffs, detail, {'entity': group[0].get('entity'),
+            'recorded_evidence': [{key: fact[key] for key in ('id', 'key', 'value')} for fact in group]}))
+    return [value for _, _, value in sorted(candidates, key=lambda item: (-item[0], -item[1], str(item[2]['entity'])))[:3]]
 
 
 class ConfigurationError(ValueError):
@@ -179,6 +202,9 @@ For technical stories compare the available evidence and choose a concrete probl
 never invent a bug, tradeoff, personal responsibility or lesson absent from evidence. No generic fallback.
 Prefer an example with verified implementation, architecture and contribution facts over a broad one-line
 story. Explain the documented engineering problem and implementation in enough detail to answer the question.
+The technical_evidence_index highlights recorded design tradeoffs and implementation, ordered by explicit
+tradeoff support. Prefer a source with a documented design decision and personal contribution over inventing
+an incident around a familiar architecture. It is source data, not additional autobiography.
 Do not add familiar but undocumented concerns such as security, compliance, scalable performance,
 engagement, real-time processing, testing or iterative optimization. A reasonable explanation of why a
 documented design is difficult is allowed; a claim that the candidate fixed an undocumented issue is not.
@@ -216,6 +242,8 @@ enumerate unused technologies, or add project/version names absent from the answ
 Do not put subjective alignment, aspirations, company praise or future opportunities in candidate claims.
 Put factual employer/product/role assertions in company_claims with exact source_urls from job/context_sources
 or company_context. Candidate fact IDs cannot support employer claims. Never use uncited prior company knowledge.
+Company programme lengths and dates belong in exact employer clauses named in company_claims with research
+citations; candidate dates and metrics still need candidate fact IDs. Keep the two factual subjects separate.
 Build company_claims from final answer clauses too. Naming a product in an aspiration does not require
 copying its source description. Never expand the answer just to include an unused claim or source inventory.
 Do not demand user counts, revenue or quantified impact when the question does not request those metrics.
@@ -659,7 +687,8 @@ class ApplicationAnswerLLM:
                    'context_mode': 'complete_professional' if complete_profile else 'question_retrieval',
                    'knowledge_version': retriever.knowledge.version,
                    'answer_request': {'question_id': qid, 'intent': intent, 'exact_question': question,
-                                      'output_requirements': output_requirements}}
+                                      'output_requirements': output_requirements,
+                                      'technical_evidence_index': technical_evidence_index(facts, intent)}}
         answer_schema = json.loads(json.dumps(ANSWER_SCHEMA))
         answer_schema['properties']['question_id']['enum'] = [qid]
         answer_schema['properties']['intent']['enum'] = [intent]
@@ -764,12 +793,13 @@ class ApplicationAnswerLLM:
                     # Every cited claim is actual evidence usage, even when the
                     # provider omitted its ID from the summary metadata list.
                     restored_citations = reconcile_claim_evidence(generated, facts)
-                    issues = self.validator.validate(generated, facts, qid, intent, output_requirements, previous, resume)
                     from .intelligence.answer_evidence import content_words
                     destination = str(public_job.get('company') or '').strip()
                     company_names = [destination] if destination else []
                     company_names.extend(match[1] for url in company_sources
                                          if (match := re.search(r'/platforms/([^/]+)', url)))
+                    issues = self.validator.validate(generated, facts, qid, intent, output_requirements, previous, resume,
+                        company_sources=company_sources, company_names=company_names)
                     assertion_text = generated['answer']
                     for name in company_names:
                         assertion_text = re.sub(r'\bif\s+' + re.escape(name) + r"\s+(?:didn't|did not|doesn't|does not)\s+exist\s*,?\s*",

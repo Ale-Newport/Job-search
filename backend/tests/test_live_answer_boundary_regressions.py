@@ -3,10 +3,11 @@ import pytest
 
 from jobagent.automation.answers import option_for
 from jobagent.intelligence.formatting import AnswerFormatResolver, choice
-from jobagent.intelligence.answer_evidence import prose_claim_issues
+from jobagent.intelligence.answer_evidence import prose_claim_issues, AnswerEvidenceValidator
 from jobagent.automation.reasoning import conditional_state
 from jobagent.automation.adapters import get_adapter
 from jobagent.automation.consent import dropdown_open_target
+from jobagent.application_answer_llm import technical_evidence_index
 
 
 def test_reference_link_does_not_turn_role_explanation_into_url():
@@ -74,3 +75,62 @@ def test_editable_combobox_opens_before_answer_text_filters_options():
 def test_confirmed_other_white_category_maps_to_explicit_ethnic_background():
     options = [{'label': 'White: British'}, {'label': 'White: Any other White ethnic background'}]
     assert choice('White - Other', options, disclosure_concept='ethnicity') == options[1]
+
+
+def test_owned_implementation_clause_is_separate_from_reflection():
+    fact = {'id': 'p', 'entity': 'Simulator', 'category': 'project',
+            'value': 'Whole system: order books, matching engine, price engine, threading model and dashboard.'}
+    assert not prose_claim_issues('In Simulator, I built the entire system myself, which forced me to understand each layer and how they connect.',
+                                  {'p': fact}, ['p'])
+
+
+def numeric_result(answer, employer_claim, candidate_claims=()):
+    fact = {'id': 'p', 'category': 'project', 'entity': 'Simulator', 'key': 'story',
+            'value': 'I built a Python Simulator.'}
+    generated = {'question_id': 'q', 'intent': 'MOTIVATION', 'answer': answer, 'facts_used': ['p'],
+                 'claims': list(candidate_claims), 'company_claims': [employer_claim], 'unsupported_claims': [],
+                 'answers_question': True, 'follows_instructions': True}
+    return AnswerEvidenceValidator().validate(generated, [fact], 'q', 'MOTIVATION', {},
+        company_sources={'https://employer.example/job': 'Example Bank offers a 12-week internship in 2027.'},
+        company_names=['Example Bank'])
+
+
+def test_employer_programme_numbers_use_exact_employer_evidence():
+    clause = 'Example Bank offers a 12-week internship in 2027'
+    claim = {'text': clause, 'source_urls': ['https://employer.example/job']}
+    assert not numeric_result(clause + '. I would enjoy contributing Python skills.', claim)
+    assert any('number 2028' in x for x in numeric_result(clause.replace('2027', '2028') + '.',
+        dict(claim, text=clause.replace('2027', '2028'))))
+    assert any('number 12' in x for x in numeric_result(clause + '.', dict(claim, source_urls=[])))
+
+
+@pytest.mark.parametrize('clause', [
+    'I built 12 features at Example Bank in 2027',
+    'My graduation year is 2027 at Example Bank',
+    'Simulator processed 12 trades for Example Bank in 2027',
+])
+def test_employer_numeric_claim_cannot_license_candidate_history(clause):
+    claim = {'text': clause, 'source_urls': ['https://employer.example/job']}
+    assert any('number' in x for x in numeric_result(clause + '.', claim))
+
+
+def test_subjective_enjoyment_does_not_license_unsupported_performed_action():
+    claim = {'text': 'I enjoy business analytics and an empowering culture.', 'fact_ids': ['p']}
+    assert not numeric_result(claim['text'], {'text': '', 'source_urls': []}, [claim])
+    alignment = {'text': 'My interests in software engineering, artificial intelligence, and data engineering align with the kind of work Example Bank does.', 'fact_ids': ['p']}
+    assert not numeric_result(alignment['text'], {'text': '', 'source_urls': []}, [alignment])
+    history = {'text': 'I enjoy analytics because I built a secure deployment platform with compliance controls.', 'fact_ids': ['p']}
+    assert any('UNSUPPORTED' in x for x in numeric_result(history['text'], {'text': '', 'source_urls': []}, [history]))
+
+
+def test_large_profile_index_prioritizes_documented_tradeoffs_without_inventing_story():
+    facts = []
+    for name, design in [('Concurrent system', 'Independent components coordinate updates.'),
+                         ('Algorithm visualizer', 'Greedy search trades optimality for heuristic search while BFS finds optimal paths.')]:
+        for key, value in [('contribution', 'Sole author.'), ('public_architecture_tradeoffs', design),
+                           ('public_implementation_details', 'Implemented search animation with pause and step control.')]:
+            facts.append({'id': name + key, 'entity': name, 'category': 'project', 'key': key, 'value': value})
+    index = technical_evidence_index(facts, 'CHALLENGE')
+    assert index[0]['entity'] == 'Algorithm visualizer'
+    assert {f['id'] for c in index for f in c['recorded_evidence']} == {f['id'] for f in facts}
+    assert technical_evidence_index(facts, 'HYPOTHETICAL') == []

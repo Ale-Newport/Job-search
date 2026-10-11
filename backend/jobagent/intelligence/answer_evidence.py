@@ -314,7 +314,11 @@ def prose_claim_issues(answer, known, used):
             r"iterated|adjusted|augmented|optimized|tested|validated|integrated|designed|created|deployed)\b|"
             r"\b(?:This(?: (?:project|system|pipeline|challenge))?|It|The (?:project|system|pipeline|challenge))\s+(?:required|taught|reinforced)\b",
             sentence, re.I)
-        method_words = content_words(sentence)
+        # Check the performed action separately from a relative reflection.
+        # Other incident/guarantee checks still inspect the entire sentence.
+        action_clause = re.split(r',\s*which\b|\bwhich\s+(?:forced|helped|taught|gave)\b', sentence,
+                                 maxsplit=1, flags=re.I)[0]
+        method_words = content_words(action_clause)
         missing_method_words = method_words - content_words(source)
         if historical_method and len(method_words) >= 4 and len(missing_method_words) / len(method_words) > .5:
             issues.append('UNSUPPORTED_LLM_CLAIM: actual answer adds undocumented historical method detail: ' +
@@ -477,8 +481,8 @@ def entailment_issues(answer, claims, known, used):
         # Allow normal paraphrases, while refusing a claim whose substantive
         # detail is mostly absent from its cited source.
         subjective = bool(re.search(r'\b(?:I (?:am|would be) (?:interested|drawn|excited)|I (?:want|hope|prefer)|'
-                                   r'(?:excited|interested|passionate|drawn)\s+(?:about|in|to)|'
-                                   r'(?:my|this) (?:background|interest|experience).{0,35}\balign|'
+                                   r'I (?:enjoy|value|appreciate)\b|(?:excited|interested|passionate|drawn)\s+(?:about|in|to)|'
+                                   r'(?:my|this|these|those) (?:professional )?(?:background|interests?|experience)[^.!?]{0,200}\balign|'
                                    r'\bopportunity to|\bchance to)\b', claim.get('text', ''), re.I))
         historical = bool(re.search(r'\b(?:built|developed|deployed|implemented|managed|led|resolved|increased|reduced|achieved)\b', claim.get('text', ''), re.I))
         if len(words) >= 4 and len(missing) / len(words) > .5 and not (subjective and not historical):
@@ -492,8 +496,27 @@ def entailment_issues(answer, claims, known, used):
     return issues
 
 
+def candidate_numeric_prose(answer, generated, facts, company_sources, company_names):
+    """Exclude exact sourced employer clauses, never candidate accomplishments."""
+    candidate_text = answer
+    candidate_entities = {f.get('entity') for f in facts if f.get('entity') and f.get('category') in
+                          {'project', 'experience', 'education'}}
+    for claim in generated.get('company_claims', []):
+        text, urls = claim.get('text', ''), claim.get('source_urls', [])
+        if (not text or text not in candidate_text or not urls or any(url not in company_sources for url in urls)
+                or re.search(r'\b(?:I|my|we|our)\b', text, re.I)
+                or any(name.casefold() in text.casefold() for name in candidate_entities)
+                or not any(name and name.casefold() in text.casefold() for name in company_names)):
+            continue
+        source = '\n'.join(company_sources[url] for url in urls)
+        if numeric_claims(text) <= numeric_claims(source):
+            candidate_text = candidate_text.replace(text, ' ')
+    return candidate_text
+
+
 class AnswerEvidenceValidator:
-    def validate(self, generated, facts, question_id, intent, output_requirements, previous_answers=(), resume=None):
+    def validate(self, generated, facts, question_id, intent, output_requirements, previous_answers=(), resume=None,
+                 *, company_sources=None, company_names=()):
         issues = []
         answer = generated.get('answer')
         if generated.get('question_id') != question_id:
@@ -529,12 +552,13 @@ class AnswerEvidenceValidator:
                 issues.append('INSTRUCTION_COMPLIANCE: wrong number of selected options')
         source = '\n'.join(str(known[x]['value']) for x in used).casefold()
         cited_facts = [known[x] for x in used]
-        for number, unit in factual_numeric_claims(answer, cited_facts) - factual_numeric_claims(source, cited_facts):
+        numeric_prose = candidate_numeric_prose(answer, generated, facts, company_sources or {}, company_names)
+        for number, unit in factual_numeric_claims(numeric_prose, cited_facts) - factual_numeric_claims(source, cited_facts):
             issues.append(f'UNSUPPORTED_LLM_CLAIM: number {number}{unit} is absent from cited evidence')
         used_entities = {known[x].get('entity') for x in used if x in known and known[x].get('entity')
                          and known[x].get('category') in {'project', 'experience'}}
         named_entities = {name for name in used_entities if name.casefold() in answer.casefold()}
-        for sentence in re.split(r'(?<!\d)[.!?](?:\s+|$)', answer):
+        for sentence in re.split(r'(?<!\d)[.!?](?:\s+|$)', numeric_prose):
             metric_entities = {name for name in named_entities if name.casefold() in sentence.casefold()}
             if not metric_entities and len(named_entities) == 1:
                 metric_entities = named_entities

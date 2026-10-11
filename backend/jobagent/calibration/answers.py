@@ -108,7 +108,9 @@ async def run(args):
     sources = await asyncio.gather(*(research.source(url) for url in urls))
     job['company_context'] = [source for source in sources if source]
     report_path = output / 'real-llm-regression.json'
+    selected_questions = getattr(args, 'question', None)
     report = {'genuine_provider_calls': False, 'provider': settings['text_provider'], 'model': settings['text_model'],
+              'selected_question_numbers': selected_questions or list(range(1, len(QUESTIONS) + 1)),
               'job': {key: job.get(key) for key in ('id', 'title', 'company', 'location', 'url', 'application_url')},
               'usage_ledger': str(Path(args.usage_database).resolve()) if args.usage_database else str(output / 'llm-calibration.sqlite3'),
               'usage_before': calibration_usage(usage_db),
@@ -127,6 +129,8 @@ async def run(args):
     print(json.dumps({'stage': 'connected', 'latency_ms': report['connection']['latency_ms']}), flush=True)
     previous = []
     for index, question in enumerate(QUESTIONS):
+        if selected_questions and index + 1 not in selected_questions:
+            continue
         started = time.monotonic()
         field = {'id': f'real-question-{index + 1}', 'type': 'textarea', 'multiline': True, '_related_answers': list(previous)}
         try:
@@ -158,6 +162,8 @@ def main(argv=None):
     parser.add_argument('--database', required=True)
     parser.add_argument('--output', required=True)
     parser.add_argument('--job', required=True, help='Exact stored target job ID; matching titles never substitute another vacancy')
+    parser.add_argument('--question', action='append', type=int, choices=range(1, len(QUESTIONS) + 1),
+                        help='Replay a specific original question number; repeat to select several. Default runs all ten.')
     parser.add_argument('--allow-remote', action='store_true')
     parser.add_argument('--usage-database', help='Existing live database whose nonsecret provider settings and shared monthly usage ledger are used')
     asyncio.run(run(parser.parse_args(argv)))

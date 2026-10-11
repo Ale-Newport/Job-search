@@ -4,6 +4,7 @@ import pytest
 from jobagent.automation.answers import option_for
 from jobagent.intelligence.formatting import AnswerFormatResolver, choice
 from jobagent.intelligence.answer_evidence import prose_claim_issues, AnswerEvidenceValidator
+from jobagent.intelligence.answer_evidence import content_words, reconcile_claim_evidence
 from jobagent.automation.reasoning import conditional_state
 from jobagent.automation.adapters import get_adapter
 from jobagent.automation.consent import dropdown_open_target
@@ -134,3 +135,19 @@ def test_large_profile_index_prioritizes_documented_tradeoffs_without_inventing_
     assert index[0]['entity'] == 'Algorithm visualizer'
     assert {f['id'] for c in index for f in c['recorded_evidence']} == {f['id'] for f in facts}
     assert technical_evidence_index(facts, 'HYPOTHETICAL') == []
+
+
+def test_named_project_and_hyphenated_pathfinding_keep_actual_implementation_support():
+    common = {'entity': 'Labyrinth', 'entity_id': 'maze', 'category': 'project'}
+    facts = [dict(common, id='author', key='contribution', value='Sole author.'),
+             dict(common, id='code', key='public_implementation_details', value=[
+                 'Maze generation includes recursive backtracker, randomized Prim and randomized Kruskal.',
+                 'Search includes BFS, DFS, Dijkstra and A*.'])]
+    answer = 'The hardest technical challenge I faced was building Labyrinth, where I implemented maze-generation and pathfinding algorithms.'
+    generated = {'question_id': 'q', 'intent': 'CHALLENGE', 'answer': answer, 'facts_used': ['author'],
+                 'claims': [{'text': answer, 'fact_ids': ['author']}], 'company_claims': [],
+                 'unsupported_claims': [], 'answers_question': True, 'follows_instructions': True}
+    reconcile_claim_evidence(generated, facts)
+    assert generated['claims'][0]['fact_ids'] == ['author', 'code']
+    assert not AnswerEvidenceValidator().validate(generated, facts, 'q', 'CHALLENGE', {})
+    assert content_words('maze-generation and pathfinding') == content_words('maze generation and search')

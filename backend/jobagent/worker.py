@@ -139,7 +139,6 @@ async def serve(root: Path, task_id: str):
         orchestrator = Orchestrator(db, root, application_scope=task['application_id'], recover=False)
         orchestrator.browser.profile_path = root / 'browser-profile' / 'applications' / task['application_id']
         orchestrator.browser._headless = bool(payload.get('headless', False))
-        orchestrator.preparation_timeout = 220
         orchestrator.text_service = TextService(db, SecretStore())
         # Reopen semantic checkpoint URL after process loss, never replay a submit.
         run = db.one('SELECT checkpoint FROM automation_runs WHERE id=?', (task['run_id'],))

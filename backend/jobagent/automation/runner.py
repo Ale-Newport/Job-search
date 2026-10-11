@@ -158,6 +158,24 @@ class BrowserManager(BrowserSession):
                 'resume_text': resumes[0].get('text', ''), 'resume_hash': resumes[0].get('content_hash', ''),
                 'resume_document_id': resumes[0].get('id'), 'resume_version_id': resumes[0].get('id')}
 
+        async def answer_progress(update):
+            diagnostic = self._answer_diagnostics.get(update['question_id'])
+            if diagnostic is None:
+                return
+            diagnostic.update(status=update['status'], generation_attempt=update['attempt'])
+            if self.on_step:
+                outcome = self.on_step({'operation': 'ANSWER_PROGRESS', 'executed': False,
+                    'label': diagnostic['question'], 'application_id': self._active_application_id,
+                    'observation': snapshot, 'form_state': self.form_state,
+                    'answer_diagnostics': [dict(d) for d in self._answer_diagnostics.values()],
+                    'answer_progress': [{'question_id': d['question_id'], 'question': d['question'], 'status': d['status']}
+                                        for d in self._answer_diagnostics.values()]})
+                if inspect.isawaitable(outcome):
+                    await outcome
+        answer_llm = getattr(settings.get('_candidate_engine'), 'answer_llm', None)
+        if answer_llm is not None and hasattr(answer_llm, 'on_progress'):
+            answer_llm.on_progress = answer_progress
+
         async def resolve(element):
             element = resolution_element(element, snapshot['elements'])
             field = adapter.question(element)

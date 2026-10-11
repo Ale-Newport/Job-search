@@ -281,6 +281,10 @@ def prospective_statement(sentence):
         PAST_EVENT_ACTION.search(sentence) or PAST_IMPLEMENTATION.search(sentence))
 
 
+def evidence_text(facts):
+    return '\n'.join(str(fact.get('entity') or '') + ' ' + str(fact['value']) for fact in facts)
+
+
 def prose_claim_issues(answer, known, used):
     """Check omitted incident, guarantee and causal claims against local evidence."""
     issues = []
@@ -303,8 +307,7 @@ def prose_claim_issues(answer, known, used):
         if mentioned:
             active = mentioned
         local_facts = [fact for entity in active for fact in grouped[entity]]
-        source = '\n'.join(str(fact['value']) for fact in (local_facts if grouped else
-                           [known[identifier] for identifier in used if identifier in known]))
+        source = evidence_text(local_facts if grouped else [known[identifier] for identifier in used if identifier in known])
         if prospective_statement(sentence):
             continue
         # Inspect factual methods in the prose even if the model omitted them
@@ -370,7 +373,7 @@ def content_words(text):
                'project work worked working experience system team software engineering engineer engineers '
                'its these those into both more each all their they them not only led lead would can could '
                'be been am are such some very significantly particular particularly result results '
-               'complex challenging challenge significant numerous various real-world'.split())
+               'complex challenging challenge significant numerous various real-world hardest difficult technical faced implementation'.split())
     def stem(word):
         if any(character in word for character in '.+#'):
             return word
@@ -387,8 +390,11 @@ def content_words(text):
         return word[:-1] if len(word) > 5 and word.endswith('e') else word
     # Normalize both source and claim, including stop words, before comparison.
     # Terminal periods are punctuation; internal periods in Vue.js remain useful.
-    normalized_stop = {stem(word) for word in stop}
-    words = {stem(word) for word in TOKENS.findall(str(text).casefold()) if len(word) >= 3} - normalized_stop
+    normalized_stop = {stem(word) for word in TOKENS.findall(' '.join(stop).replace('-', ' '))}
+    words = {stem(word) for word in TOKENS.findall(str(text).casefold().replace('-', ' ')) if len(word) >= 3} - normalized_stop
+    if 'pathfind' in words:
+        words.remove('pathfind')
+        words.add('search')
     if re.search(r'deep[- ]learning|neural|\bcnn\b|machine[- ]learning', str(text), re.I):
         words.update({stem('machine'), stem('learning')})
     return words
@@ -442,7 +448,7 @@ def reconcile_claim_evidence(generated, facts):
         claim_terms = content_words(claim.get('text', ''))
         claim_numbers = factual_numeric_claims(claim.get('text', ''), [known[identifier] for identifier in identifiers])
         for _ in range(3):
-            cited = '\n'.join(str(known[identifier]['value']) for identifier in identifiers)
+            cited = evidence_text([known[identifier] for identifier in identifiers])
             missing_terms = claim_terms - content_words(cited)
             missing_numbers = claim_numbers - factual_numeric_claims(cited, [known[identifier] for identifier in identifiers])
             candidates = []
@@ -475,7 +481,7 @@ def entailment_issues(answer, claims, known, used):
     for claim in claims if isinstance(claims, list) else []:
         if not isinstance(claim, dict):
             continue
-        cited = '\n'.join(str(known[x]['value']) for x in claim.get('fact_ids', []) if x in known)
+        cited = evidence_text([known[x] for x in claim.get('fact_ids', []) if x in known])
         words = content_words(claim.get('text', ''))
         missing = words - content_words(cited)
         # Allow normal paraphrases, while refusing a claim whose substantive

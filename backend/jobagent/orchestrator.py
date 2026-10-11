@@ -21,7 +21,10 @@ def settings_for(db):
 
 
 class Orchestrator:
-    preparation_timeout = 180
+    # Multi-question generation and independent reviews can exceed a few
+    # minutes. Per-request timeouts and the worker progress watchdog still
+    # bound stalls; this is an overall limit, not the liveness detector.
+    preparation_timeout = 1800
     submission_timeout = 60
     review_states = frozenset({'needs_review', 'ready_for_review', 'human_required', 'browser_question',
                                'section_review', 'section_approved'})

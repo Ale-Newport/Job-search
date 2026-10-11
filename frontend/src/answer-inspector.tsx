@@ -21,6 +21,12 @@ export function AnswerInspector({
   const missing = answer.missing_facts ?? answer.missing_fields;
   const validation = answer.validation ?? answer.validation_result;
   const state = answer.status || answer.state || answer.generation_state;
+  const progressText: Record<string, string> = {
+    GENERATING: "Generating answer",
+    REGENERATING: "Rewriting after validation",
+    VALIDATING: "Checking answer quality",
+    RETRYING: "Retrying the model request",
+  };
   return (
     <details className="answer-inspector" open={open}>
       <summary>Answer Inspector{state ? ` · ${label(state)}` : ""}</summary>
@@ -47,8 +53,8 @@ export function AnswerInspector({
             requested_format: format || "Not recorded",
             generated_answer:
               text ||
-              (state === "GENERATING"
-                ? "Generating answer"
+              (state && progressText[state]
+                ? progressText[state]
                 : answer.leave_blank
                   ? "Left blank by policy"
                   : "No supported answer"),
@@ -57,6 +63,9 @@ export function AnswerInspector({
             candidate_facts_used: answer.facts_used || answer.fact_ids || [],
             llm_provider: answer.provider || "Not used / not recorded",
             llm_model: answer.model || "Not used / not recorded",
+            ...(answer.generation_attempt
+              ? { generation_attempt: answer.generation_attempt }
+              : {}),
             validation_result:
               validation ??
               (quality?.passed === undefined

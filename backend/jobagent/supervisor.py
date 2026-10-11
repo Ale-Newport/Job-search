@@ -177,7 +177,9 @@ class WorkerSupervisor(Orchestrator):
         worker.state = 'RUNNING'
         worker.progress = time.monotonic()
         self.db.execute("UPDATE automation_tasks SET state='RUNNING',updated_at=? WHERE id=?", (now(), worker.task['id']))
-        await self._rpc(worker, 'fill', {'resume': resume}, timeout=self.progress_seconds)
+        # The progress watchdog detects a stalled worker independently. A
+        # healthy multi-question fill may take longer than that idle interval.
+        await self._rpc(worker, 'fill', {'resume': resume}, timeout=self.preparation_timeout)
 
     def _claim(self, capacity):
         with self.db.transaction() as conn:

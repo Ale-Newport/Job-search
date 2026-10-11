@@ -8,6 +8,7 @@ from __future__ import annotations
 import asyncio
 from dataclasses import dataclass
 import hashlib
+import inspect
 import json
 import logging
 import math
@@ -26,7 +27,7 @@ from .intelligence.professional_context import (contains_private_candidate_data,
 from .usage import Reservation
 
 logger = logging.getLogger('meridian.answers')
-PROMPT_VERSION = 'application-answer-v7'
+PROMPT_VERSION = 'application-answer-v8'
 PROVIDERS = {
     'openai': 'https://api.openai.com/v1',
     'anthropic': 'https://api.anthropic.com/v1',
@@ -217,6 +218,8 @@ Describe documented mechanisms, not hoped-for guarantees. Architecture and compo
 establish corruption or race prevention, consistency, avoided bottlenecks, minimal coupling or real-time
 requirements. Do not convert an intended correctness or performance property into an achieved result.
 Explain why coordinating the documented mechanisms is challenging, without inventing a fix or optimization.
+End technical stories with the documented design tradeoff or present-tense technical reasoning. Do not add
+retrospective lessons or claim that an unrecorded constraint required a particular implementation method.
 Verified facts are authoritative; an uploaded CV may retain superseded education or language details.
 For NOT_ON_RESUME compare with exact uploaded_resume; facts must describe an achievement absent from it.
 Choose an achievement whose evidence_groups entry is absent_from_uploaded_resume=true when available.
@@ -302,7 +305,7 @@ def relevant_excerpt(text, question, limit):
 
 
 class ApplicationAnswerLLM:
-    def __init__(self, db, secret_store, *, transport=None, usage_db=None):
+    def __init__(self, db, secret_store, *, transport=None, usage_db=None, on_progress=None):
         self.db, self.secrets, self.transport = db, secret_store, transport
         # QA profile copies must reserve against the same ledger as live use.
         self.usage_db = usage_db if usage_db is not None else db
@@ -311,6 +314,13 @@ class ApplicationAnswerLLM:
         self._active = 0
         self.validator = AnswerEvidenceValidator()
         self.consistency = ApplicationConsistencyReviewer()
+        self.on_progress = on_progress
+
+    async def _progress(self, question_id, intent, state, attempt):
+        if self.on_progress:
+            outcome = self.on_progress({'question_id': question_id, 'intent': intent, 'status': state, 'attempt': attempt + 1})
+            if inspect.isawaitable(outcome):
+                await outcome
 
     def locked(self):
         return self._active > 0
@@ -503,6 +513,8 @@ class ApplicationAnswerLLM:
         upper = ((len(json.dumps(body).encode()) + 1000) * input_rate + maximum * prices['output_cost_per_million']) / 1_000_000
         total_cost = 0
         for attempt in range(retries + 1):
+            if attempt and payload.get('question_id'):
+                await self._progress(payload['question_id'], payload.get('intent'), 'RETRYING', attempt)
             reservation = Reservation(self.usage_db, upper, budget, provider)
             try:
                 async with httpx.AsyncClient(timeout=timeout, trust_env=False, follow_redirects=False, **({'transport': self.transport} if self.transport else {})) as client:
@@ -717,6 +729,7 @@ class ApplicationAnswerLLM:
                 feedback = []
                 previous_draft = None
                 for attempt in range(3):
+                    await self._progress(qid, intent, 'REGENERATING' if attempt else 'GENERATING', attempt)
                     request = json.loads(context.payload_json)
                     if feedback:
                         request['revision_requirements'] = feedback
@@ -750,7 +763,7 @@ class ApplicationAnswerLLM:
                     generation_system = SYSTEM
                     if output_requirements.get('target_words'):
                         target = output_requirements['target_words']
-                        prompt_target = max(output_requirements['min_words'], target - max(1, round(target * .1)))
+                        prompt_target = max(output_requirements['min_words'], target - max(1, round(target * .05)))
                         prompt_max = min(target, output_requirements['max_words'])
                         generation_system += (f'\nAim for {prompt_target} whitespace-separated words, between '
                             f'{output_requirements["min_words"]} and {prompt_max} words, leaving room below the absolute '
@@ -838,6 +851,7 @@ class ApplicationAnswerLLM:
                             issues.append('INSTRUCTION_COMPLIANCE: select exactly one role named in the form or employer context')
                     review = None
                     if not issues and settings.get('text_quality_review', True):
+                        await self._progress(qid, intent, 'VALIDATING', attempt)
                         review, review_usage = await self._request(call_settings, REVIEW_SYSTEM, {**request, 'generated_answer': generated}, review_schema)
                         total_cost += review_usage['cost']
                         scores = review.get('scores', {})
@@ -859,6 +873,7 @@ class ApplicationAnswerLLM:
                         raise AnswerValidationError(issues, details={'question_id': qid, 'intent': intent,
                             'discarded_draft': generated, 'quality_review': review, 'requirements': output_requirements})
                     answer = generated['answer'].strip()
+                    await self._progress(qid, intent, 'ANSWER_VALIDATED', attempt)
                     answer_hash = hashlib.sha256(answer.encode()).hexdigest()
                     logger.info('answer_validated question_id=%s context_hash=%s answer_hash=%s provider=%s model=%s', qid, context.context_hash, answer_hash, usage['provider'], usage['model'])
                     return {'id': str(uuid4()), **generated, 'question_id': qid, 'exact_question': question,

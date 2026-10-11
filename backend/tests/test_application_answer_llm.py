@@ -71,6 +71,29 @@ class Keys:
         return 'test-only-key'
 
 
+async def test_generation_review_and_regeneration_publish_immutable_question_progress(db, evidence):
+    events, drafts = [], 0
+    async def progress(update):
+        events.append(update)
+    def handler(request):
+        nonlocal drafts
+        payload = request_payload(request)
+        if 'generated_answer' in payload:
+            generated = {'question_id': payload['question_id'], 'passed': True,
+                         'scores': {name: .95 for name in SCORE_NAMES}, 'unsupported_claims': [], 'issues': [], 'reason': 'Grounded.'}
+        else:
+            drafts += 1
+            generated = complete(payload, fid=evidence, answer='I debugged a race condition in Chess Assistant AI.' if drafts == 1 else None)
+        return response_for(request, generated)
+    llm = ApplicationAnswerLLM(db, Keys(), transport=httpx.MockTransport(handler), on_progress=progress)
+    result = await llm.generate(settings(), 'Describe a project you built.', {}, question_id='progress-question')
+    assert result['state'] == 'ANSWER_VALIDATED'
+    assert [e['status'] for e in events] == ['GENERATING', 'REGENERATING', 'VALIDATING', 'ANSWER_VALIDATED']
+    assert {e['question_id'] for e in events} == {'progress-question'}
+    assert [e['attempt'] for e in events] == [1, 2, 2, 2]
+    assert all(set(e) == {'question_id', 'intent', 'status', 'attempt'} for e in events)
+
+
 def settings(provider='ollama'):
     return {'text_provider': provider, 'text_model': 'discovered-model', 'text_retry_attempts': 0,
             'text_quality_review': True, 'monthly_budget': 10,

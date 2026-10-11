@@ -303,9 +303,22 @@ def prose_claim_issues(answer, known, used):
         if mentioned:
             active = mentioned
         local_facts = [fact for entity in active for fact in grouped[entity]]
-        source = '\n'.join(str(fact['value']) for fact in local_facts)
+        source = '\n'.join(str(fact['value']) for fact in (local_facts if grouped else
+                           [known[identifier] for identifier in used if identifier in known]))
         if prospective_statement(sentence):
             continue
+        # Inspect factual methods in the prose even if the model omitted them
+        # from its claims index. Subjective future preferences are excluded.
+        historical_method = re.search(
+            r"\b(?:I|we)\s+(?:(?:had|needed) to\s+)?(?:built|developed|implemented|used|trained|"
+            r"iterated|adjusted|augmented|optimized|tested|validated|integrated|designed|created|deployed)\b|"
+            r"\b(?:This(?: (?:project|system|pipeline|challenge))?|It|The (?:project|system|pipeline|challenge))\s+(?:required|taught|reinforced)\b",
+            sentence, re.I)
+        method_words = content_words(sentence)
+        missing_method_words = method_words - content_words(source)
+        if historical_method and len(method_words) >= 4 and len(missing_method_words) / len(method_words) > .5:
+            issues.append('UNSUPPORTED_LLM_CLAIM: actual answer adds undocumented historical method detail: ' +
+                          ', '.join(sorted(missing_method_words)[:6]))
         details = {name: pattern for name, pattern in INCIDENT_DETAILS.items() if re.search(pattern, sentence, re.I)}
         completed = bool(COMPLETED_ACTION.search(sentence) or PAST_EVENT_ACTION.search(sentence))
         occurred = bool(details and INCIDENT_OCCURRENCE.search(sentence))

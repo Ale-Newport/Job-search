@@ -62,14 +62,19 @@ def resolution_element(element, elements):
 
 
 def dropdown_open_target(element, elements):
-    """Use only a menu toggle explicitly linked by the current DOM observation."""
+    """Open the observed combobox or its explicitly linked menu toggle."""
     trigger_id = element.get("dropdown_trigger_id")
-    if trigger_id is None or element.get("expanded"):
+    if element.get("expanded"):
         return None
-    return next((peer for peer in elements
+    linked = next((peer for peer in elements
                  if peer.get("document_id") == element.get("document_id")
                  and peer.get("node_id") == trigger_id and peer.get("role") == "button"
                  and "CLICK" in peer.get("operations", [])), None)
+    if linked:
+        return linked
+    if element.get("role") == "combobox" and "CLICK" in element.get("operations", []):
+        return element
+    return None
 
 
 def selected_resolution_matches(resolution, value):

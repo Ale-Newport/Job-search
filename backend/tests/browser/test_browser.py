@@ -276,6 +276,28 @@ async def test_unmatched_dropdown_does_not_stop_later_verified_fields(browser, f
     assert await browser.page.evaluate('window.submissions')==0
 
 
+async def test_editable_dropdown_reads_equivalent_visible_label_before_filtering(browser, fixture_server, candidate):
+    await browser.open(fixture_server + '/generic.html')
+    await browser.page.evaluate("""() => {
+      const widget=document.createElement('input');widget.setAttribute('role','combobox');
+      widget.setAttribute('aria-label','Country');widget.setAttribute('aria-expanded','false');
+      document.querySelector('form').prepend(widget);
+      function open(){widget.setAttribute('aria-expanded','true');
+        document.querySelector('#equivalent-country')?.remove();
+        if(widget.value && !'Great Britain'.includes(widget.value)) return;
+        const option=document.createElement('div');option.id='equivalent-country';
+        option.setAttribute('role','option');option.textContent='Great Britain';widget.after(option);
+        option.onclick=()=>{widget.value='Great Britain';widget.setAttribute('aria-expanded','false');option.remove()};
+      }
+      widget.onclick=open;widget.oninput=open;
+    }""")
+    browser._active_application_id='editable-options'
+    result=await browser.fill_application({'id':'editable-options','url':fixture_server+'/generic.html'},candidate,[])
+    assert any(a['question']=='Country' and a['answer']=='United Kingdom' for a in result['answers']), result
+    assert await browser.page.locator('[role=combobox]').input_value()=='Great Britain'
+    assert await browser.page.evaluate('window.submissions')==0
+
+
 async def test_laya_failure_in_ambiguous_navigation_requires_human(browser, fixture_server, candidate):
     class OfflineEngine:
         async def decide(self, snapshot, goal):

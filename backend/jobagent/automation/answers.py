@@ -187,6 +187,13 @@ def option_for(answer: str, options: list[dict], *, question: str = "") -> dict 
                       "no": {"no", "false"}, "false": {"no", "false"}}
     if norm in boolean_labels:
         equivalents = [o for o in labels if normalize(o.get("label", "")) in boolean_labels[norm]]
+        # These labels repeat the consent decision already resolved for the
+        # exact question. Extra purposes or eligibility assertions still fail.
+        if not equivalents and re.search(r"\bconsent\b|\bopt in\b|\bopt out\b", normalize(question)):
+            consent_labels = {"yes": {"yes i consent", "i consent"},
+                              "no": {"no i do not consent", "i do not consent"}}
+            polarity = "yes" if norm in {"yes", "true"} else "no"
+            equivalents = [o for o in labels if normalize(o.get("label", "")) in consent_labels[polarity]]
         return equivalents[0] if len(equivalents) == 1 else None
     matches = [o for o in labels if norm == normalize(o.get("value", ""))]
     if len(matches) == 1:

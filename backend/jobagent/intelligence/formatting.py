@@ -49,6 +49,8 @@ class AnswerFormatResolver:
             field.get("placeholder"), field.get("instructions"), field.get("validation_message"),
             field.get("pattern"),
         ))
+        # A research link is source material, not an instruction to enter a URL.
+        text = re.sub(r"https?://\S+", "", text)
         if kind == "file":
             return "FILE_UPLOAD"
         if field.get("options"):
@@ -84,7 +86,7 @@ class AnswerFormatResolver:
             return "YYYY-MM"
         if kind == "number":
             return "INTEGER" if str(field.get("step")) == "1" or re.search(r"whole number|integer", text, re.I) else "DECIMAL"
-        if kind == "url" or re.search(r"\bURL\b|https?://", text):
+        if kind == "url" or (kind != "textarea" and field.get("tag") != "textarea" and re.search(r"\bURL\b", text)):
             return "URL"
         if kind == "email":
             return "EMAIL"
@@ -219,6 +221,7 @@ def choice(value, options, *, question="", disclosure_concept=None):
                 "white other",
                 "other white",
                 "white any other white background",
+                "white any other white ethnic background",
                 "any other white background",
                 "other white background",
             }

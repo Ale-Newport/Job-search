@@ -65,9 +65,11 @@ def conditional_state(element, elements, adapter):
         )
     if not match:
         match = re.search(r"^\s*(other)\s*[,:(—-]?\s*please specify", text, re.I)
+    affirmative_followup = not match and bool(re.search(r"^\s*if so\b", text, re.I))
     if not match:
-        return None
-    expected = normalize(match[1])
+        if not affirmative_followup:
+            return None
+    expected = "yes" if affirmative_followup else normalize(match[1])
     preceding = []
     for candidate in elements:
         if candidate.get("node_id") == element.get("node_id") and candidate.get("document_id") == element.get(
@@ -79,6 +81,9 @@ def conditional_state(element, elements, adapter):
         ):
             continue
         if candidate.get("role") not in {"combobox", "radio", "checkbox"}:
+            continue
+        if affirmative_followup and (adapter.question(candidate) == adapter.question(element) or
+                element.get("group") and candidate.get("group") == element["group"]):
             continue
         preceding.append(candidate)
     explicit = [

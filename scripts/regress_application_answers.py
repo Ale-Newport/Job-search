@@ -34,7 +34,7 @@ async def run(args):
         usage_db = Database(usage_path)
         configure_from_live(db, usage_db)
     job = db.one("SELECT * FROM jobs WHERE id=?", (args.job,)) if args.job else {}
-    job = {**(job or {}), "id": args.job or "answer-regression", "application_id": "answer-regression",
+    job = {**(job or {}), "id": args.job or "answer-regression", "job_id": args.job or "answer-regression", "application_id": "answer-regression",
            "application_url": args.url, "url": args.url,
            "company": args.company or (job or {}).get("company", ""),
            "title": args.title or (job or {}).get("title", ""),

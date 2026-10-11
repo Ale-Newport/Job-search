@@ -26,14 +26,25 @@ const rateKeys = [
   "output_cost_per_million",
 ] as const;
 
-function modelPrices(config: Data, model: unknown): Data {
-  const saved = config.answer_model_prices?.[String(model || "").trim()];
-  return Object.fromEntries(rateKeys.map((key) => [key, saved?.[key] ?? ""]));
+const cacheRateFields = [
+  { key: "cached_input_cost_per_million", name: "Cached input" },
+  { key: "cache_write_cost_per_million", name: "Cache write" },
+] as const;
+
+function requiredRateKeys(provider: string): string[] {
+  return provider === "openai"
+    ? [...rateKeys, ...cacheRateFields.map((field) => field.key)]
+    : [...rateKeys];
 }
 
-function validPrices(prices: Data): boolean {
+function modelPrices(config: Data, model: unknown, provider: string): Data {
+  const saved = config.answer_model_prices?.[String(model || "").trim()];
+  return Object.fromEntries(requiredRateKeys(provider).map((key) => [key, saved?.[key] ?? ""]));
+}
+
+function validPrices(prices: Data, provider: string): boolean {
   return (
-    rateKeys.every((key) => {
+    requiredRateKeys(provider).every((key) => {
       const price = prices[key];
       return (
         price !== "" &&
@@ -151,10 +162,10 @@ function AnswerLLMForm({
     integrations.find((i) => i.provider === values.text_provider)?.config || {};
   const [savedConfig, setSavedConfig] = useState<Data>(initialConfig);
   const [prices, setPrices] = useState<Data>(
-    modelPrices(initialConfig, values.text_model),
+    modelPrices(initialConfig, values.text_model, values.text_provider),
   );
   const [fallbackPrices, setFallbackPrices] = useState<Data>(
-    modelPrices(initialConfig, values.text_fallback_model),
+    modelPrices(initialConfig, values.text_fallback_model, values.text_provider),
   );
   const [models, setModels] = useState<Array<{ id: string; label?: string }>>(
     [],
@@ -166,9 +177,9 @@ function AnswerLLMForm({
   const provider = values.text_provider;
   const remote = provider !== "none" && provider !== "ollama";
   const change = (key: string, value: unknown) => {
-    if (key === "text_model") setPrices(modelPrices(savedConfig, value));
+    if (key === "text_model") setPrices(modelPrices(savedConfig, value, provider));
     if (key === "text_fallback_model")
-      setFallbackPrices(modelPrices(savedConfig, value));
+      setFallbackPrices(modelPrices(savedConfig, value, provider));
     setValues((v) => ({ ...v, [key]: value }));
     setResult(null);
     setMessage("");
@@ -184,8 +195,8 @@ function AnswerLLMForm({
       text_base_url: "",
     }));
     setSavedConfig(config);
-    setPrices(modelPrices(config, model));
-    setFallbackPrices(modelPrices(config, ""));
+    setPrices(modelPrices(config, model, next));
+    setFallbackPrices(modelPrices(config, "", next));
     setSecret("");
     setModels([]);
     setResult(null);
@@ -213,33 +224,35 @@ function AnswerLLMForm({
     if (
       remote &&
       requireModel &&
-      !validPrices(prices)
+      !validPrices(prices, provider)
     )
       throw new Error(
-        "Enter current input and output token prices for the primary model. At least one rate must be positive.",
+        "Enter current input and output token prices for the primary model. At least one rate must be positive." +
+          (provider === "openai" ? " OpenAI also requires nonnegative cached input and cache write rates." : ""),
       );
-    if (remote && requireModel && fallback && !validPrices(fallbackPrices))
+    if (remote && requireModel && fallback && !validPrices(fallbackPrices, provider))
       throw new Error(
-        "Enter separate current input and output token prices for the fallback model. At least one rate must be positive.",
+        "Enter separate current input and output token prices for the fallback model. At least one rate must be positive." +
+          (provider === "openai" ? " OpenAI also requires nonnegative cached input and cache write rates." : ""),
       );
     if (
       remote &&
       fallback === model &&
       fallback &&
-      validPrices(prices) &&
-      validPrices(fallbackPrices) &&
-      rateKeys.some((key) => Number(prices[key]) !== Number(fallbackPrices[key]))
+      validPrices(prices, provider) &&
+      validPrices(fallbackPrices, provider) &&
+      requiredRateKeys(provider).some((key) => Number(prices[key]) !== Number(fallbackPrices[key]))
     )
       throw new Error("Primary and fallback rates for the same model must match.");
     if (provider !== "none" && (secret.trim() || remote)) {
       const exactPrices = { ...savedConfig.answer_model_prices };
-      if (remote && model && validPrices(prices))
+      if (remote && model && validPrices(prices, provider))
         exactPrices[model] = Object.fromEntries(
-          rateKeys.map((key) => [key, Number(prices[key])]),
+          requiredRateKeys(provider).map((key) => [key, Number(prices[key])]),
         );
-      if (remote && fallback && validPrices(fallbackPrices))
+      if (remote && fallback && validPrices(fallbackPrices, provider))
         exactPrices[fallback] = Object.fromEntries(
-          rateKeys.map((key) => [key, Number(fallbackPrices[key])]),
+          requiredRateKeys(provider).map((key) => [key, Number(fallbackPrices[key])]),
         );
       const config = {
         ...savedConfig,
@@ -606,6 +619,26 @@ function AnswerLLMForm({
                         </small>
                       </label>
                     ))}
+                    {provider === "openai" && cacheRateFields.map((field) => (
+                      <label className="field" key={field.key}>
+                        <span>{field.name} price per million tokens (USD)</span>
+                        <input
+                          aria-label={`${field.name} price per million tokens (USD)`}
+                          type="number"
+                          min={0}
+                          step="any"
+                          value={prices[field.key]}
+                          onChange={(e) => setPrices((p) => ({
+                            ...p,
+                            [field.key]: e.target.value === "" ? "" : Number(e.target.value),
+                          }))}
+                        />
+                        <small>
+                          Current published OpenAI rate for this exact primary
+                          model. Zero is accepted when it is the published rate.
+                        </small>
+                      </label>
+                    ))}
                     {String(values.text_fallback_model).trim() &&
                       (["input", "output"] as const).map((direction) => (
                         <label className="field" key={`fallback-${direction}`}>
@@ -631,6 +664,27 @@ function AnswerLLMForm({
                           <small>
                             Current published rate for the exact fallback model.
                             Required before cloud testing or generation.
+                          </small>
+                        </label>
+                      ))}
+                    {provider === "openai" && String(values.text_fallback_model).trim() &&
+                      cacheRateFields.map((field) => (
+                        <label className="field" key={`fallback-${field.key}`}>
+                          <span>Fallback {field.name.toLowerCase()} price per million tokens (USD)</span>
+                          <input
+                            aria-label={`Fallback ${field.name.toLowerCase()} price per million tokens (USD)`}
+                            type="number"
+                            min={0}
+                            step="any"
+                            value={fallbackPrices[field.key]}
+                            onChange={(e) => setFallbackPrices((p) => ({
+                              ...p,
+                              [field.key]: e.target.value === "" ? "" : Number(e.target.value),
+                            }))}
+                          />
+                          <small>
+                            Current published OpenAI rate for this exact fallback
+                            model. Required before cloud testing or generation.
                           </small>
                         </label>
                       ))}

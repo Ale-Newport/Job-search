@@ -255,6 +255,27 @@ async def test_custom_dropdown_matches_verified_option_and_progress_callback(bro
     assert any(e["operation"] == "CLICK" and e["observation"] for e in events)
 
 
+async def test_unmatched_dropdown_does_not_stop_later_verified_fields(browser, fixture_server, candidate):
+    await browser.open(fixture_server + '/generic.html')
+    await browser.page.evaluate("""() => {
+      const widget=document.createElement('div');widget.setAttribute('role','combobox');
+      widget.setAttribute('aria-label','Country');widget.setAttribute('aria-expanded','false');
+      widget.textContent='Select country';widget.style.cssText='padding:20px;border:1px solid';
+      document.querySelector('form').prepend(widget);
+      widget.onclick=()=>{widget.setAttribute('aria-expanded','true');
+        if(document.querySelector('[role=option]'))return;
+        const option=document.createElement('div');option.setAttribute('role','option');
+        option.textContent='Canada';widget.after(option)};
+    }""")
+    browser._active_application_id='unmatched'
+    result=await browser.fill_application({'id':'unmatched','url':fixture_server+'/generic.html'},candidate,[])
+    assert result['status']=='human_required', result
+    assert any(q['question']=='Country' and q['kind']=='option' for q in result['questions'])
+    assert await browser.page.locator('[name=email]').input_value()=='alex@example.test'
+    assert not any(a['question']=='Country' for a in result['answers'])
+    assert await browser.page.evaluate('window.submissions')==0
+
+
 async def test_laya_failure_in_ambiguous_navigation_requires_human(browser, fixture_server, candidate):
     class OfflineEngine:
         async def decide(self, snapshot, goal):

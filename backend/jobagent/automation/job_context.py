@@ -33,7 +33,7 @@ def _source(text, url, kind, observed_at=None):
 
 def stored_job_context(application):
     """Do not forward application notes, saved answers or contact values as JD."""
-    keys = ("title", "company", "location", "country", "url", "application_url", "ats", "source")
+    keys = ("job_id", "company_id", "title", "company", "location", "country", "url", "application_url", "ats", "source")
     result = {key: application[key] for key in keys if application.get(key)}
     result["application_id"] = application.get("application_id") or application.get("id")
     result["description"] = _plain(application.get("description"))

@@ -7,6 +7,7 @@ share the selected candidate data with the selected employers. Never submits.
 import argparse
 import asyncio
 import json
+import re
 from pathlib import Path
 from jobagent.db import Database
 from jobagent.core import get_settings
@@ -72,6 +73,12 @@ def audit_fields(snapshot, adapter, intelligence, result, job):
         elif field["role"] == "checkbox":
             value = "Yes" if field.get("checked") else ""
         match = bool(expected is not None and value and selected_choice_matches(question, str(expected), str(value)))
+        if field.get('type') == 'tel' and expected is not None and value:
+            # ATS phone widgets can insert spacing without changing the number.
+            # Compare the complete digit sequence, including the country code.
+            expected_digits = re.sub(r'\D', '', str(expected))
+            observed_digits = re.sub(r'\D', '', str(value))
+            match = bool(7 <= len(expected_digits) <= 15 and expected_digits == observed_digits)
         if field.get('multiple'):
             if field.get('tag') == 'select':
                 selected = [o['label'] for o in field['options'] if o['value'] in field.get('selected_values', [])]

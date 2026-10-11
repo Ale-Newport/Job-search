@@ -37,13 +37,17 @@ def configure_from_live(db, live_db):
     row = live_db.one('SELECT config FROM integrations WHERE provider=?', (provider,))
     config = json.loads(row['config']) if row else {}
     prices = {key: config[key] for key in ('input_cost_per_million', 'output_cost_per_million') if key in config}
-    rate_keys = ('input_cost_per_million', 'output_cost_per_million')
+    rate_keys = ('input_cost_per_million', 'output_cost_per_million',
+                 'cached_input_cost_per_million', 'cache_write_cost_per_million')
+    required_keys = rate_keys[:2]
     bound_prices = config.get('answer_model_prices', {})
     if isinstance(bound_prices, dict):
         prices['answer_model_prices'] = {
-            model: {key: rates[key] for key in rate_keys} for model, rates in bound_prices.items()
+            model: {key: rates[key] for key in rate_keys if key in rates
+                    and not isinstance(rates[key], bool) and isinstance(rates[key], (int, float))
+                    and math.isfinite(rates[key]) and rates[key] >= 0} for model, rates in bound_prices.items()
             if isinstance(rates, dict) and all(not isinstance(rates.get(key), bool) and isinstance(rates.get(key), (int, float))
-                                              and math.isfinite(rates[key]) and rates[key] >= 0 for key in rate_keys)
+                                              and math.isfinite(rates[key]) and rates[key] >= 0 for key in required_keys)
         }
     if provider and provider != 'none':
         from jobagent.db import uid

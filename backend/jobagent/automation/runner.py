@@ -69,6 +69,12 @@ class BrowserManager(BrowserSession):
         narratives = [d for d in self._answer_diagnostics.values() if d.get('provider') in
                       {'openai', 'anthropic', 'gemini', 'ollama', 'openai-compatible'} and d.get('answer')]
         coherence = ApplicationConsistencyReviewer().review(narratives)
+        from ..intelligence.form_consistency import review_observed_facts
+        factual_review = review_observed_facts(snapshot, get_adapter(snapshot['url']) if snapshot else None,
+            getattr(self, '_consistency_engine', None), getattr(self, '_consistency_job', {}))
+        coherence['issues'].extend(factual_review['issues'])
+        coherence['passed'] = coherence['passed'] and factual_review['passed']
+        coherence['factual_fields_checked'] = factual_review['checked_fields']
         if status == 'needs_review' and not coherence['passed']:
             status = 'human_required'
             questions = [*(questions or []), {'question': 'Review repeated or inconsistent application answers.',
@@ -139,6 +145,8 @@ class BrowserManager(BrowserSession):
         snapshot = None
         policies = dict(settings.get("sensitive_policies", {}))
         policies["_candidate_engine"] = settings.get("_candidate_engine")
+        self._consistency_engine = settings.get('_candidate_engine')
+        self._consistency_job = settings.get('_job_context', application)
         policies["_job_context"] = settings.get("_job_context", application)
         reasoning_cache = {}
         self._answer_diagnostics = {}
@@ -240,12 +248,14 @@ class BrowserManager(BrowserSession):
             dismissed_cookies = set()
             field_attempts = {}
             pending_dropdown = None
+            failed_dropdowns = {}
             cleared_disclosures = set()
             while len(steps) < max_steps:
                 self.form_state = 'ANALYSE_CURRENT_STEP'
                 job_context = enrich_job_context(settings.get('_job_context', application), snapshot)
                 settings['_job_context'] = job_context
                 policies['_job_context'] = job_context
+                self._consistency_job = job_context
                 intelligence = settings.get('_candidate_engine')
                 if intelligence:
                     intelligence.reload()
@@ -331,9 +341,14 @@ class BrowserManager(BrowserSession):
                         await asyncio.sleep(.2)
                         snapshot = await self.observe()
                     if len(choices) != 1:
-                        return self._result("human_required", snapshot, answers=answers, steps=steps, adapter=adapter.name,
-                                            questions=[{"question": resolution["question"], "kind": "option",
-                                                        "reason": "No unique visible dropdown option matches the verified answer."}])
+                        failed_dropdowns[(pending_dropdown['frame_url'], pending_dropdown['manual_key'] or
+                                          (pending_dropdown['document_id'], pending_dropdown['node_id']))] = {
+                            'question': resolution['question'], 'kind': 'option',
+                            'reason': 'No unique visible dropdown option matches the verified answer.'}
+                        # An unresolved choice must not prevent independent later
+                        # fields from being completed. It remains a final review item.
+                        pending_dropdown = None
+                        continue
                     try:
                         await self._record_step(await self.execute(Decision(Operation.CLICK, choices[0]["index"]), snapshot), steps, snapshot)
                     except UserEdit:
@@ -350,9 +365,12 @@ class BrowserManager(BrowserSession):
                     selected = next((e for e in snapshot["elements"] if e["node_id"] == pending_dropdown["node_id"] and
                                      e["document_id"] == pending_dropdown["document_id"]), None)
                     if selected is None or selected.get("expanded") or normalize(selected.get("selected_text") or selected.get("value", "")) != normalize(choices[0]["label"]):
-                        return self._result("human_required", snapshot, answers=answers, steps=steps, adapter=adapter.name,
-                                            questions=[{"question": resolution["question"], "kind": "option",
-                                                        "reason": "The selected dropdown value could not be independently verified."}])
+                        failed_dropdowns[(pending_dropdown['frame_url'], pending_dropdown['manual_key'] or
+                                          (pending_dropdown['document_id'], pending_dropdown['node_id']))] = {
+                            'question': resolution['question'], 'kind': 'option',
+                            'reason': 'The selected dropdown value could not be independently verified.'}
+                        pending_dropdown = None
+                        continue
                     resolution['selection_verified'] = True
                     diagnostic = self._answer_diagnostics.get(resolution.get('question_id'))
                     if diagnostic:
@@ -381,6 +399,12 @@ class BrowserManager(BrowserSession):
                             self._add_answer(answers, {'question': field, 'answer': edit['answer'],
                                 'fact_ids': edit.get('fact_ids') or [], 'verified': bool(edit.get('fact_ids')),
                                 'kind': classify_question(field), 'source': 'user_edit'})
+                        continue
+                    unresolved = failed_dropdowns.get((element.get('frame_url'), element.get('manual_key') or
+                                                       (element['document_id'], element['node_id'])))
+                    if unresolved:
+                        questions.append({**unresolved, 'target': element['index'],
+                                          'required': bool(element.get('required'))})
                         continue
                     inherit_disclosure_context(element, snapshot["elements"], adapter)
                     disclosure = disclosure_resolution(adapter.question(element), element, policies)

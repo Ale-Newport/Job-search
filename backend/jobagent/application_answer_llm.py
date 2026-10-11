@@ -35,6 +35,35 @@ PROVIDERS = {
 SETUP_MESSAGE = 'An LLM is required to generate personalised answers to open-ended application questions. Choose a provider, connect an API key through the app (or select an available local Ollama model), select a model and test the connection.'
 SCORE_NAMES = ('question_relevance', 'specificity', 'factual_support', 'clarity', 'professional_quality',
                'company_relevance', 'instruction_compliance', 'length_compliance', 'redundancy', 'naturalness')
+OPENAI_CACHE_RATE_KEYS = ('cached_input_cost_per_million', 'cache_write_cost_per_million')
+
+
+def professional_previous_answers(answers):
+    """Keep validated professional context; never forward factual form history."""
+    from .intelligence.engine import NARRATIVE_INTENTS
+    safe = []
+    for answer in answers:
+        if not isinstance(answer, dict):
+            continue
+        intent = answer.get('intent') or answer.get('canonical_intent')
+        state = answer.get('state') or answer.get('status')
+        quality = answer.get('quality') or {}
+        if (intent not in NARRATIVE_INTENTS or state not in {'ANSWER_VALIDATED', 'ANSWER_ACCEPTED_BY_FORM'}
+                or not isinstance(quality, dict) or quality.get('passed') is not True
+                or answer.get('root_cause') or answer.get('requires_human_input')
+                or answer.get('kind') in {'contact', 'identity', 'gender', 'ethnicity', 'disability',
+                                          'demographic', 'consent', 'work_authorization'}):
+            continue
+        projected = {key: answer[key] for key in ('question_id', 'exact_question', 'intent', 'answer',
+                     'facts_used', 'evidence_entities', 'selected_roles', 'selected_options') if key in answer}
+        text = json.dumps({key: projected.get(key) for key in ('exact_question', 'answer', 'selected_roles', 'selected_options')}, ensure_ascii=False)
+        if re.search(r'[\w.+-]+@[\w.-]+\.[a-z]{2,}|(?:\+?\d[\d ()-]{8,}\d)|'
+                     r'\b(?:sexual orientation|transgender|ethnicity|my disability|my visa|'
+                     r'heterosexual|homosexual|bisexual|work authori[sz]ation|'
+                     r'sponsorship status|passport|national insurance)\b', text, re.I):
+            continue
+        safe.append(projected)
+    return safe
 
 
 class ConfigurationError(ValueError):
@@ -262,7 +291,12 @@ class ApplicationAnswerLLM:
                 raise ConfigurationError(f'Configure current input and output token prices for the exact {role} cloud answer model. Rates saved for another model or generic provider rates cannot price it.')
             if sum(prices[key] for key in rate_keys) <= 0:
                 raise ConfigurationError('Cloud token rates cannot both be zero. Enter each selected model’s current paid token rates so the authorized spending cap can be enforced; local inference can use zero rates.')
-        return {key: model_prices[model][key] for key in rate_keys}, float(budget)
+            if provider == 'openai' and any(isinstance(prices.get(key), bool) or not isinstance(prices.get(key), (int, float))
+                                            or not math.isfinite(prices[key]) or prices[key] < 0 for key in OPENAI_CACHE_RATE_KEYS):
+                role = 'fallback' if selected == fallback and selected != model else 'selected'
+                raise ConfigurationError(f'Configure current cached input and cache write token prices for the exact {role} OpenAI answer model. Automatic cache writes may cost more than ordinary input; the spending cap requires model-bound cache rates.')
+        selected_keys = rate_keys + OPENAI_CACHE_RATE_KEYS if provider == 'openai' else rate_keys
+        return {key: model_prices[model][key] for key in selected_keys}, float(budget)
 
     async def status(self, settings):
         provider = settings.get('text_provider', 'none')
@@ -391,7 +425,10 @@ class ApplicationAnswerLLM:
                 body['thinking'] = {'type': 'disabled'}
             if provider == 'gemini':
                 headers = {'Authorization': f'Bearer {key}'}
-        upper = ((len(json.dumps(body).encode()) + 1000) * prices['input_cost_per_million'] + maximum * prices['output_cost_per_million']) / 1_000_000
+        # Automatic cache writes can cost more than ordinary input. Reserve at
+        # the highest configured input rate before dispatching the request.
+        input_rate = max(prices[key] for key in ('input_cost_per_million', *OPENAI_CACHE_RATE_KEYS) if key in prices)
+        upper = ((len(json.dumps(body).encode()) + 1000) * input_rate + maximum * prices['output_cost_per_million']) / 1_000_000
         total_cost = 0
         for attempt in range(retries + 1):
             reservation = Reservation(self.usage_db, upper, budget, provider)
@@ -406,6 +443,8 @@ class ApplicationAnswerLLM:
                     raise ProviderError(f'LLM returned HTTP {response.status_code}; check model access, endpoint, API key and token limits. No answer was filled.')
                 raw = response.json()
                 usage = raw.get('usage', {}) if provider != 'gemini' or base.endswith('/openai') else raw.get('usageMetadata', {})
+                if not isinstance(usage, dict):
+                    raise ProviderError('LLM returned invalid token accounting')
                 input_tokens = usage.get('input_tokens', usage.get('prompt_tokens', usage.get('promptTokenCount', raw.get('prompt_eval_count', 0))))
                 output_tokens = usage.get('output_tokens', usage.get('completion_tokens', usage.get('candidatesTokenCount', raw.get('eval_count', 0))))
                 if provider == 'gemini' and not base.endswith('/openai'):
@@ -413,6 +452,29 @@ class ApplicationAnswerLLM:
                 if any(isinstance(n, bool) or not isinstance(n, int) or n < 0 for n in (input_tokens, output_tokens)):
                     raise ProviderError('LLM returned invalid token accounting')
                 cost = (input_tokens * prices['input_cost_per_million'] + output_tokens * prices['output_cost_per_million']) / 1_000_000 if usage or local else upper
+                if provider == 'openai' and not local:
+                    # Cache reads and writes are subsets of input_tokens, not
+                    # additive charges. Without a complete valid breakdown,
+                    # retain the reservation rather than guess a lower charge.
+                    details = usage.get('input_tokens_details')
+                    if 'input_tokens_details' in usage and not isinstance(details, dict):
+                        raise ProviderError('LLM returned invalid cache token accounting')
+                    details = details or {}
+                    cache_keys = ('cached_tokens', 'cache_write_tokens')
+                    if any(isinstance(details[key], bool) or not isinstance(details[key], int) or details[key] < 0
+                           for key in cache_keys if key in details):
+                        raise ProviderError('LLM returned invalid cache token accounting')
+                    if 'input_tokens' in usage and sum(details.get(key, 0) for key in cache_keys) > input_tokens:
+                        raise ProviderError('LLM returned invalid cache token accounting')
+                    if all(key in usage for key in ('input_tokens', 'output_tokens')) and all(key in details for key in cache_keys):
+                        cached, written = (details[key] for key in cache_keys)
+                        ordinary = input_tokens - cached - written
+                        cost = (ordinary * prices['input_cost_per_million']
+                                + cached * prices['cached_input_cost_per_million']
+                                + written * prices['cache_write_cost_per_million']
+                                + output_tokens * prices['output_cost_per_million']) / 1_000_000
+                    else:
+                        cost = upper
                 reservation.settle(cost, input_tokens, output_tokens)
                 total_cost += cost
                 if provider == 'openai':
@@ -503,9 +565,7 @@ class ApplicationAnswerLLM:
         qid = question_id or field.get('question_id') or field.get('id') or digest([job.get('application_id', job.get('id')), field.get('target'), question])[:32]
         if not isinstance(qid, str) or not qid.strip():
             raise ConfigurationError('Every generative question needs a nonempty immutable string ID')
-        previous = list(previous_answers or field.get('_related_answers') or job.get('related_answers', []))
-        previous = [{key: item[key] for key in ('question_id', 'exact_question', 'intent', 'answer', 'facts_used', 'evidence_entities') if key in item}
-                    if isinstance(item, dict) else {'answer': str(item)} for item in previous]
+        previous = professional_previous_answers(previous_answers or field.get('_related_answers') or job.get('related_answers', []))
         public_job = {key: job[key] for key in ('title', 'company', 'company_id', 'location', 'country', 'description', 'skills', 'url', 'context_sources') if job.get(key)}
         if public_job.get('description'):
             public_job['description'] = relevant_excerpt(public_job['description'], question, 6500)

@@ -3,10 +3,19 @@
 from __future__ import annotations
 
 import json
+import hashlib
 import re
 import unicodedata
 
 from .disclosures import disclosure_resolution
+
+
+def question_identity(application_id, element, question):
+    """Keep identically named questions in separate forms/education sections apart."""
+    identity = [application_id, element.get('document_id'), element.get('form_id'),
+                element.get('section_label'), element.get('name') or element.get('field_path') or
+                element.get('group') or element.get('node_id'), question]
+    return hashlib.sha256(json.dumps(identity, ensure_ascii=False).encode()).hexdigest()
 
 
 def normalize(value: str) -> str:

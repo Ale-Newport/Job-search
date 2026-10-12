@@ -116,3 +116,17 @@ async def test_jev_records_valid_usage_even_when_decision_is_invalid():
     with pytest.raises(InvalidDecision):
         await engine.decide(benchmark_snapshot(), "Fill email")
     assert recorded == [{"input_tokens": 100, "output_tokens": 5}]
+
+
+def test_redirected_job_board_filters_cannot_be_filled_as_an_application():
+    from jobagent.automation.browser import lost_posting_target
+    snapshot = {'url': 'https://apply.workable.com/fixture/', 'elements': [{'label': 'Location', 'operations': ['SELECT']}], 'blocked': False}
+    assert lost_posting_target('https://apply.workable.com/fixture/j/ABC123', snapshot)
+    snapshot['url'] = 'https://apply.workable.com/fixture/j/ABC123/apply'
+    assert not lost_posting_target('https://apply.workable.com/fixture/j/ABC123', snapshot)
+    snapshot['url'] = 'https://apply.workable.com/fixture/j/DEF456'
+    assert lost_posting_target('https://apply.workable.com/fixture/j/ABC123', snapshot)
+def test_explicit_closed_posting_text_is_rejected_even_when_the_url_retains_its_id():
+    from jobagent.automation.browser import lost_posting_target
+    url = 'https://jobs.ashbyhq.com/fixture/actual-job/application'
+    assert lost_posting_target(url, {'url':url,'elements':[], 'frames':[{'text':'Job not found. View all open positions'}]})

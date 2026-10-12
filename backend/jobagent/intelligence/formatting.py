@@ -243,6 +243,22 @@ def choice(value, options, *, question="", disclosure_concept=None):
             if len(matches) == 1:
                 return matches[0]
     # Phone country menus decorate country names with international dial codes.
+    if concept == 'ethnicity':
+        # A confirmed subgroup can map to its broader displayed category. The
+        # reverse direction would invent a subgroup and remains unsupported.
+        for broad in ('white','black','asian','mixed'):
+            if norm.startswith(broad+' '):
+                matches = [option for option in labels if normalize(option['label']) == broad]
+                if len(matches) == 1:
+                    return matches[0]
+    if re.search(r'\b(?:what|which)\b.*\bnationality\b', normalize(question)) and norm not in {'unknown','none','prefer not to say','unspecified','undisclosed','undeclared','undetermined','na'}:
+        positive = [option for option in labels if normalize(option['label']) == 'british']
+        negative = [option for option in labels if normalize(option['label']) == 'non british']
+        if len(positive) == len(negative) == 1:
+            if norm in {'british','english','scottish','welsh','uk','gb','united kingdom','great britain'}:
+                return positive[0]
+            if re.fullmatch(r'[a-z]+',norm):
+                return negative[0]
     countries = [o for o in labels if normalize(re.sub(r"\s+\+\d[\d\s-]*$", "", o["label"])) == norm]
     if len(countries) == 1:
         return countries[0]

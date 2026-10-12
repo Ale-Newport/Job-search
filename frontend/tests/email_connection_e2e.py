@@ -32,6 +32,13 @@ async def main():
             elif path == '/api/email/status':
                 result = {'syncing': state['phase'] != 'idle', 'phase': state['phase'],
                           'provider': 'gmail', 'messages_read': 0}
+            elif path == '/api/sources':
+                result = {'items':[{'id':'email-alert-fixture','name':'Indeed alerts fixture','kind':'indeed',
+                                    'url':'https://www.indeed.com/','enabled':True,'config':{'delivery':'email'},
+                                    'last_checked':'2026-09-29T15:00:00+00:00','jobs_found':160,
+                                    'health':'INBOX_ERROR' if state['error'] else 'RECEIVING_ALERTS'}], 'total':1}
+            elif path == '/api/sources/run':
+                result = {'task_id':'queued-source-fixture','status':'queued'}
             elif path == '/api/email/sync':
                 state['error'] = 'Allow Meridian in the Keychain prompt, then try again.' if state['fail'] else None
                 state['synced'] = not state['fail']
@@ -58,6 +65,15 @@ async def main():
         await expect(page.get_by_text('Email sync needs attention. Check the account message below.', exact=True)).to_be_visible()
         await expect(card.get_by_text(state['error'], exact=True)).to_be_visible()
         await expect(page.get_by_text('Email sync completed.', exact=False)).to_have_count(0)
+        await page.get_by_role('navigation').get_by_role('button', name='Sources', exact=True).click()
+        alert = page.get_by_role('row').filter(has_text='Indeed alerts fixture')
+        await expect(alert.get_by_text('Inbox Error', exact=True)).to_be_visible()
+        await expect(alert.get_by_text('Receiving Alerts', exact=True)).to_have_count(0)
+        await page.get_by_role('button', name='Run search', exact=True).click()
+        await expect(page.get_by_text('Checking your job sources. Results appear in source health.', exact=True)).to_be_visible()
+        await expect(page.get_by_text('Discovery finished.', exact=True)).to_have_count(0)
+        await expect(page.get_by_text('queued-source-fixture', exact=False)).to_have_count(0)
+        await page.get_by_role('navigation').get_by_role('button', name='Email', exact=True).click()
         state['fail'] = False
         await page.get_by_role('button', name='Sync inbox', exact=True).click()
         await expect(page.get_by_text('Email sync completed. 0 new messages imported.', exact=True)).to_be_visible()

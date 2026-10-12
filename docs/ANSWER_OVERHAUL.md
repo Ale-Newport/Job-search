@@ -1,5 +1,7 @@
 # Application answering overhaul — 11 October 2026
 
+This is the historical 11 October snapshot. See [Universal reliability verification](UNIVERSAL_RELIABILITY.md) for subsequent source repairs, installed acceptance checks, answer-history preservation and the authorized $20 budget.
+
 This release separates verified factual reasoning from generative application writing. The overhaul is installed; the final live/native validation remains unfinished and is reported explicitly below. Failed drafts remain rejected, and coverage below distinguishes observed controls from attempts. No calibration application has been submitted.
 
 ## Demonstrated root causes

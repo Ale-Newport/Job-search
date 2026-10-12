@@ -20,12 +20,18 @@ def links_cell(value, base):
     return [urljoin(base, link) for link in links if urlsplit(urljoin(base, link)).scheme in {"http", "https"}]
 
 
+class JobTableResult(list):
+    def __init__(self, jobs, valid_tables):
+        super().__init__(jobs)
+        self.valid_tables = valid_tables
+
+
 def parse_github_tables(content: str, source_url: str) -> list[dict]:
     tables = []
     header, rows = [], []
     for line in content.splitlines():
         if not line.strip().startswith("|"):
-            if rows:
+            if header:
                 tables.append((header, rows))
             header, rows = [], []
             continue
@@ -36,7 +42,7 @@ def parse_github_tables(content: str, source_url: str) -> list[dict]:
             header = [text_cell(c).lower() for c in cells]
         else:
             rows.append(cells)
-    if rows:
+    if header:
         tables.append((header, rows))
     for table in BeautifulSoup(content, "html.parser").find_all("table"):
         trs = table.find_all("tr")
@@ -47,7 +53,7 @@ def parse_github_tables(content: str, source_url: str) -> list[dict]:
                     [[str(c) for c in row.find_all("td")] for row in trs[1:]],
                 )
             )
-    jobs, seen = [], set()
+    jobs, seen, valid_tables = [], set(), 0
     for headers, rows in tables:
 
         def index(names):
@@ -60,6 +66,7 @@ def parse_github_tables(content: str, source_url: str) -> list[dict]:
         )
         if company_i is None or title_i is None or apply_i is None:
             continue
+        valid_tables += 1
         company = ""
         for cells in rows:
             if len(cells) < len(headers):
@@ -113,7 +120,7 @@ def parse_github_tables(content: str, source_url: str) -> list[dict]:
                     },
                 }
             )
-    return jobs
+    return JobTableResult(jobs, valid_tables)
 
 
 def parse_trackr(data: dict, source_url: str) -> list[dict]:

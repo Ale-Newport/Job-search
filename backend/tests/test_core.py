@@ -75,7 +75,7 @@ def fact(db, value="Python", status="verified", category="skill", key="python"):
 
 def test_database_migrates_reopens_foreign_keys_and_rolls_back(db):
     assert db.one("PRAGMA journal_mode")["journal_mode"] == "wal"
-    assert db.one("SELECT version_num FROM alembic_version")["version_num"] == "0008_reliability"
+    assert db.one("SELECT version_num FROM alembic_version")["version_num"] == "0012_application_answer_history"
     with pytest.raises(Exception):
         with db.transaction() as conn:
             conn.execute("INSERT INTO settings VALUES('example','true')")
@@ -357,6 +357,13 @@ def test_full_professional_context_rejects_implicit_opt_in_atomically(client, in
     assert settings["monthly_budget"] == 0
 
 
+@pytest.mark.parametrize('invalid', [-1, 20.01, True, '20', None])
+def test_settings_reject_budget_above_authorized_maximum_atomically(client, invalid):
+    assert client.patch('/api/settings', json={'monthly_budget': 20}).status_code == 200
+    assert client.patch('/api/settings', json={'monthly_budget': invalid}).status_code == 422
+    assert client.get('/api/settings').json()['monthly_budget'] == 20
+
+
 def test_selected_cv_replacement_preserves_history_and_blocks_after_submit(client, db, tmp_path):
     posting = job(db)
     first = import_document(db, tmp_path, b"First CV text", "first.txt")["version"]
@@ -589,3 +596,17 @@ async def test_source_run_single_flight_and_cancel_cleanup(db, monkeypatch):
     with pytest.raises(asyncio.CancelledError):
         await task
     assert not discovery.discovery_busy(db)
+
+
+def test_individual_source_requests_are_not_silently_deduplicated_with_other_sources(client):
+    from types import SimpleNamespace
+    keys=[]
+    def enqueue(kind,payload,dedupe_key):
+        keys.append(dedupe_key)
+        return {'task_id':str(len(keys)),'status':'queued'}
+    client.app.state.automation=SimpleNamespace(enqueue=enqueue)
+    for source in ('first-source','second-source','first-source',None):
+        response=client.post('/api/sources/run',json={'source_id':source})
+        assert response.status_code==200
+    assert keys[0]!=keys[1] and keys[0]==keys[2]
+    assert keys[3] not in keys[:3]

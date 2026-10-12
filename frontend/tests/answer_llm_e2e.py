@@ -116,7 +116,12 @@ async def main():
             await panel.get_by_label('Request timeout (seconds)', exact=True).fill('30')
             await panel.get_by_label('Retry attempts', exact=True).fill('1')
             await panel.get_by_label('Concurrent question generation', exact=True).fill('2')
-            await panel.get_by_label('Monthly AI usage limit (USD)', exact=True).fill('10')
+            budget = panel.get_by_label('Monthly AI usage limit (USD)', exact=True)
+            assert await budget.get_attribute('max') == '20'
+            await budget.fill('20.01')
+            assert not await budget.evaluate('element => element.checkValidity()')
+            await budget.fill('20')
+            assert await budget.evaluate('element => element.checkValidity()')
             await panel.get_by_label('Input price per million tokens (USD)', exact=True).fill('0.1')
             await panel.get_by_label('Output price per million tokens (USD)', exact=True).fill('0.2')
             if native_openai:
@@ -130,6 +135,7 @@ async def main():
             await panel.get_by_role('button', name='Save and test connection', exact=True).click()
             await panel.get_by_text('The configured provider returned a response. Review the connection test details below.', exact=True).wait_for()
             config = await (await page.request.get(args.backend_url + '/api/settings', headers=token)).json()
+            assert config['monthly_budget'] == 20
             assert config['text_model'] == 'synthetic-ui-model' and config['text_temperature'] == 0.3
             assert config['text_max_output_tokens'] == 2400 and config['text_retry_attempts'] == 1
             integrations = await (await page.request.get(args.backend_url + '/api/integrations', headers=token)).json()

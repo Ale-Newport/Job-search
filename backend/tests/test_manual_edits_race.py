@@ -47,3 +47,14 @@ async def test_unrelated_cdp_failure_is_not_concealed():
     edits = ManualEdits('()=>({})', None)
     with pytest.raises(RuntimeError, match='Connection lost'):
         await edits.watch(Page(Session('Connection lost')))
+
+
+async def test_close_releases_watches_when_a_retired_session_never_replies():
+    import asyncio
+    class RetiredSession:
+        async def send(self, *_):
+            await asyncio.Event().wait()
+    edits = ManualEdits('()=>({})', None)
+    edits.pages[object()] = {'cdp': RetiredSession(), 'contexts': {1}, 'script': 'retired'}
+    await asyncio.wait_for(edits.close(), timeout=4)
+    assert not edits.pages

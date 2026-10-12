@@ -235,6 +235,7 @@ class CandidateEngine:
         # names or project descriptions are not treated as separate questions.
         if (
             semantic is None
+            and not (s['intent'] == 'DEGREE' and s['attribute'] in {'start_date','end_date','study_interval'})
             and not field.get("options")
             and field.get("type") not in {"number", "date", "month", "checkbox", "radio"}
         ):
@@ -450,6 +451,18 @@ class CandidateEngine:
                     return result
             return self.unknown(question, s, "MISSING_RECENCY_OR_SUBJECT_EVIDENCE")
         elif intent in {"EDUCATION", "DEGREE", "MODULE", "GRADE", "GPA", "ACADEMIC_RESULT"}:
+            if intent == 'DEGREE' and re.search(r'\b(?:other|additional) (?:degrees|qualifications)\b', text):
+                related = field.get('_related_answers') or []
+                covered = {identifier for answer in related for identifier in answer.get('fact_ids', [])}
+                extras = [record for record in k.records('education') if val(record,'degree') and
+                          not any(fact['id'] in covered for fact in record['fields'].values())]
+                if not covered or len(extras) != 1:
+                    return self.unknown(question, s, 'MISSING_ADDITIONAL_QUALIFICATION')
+                record = extras[0]
+                degree = read(record, 'degree')
+                status = read(record, 'status')
+                answer = degree + ' (in progress)' if status == 'studying' else degree
+                return self._finish_evidence_answer(out, answer, used, ['additional_verified_qualification'], s, field)
             selector = s["selector"]
             if intent in {"GRADE", "GPA", "ACADEMIC_RESULT"} and selector == "current":
                 selector = "completed"
@@ -512,10 +525,21 @@ class CandidateEngine:
                     answer = (
                         True if s["boolean"] and re.search(r"student|studying|enroll", text) else read(e, "institution")
                     )
+                    if field.get('options') and answer and not choice(str(answer), field['options'], question=question):
+                        aliases = [choice(alias, field['options'], question=question) for alias in e['aliases']]
+                        matches = {option['label'] for option in aliases if option}
+                        if len(matches) == 1:
+                            answer = next(iter(matches))
+                            rules.append('verified_institution_alias')
                 elif intent == "MODULE":
                     answer = read(e, "modules")
                 elif intent in {"GRADE", "ACADEMIC_RESULT"}:
-                    answer = read(e, "classification") if re.search(r"class|honour", text) else read(e, "average")
+                    if s['attribute'].startswith('year_'):
+                        answer = read(e, s['attribute'])
+                        if answer is None:
+                            return self.unknown(question, s, 'MISSING_YEAR_SPECIFIC_RESULT')
+                    else:
+                        answer = read(e, "classification") if re.search(r"class|honour", text) else read(e, "average")
                     if (
                         answer is not None
                         and "%" in question
@@ -541,7 +565,21 @@ class CandidateEngine:
                         if grade and average is not None:
                             answer = f"UK {grade}; {average}%. No official US GPA."
                 else:
+                    if s['attribute'] == 'study_interval':
+                        start,end = read(e,'start_date'),read(e,'end_date')
+                        if not start or not end:
+                            return self.unknown(question,s,'MISSING_EDUCATION_DATE_RANGE')
+                        start,error = format_date(start,question,field)
+                        end,end_error = format_date(end,question,field)
+                        if error or end_error:
+                            return self.unknown(question,s,error or end_error)
+                        return self._finish_evidence_answer(out,f'{start} – {end}',used,
+                            ['verified_education_date_range'],s,field)
                     answer = read(e, s["attribute"])
+                    if answer is not None and s['attribute'] in {'start_date','end_date'}:
+                        answer, error = format_date(answer, question, field)
+                        if error:
+                            return self.unknown(question, s, error)
                     if s["boolean"]:
                         answer = True if answer else None
         elif intent in {"GRADUATION", "START_DATE", "AVAILABILITY"}:

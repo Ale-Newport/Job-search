@@ -96,6 +96,9 @@ async def run(args):
     if not job:
         raise ValueError('The calibration database does not contain the exact target job')
     job = dict(job)
+    if getattr(args,'question_text',None):
+        from jobagent.automation.job_context import prepare_job_context
+        job = {**job,**await prepare_job_context(job)}
     application = db.one('SELECT id FROM applications WHERE job_id=?', (job['id'],))
     job['application_id'] = application['id'] if application else 'calibration-local'
     job['job_id'] = job['id']
@@ -103,39 +106,51 @@ async def run(args):
     if resume:
         job['resume_version_id'] = resume['id']
     research = CompanyResearch(output / 'company-research')
-    urls = ['https://blog.palantir.com/dev-versus-delta-demystifying-engineering-roles-at-palantir-ad44c2a6e87',
+    urls = [] if getattr(args,'question_text',None) else ['https://blog.palantir.com/dev-versus-delta-demystifying-engineering-roles-at-palantir-ad44c2a6e87',
             'https://www.palantir.com/platforms/foundry/', 'https://www.palantir.com/platforms/apollo/']
     sources = await asyncio.gather(*(research.source(url) for url in urls))
     job['company_context'] = [source for source in sources if source]
     report_path = output / 'real-llm-regression.json'
     selected_questions = getattr(args, 'question', None)
+    custom_questions = getattr(args,'question_text',None)
+    questions = custom_questions or QUESTIONS
+    if any(not isinstance(question,str) or not question.strip() or len(question)>20000 for question in questions):
+        raise ValueError('Calibration requires complete nonempty questions of at most 20000 characters')
     report = {'genuine_provider_calls': False, 'provider': settings['text_provider'], 'model': settings['text_model'],
-              'selected_question_numbers': selected_questions or list(range(1, len(QUESTIONS) + 1)),
+              'selected_question_numbers': selected_questions or list(range(1, len(questions) + 1)),
+              'custom_questions': bool(custom_questions),
               'job': {key: job.get(key) for key in ('id', 'title', 'company', 'location', 'url', 'application_url')},
               'usage_ledger': str(Path(args.usage_database).resolve()) if args.usage_database else str(output / 'llm-calibration.sqlite3'),
               'usage_before': calibration_usage(usage_db),
               'research_sources': [s['url'] for s in job['company_context']], 'unavailable_research': [url for url, s in zip(urls, sources) if not s],
               'answers': [], 'errors': [], 'no_form_fill_or_submission': True}
-    print(json.dumps({'stage': 'connecting', 'provider': settings['text_provider'], 'model': settings['text_model']}), flush=True)
-    try:
-        report['connection'] = await llm.test(settings)
-    except ValueError as exc:
-        report['connection_error'] = {'code': getattr(exc, 'code', 'UNKNOWN'), 'error': str(exc)}
-        report['usage_after'] = calibration_usage(usage_db)
-        report_path.write_text(json.dumps(report, ensure_ascii=False, indent=2))
-        raise
-    report['genuine_provider_calls'] = True
+    if not getattr(args,'skip_connection_test',False):
+        print(json.dumps({'stage': 'connecting', 'provider': settings['text_provider'], 'model': settings['text_model']}), flush=True)
+        try:
+            report['connection'] = await llm.test(settings)
+        except ValueError as exc:
+            report['connection_error'] = {'code': getattr(exc, 'code', 'UNKNOWN'), 'error': str(exc)}
+            report['usage_after'] = calibration_usage(usage_db)
+            report_path.write_text(json.dumps(report, ensure_ascii=False, indent=2))
+            raise
+        report['genuine_provider_calls'] = True
+        print(json.dumps({'stage': 'connected', 'latency_ms': report['connection']['latency_ms']}), flush=True)
     report_path.write_text(json.dumps(report, ensure_ascii=False, indent=2))
-    print(json.dumps({'stage': 'connected', 'latency_ms': report['connection']['latency_ms']}), flush=True)
-    previous = []
-    for index, question in enumerate(QUESTIONS):
+    previous = json.loads(Path(args.prior_answers).read_text()) if getattr(args,'prior_answers',None) else []
+    if not isinstance(previous,list) or len(previous)>100:
+        raise ValueError('Prior answers must be a private JSON array of at most 100 records')
+    field_context = json.loads(Path(args.field_context).read_text()) if getattr(args,'field_context',None) else {}
+    if not isinstance(field_context,dict):
+        raise ValueError('Field context must be a private JSON object')
+    for index, question in enumerate(questions):
         if selected_questions and index + 1 not in selected_questions:
             continue
         started = time.monotonic()
-        field = {'id': f'real-question-{index + 1}', 'type': 'textarea', 'multiline': True, '_related_answers': list(previous)}
+        field = {**field_context,'id': f'real-question-{index + 1}', 'type': 'textarea', 'multiline': True, '_related_answers': list(previous)}
         try:
             answer = await llm.generate(settings, question, job, field=field, question_id=field['id'], semantic=interpret(question, field))
             previous.append(answer)
+            report['genuine_provider_calls'] = True
             report['answers'].append(answer)
             print(json.dumps({'question': index + 1, 'intent': answer['intent'], 'state': answer['state'], 'word_count': answer['word_count'],
                               'seconds': round(time.monotonic() - started, 2), 'facts_used': len(answer['facts_used'])}), flush=True)
@@ -164,6 +179,10 @@ def main(argv=None):
     parser.add_argument('--job', required=True, help='Exact stored target job ID; matching titles never substitute another vacancy')
     parser.add_argument('--question', action='append', type=int, choices=range(1, len(QUESTIONS) + 1),
                         help='Replay a specific original question number; repeat to select several. Default runs all ten.')
+    parser.add_argument('--question-text',action='append',help='Exact question from another employer; repeat for several.')
+    parser.add_argument('--prior-answers',help='Private JSON file of prior validated professional answers for repetition checks')
+    parser.add_argument('--field-context',help='Private JSON file with the observed field label, help, placeholder and constraints')
+    parser.add_argument('--skip-connection-test',action='store_true',help='Generate directly without spending on a separate probe')
     parser.add_argument('--allow-remote', action='store_true')
     parser.add_argument('--usage-database', help='Existing live database whose nonsecret provider settings and shared monthly usage ledger are used')
     asyncio.run(run(parser.parse_args(argv)))

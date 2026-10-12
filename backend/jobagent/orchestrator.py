@@ -172,20 +172,25 @@ class Orchestrator:
         if element.get('type') == 'file':
             return None  # A filename is not an approved reusable document version.
         question = get_adapter(record['frame_url'], application.get('ats')).question(element)
+        from .automation.answers import question_identity
+        question_id = question_identity(application_id,element,question)
         identifier = remember_answer(self.db, application, question, record['answer'],
             reusable=True, skip=not record['answer'].strip(), element=element, direct_edit=True)
         # Replace the active answer immediately, including edits made while a
         # completed browser is parked for review. No stale approval can survive.
         with self.db.transaction() as conn:
-            conn.execute('DELETE FROM application_answers WHERE application_id=? AND question=?', (application_id, question))
+            from .answer_history import supersede_answers
+            supersede_answers(conn, application_id, question, question_id)
+            answer_id = str(uuid4())
             conn.execute('INSERT INTO application_answers VALUES(?,?,?,?,?,?,?)',
-                (str(uuid4()), application_id, question, record['answer'], json.dumps([identifier]), 1, now()))
+                (answer_id, application_id, question, record['answer'], json.dumps([identifier]), 1, now()))
+            conn.execute('INSERT INTO application_answer_targets VALUES(?,?)',(answer_id,question_id))
             run = conn.execute("SELECT id,checkpoint FROM automation_runs WHERE application_id=? AND status NOT IN ('confirmed','error','unconfirmed','reconciled') ORDER BY created_at DESC LIMIT 1", (application_id,)).fetchone()
             if run:
                 checkpoint = json.loads(run['checkpoint'])
-                answers = [a for a in checkpoint.get('answers', []) if a.get('question') != question]
+                answers = [a for a in checkpoint.get('answers', []) if (a.get('question_id') != question_id if a.get('question_id') else a.get('question') != question)]
                 answers.append({'question': question, 'answer': record['answer'], 'fact_ids': [identifier],
-                                'verified': True, 'source': 'user_edit'})
+                                'verified': True, 'source': 'user_edit','question_id':question_id})
                 checkpoint.update(answers=answers, snapshot_id=None, review_fingerprint=None)
                 conn.execute('UPDATE automation_runs SET checkpoint=?,updated_at=? WHERE id=?',
                              (json.dumps(private_checkpoint(checkpoint)), now(), run['id']))
@@ -262,7 +267,7 @@ class Orchestrator:
     def fingerprint(self, application_id):
         facts = self.db.query("SELECT id,value,verification_status,locked,updated_at FROM facts ORDER BY id")
         answers = self.db.query(
-            "SELECT question,answer,verified FROM application_answers WHERE application_id=? ORDER BY id",
+            "SELECT question,answer,verified FROM application_answers WHERE application_id=? AND NOT EXISTS(SELECT 1 FROM superseded_application_answers WHERE answer_id=application_answers.id) ORDER BY id",
             (application_id,),
         )
         documents = self.db.query(
@@ -441,7 +446,7 @@ class Orchestrator:
                 question_policies = policies.setdefault("questions", {})
                 trusted_by_id = {fact["id"]: fact for fact in facts}
                 for answer in self.db.query(
-                    "SELECT question,answer,fact_ids FROM application_answers WHERE application_id=? AND verified=1 ORDER BY created_at",
+                    "SELECT question,answer,fact_ids FROM application_answers WHERE application_id=? AND verified=1 AND NOT EXISTS(SELECT 1 FROM superseded_application_answers WHERE answer_id=application_answers.id) ORDER BY created_at",
                     (application["id"],),
                 ):
                     for fact_id in json.loads(answer["fact_ids"]):
@@ -672,18 +677,23 @@ class Orchestrator:
 
     def persist_result(self, run_id, application_id, result):
         for omitted in result.get('omitted', []):
-            self.db.execute('DELETE FROM application_answers WHERE application_id=? AND question=?', (application_id, omitted['question']))
+            from .answer_history import supersede_answers
+            with self.db.transaction() as conn:
+                supersede_answers(conn, application_id, omitted['question'])
             self.db.execute("UPDATE human_tasks SET status='resolved',answer=?,updated_at=? WHERE application_id=? AND question=?",
                             ('Not applicable: '+omitted['reason'], now(), application_id, omitted['question']))
+        replaced_questions = set()
         for answer in result.get("answers", []):
             question = answer.get("question", answer.get("label", "Field"))
-            self.db.execute(
-                "DELETE FROM application_answers WHERE application_id=? AND question=?", (application_id, question)
-            )
-            self.db.execute(
+            with self.db.transaction() as conn:
+                from .answer_history import supersede_answers
+                if question not in replaced_questions:
+                    supersede_answers(conn, application_id, question)
+                answer_id = str(uuid4())
+                conn.execute(
                 "INSERT INTO application_answers(id,application_id,question,answer,fact_ids,verified,created_at) VALUES(?,?,?,?,?,?,?)",
                 (
-                    str(uuid4()),
+                    answer_id,
                     application_id,
                     question,
                     str(answer.get("answer", "")),
@@ -692,6 +702,9 @@ class Orchestrator:
                     result.get("evidence_at", now()),
                 ),
             )
+                if answer.get('question_id'):
+                    conn.execute('INSERT INTO application_answer_targets VALUES(?,?)',(answer_id,answer['question_id']))
+            replaced_questions.add(question)
             self.db.execute(
                 "UPDATE human_tasks SET status='resolved',answer=?,updated_at=? WHERE application_id=? AND question=? AND status='open'",
                 ('Filled from profile; review inferred wording before submission' if answer.get('inferred') else str(answer.get('answer', '')),

@@ -183,16 +183,40 @@ def interpret(question, field=None):
     if re.search(r"(?:programming|coding) languages", text):
         intent = "PROGRAMMING_LANGUAGE"
     coding_details = bool(re.search(r"coding|programming|software", text) and re.search(
-        r"(?:provide|give|include).*(?:details|examples|evidence)|describe.*(?:experience|skills|background)|demonstrate.*(?:coding|programming|skills)", text))
+        r"(?:provide|give|include).*(?:details|examples|evidence)|describe.*(?:experience|skills|background)|demonstrate.*(?:coding|programming|skills)|(?:what|which).*(?:coding|programming).*experience", text))
     if coding_details and intent in {"GITHUB", "PORTFOLIO", "SKILL", "PROGRAMMING_LANGUAGE", "PROJECT", "WORK_EXPERIENCE"}:
         # Optional portfolio links are supporting evidence for the requested
         # explanation, not a replacement for the explanation itself.
         intent = "WORK_EXPERIENCE"
+    if re.search(r'(?:favourite|favorite).*(?:coding|programming|project).*experience', text):
+        intent = 'PROJECT'
+    elif re.search(r'(?:how much|how long).*(?:coding|programming).*experience', text):
+        intent = 'SKILL_DURATION'
     requested_languages = [language for language in sorted(HUMAN_LANGUAGES) if re.search(r"\b" + language + r"\b", text)]
     if requested_languages and re.search(r"speak|fluen|proficien|native|language|working knowledge|conversational", text) and intent in {"OTHER", "SKILL", "LANGUAGE"}:
         intent = "LANGUAGE"
     if intent == "OTHER" and context:
         intent = next((i for i, p in CONCEPTS if re.search(p, context)), "OTHER")
+    academic_context = bool(re.search(r'education|under\s*graduate|post\s*graduate|bachelor|master|university|college|school', context))
+    school_qualification = bool(re.search(r'\bgcse|\ba levels?\b|\ba level\b|baccalaureate|bachillerato|secondary qualification', text)) and not re.search(r'\bgraduat|\b(?:date|year|when|month)\b',text)
+    year_result = re.search(r'\b(1st|2nd|3rd|4th|first|second|third|fourth) year (?:result|grade|average|marks?)', text)
+    academic_date = None
+    if academic_context:
+        identity = normalize(re.sub(r'([a-z])([A-Z])', r'\1 \2', str(field.get('name') or question)))
+        if re.search(r'\bstart\b.*\b(?:year|date|month)\b', identity):
+            academic_date = 'start_date'
+        elif re.search(r'\b(?:end|completion|graduation)\b.*\b(?:year|date|month)\b', identity):
+            academic_date = 'end_date'
+        elif re.search(r'\bstart\b.*\bend\b.*\b(?:dates?|years?|months?)\b', text):
+            academic_date = 'study_interval'
+    if school_qualification or academic_date or academic_context and text == 'course':
+        intent = 'DEGREE'
+    elif year_result or academic_context and re.fullmatch(r'(?:predicted |expected |final |overall )?(?:result|grade|classification)',text):
+        intent = 'GRADE'
+    if intent in {'EDUCATION','DEGREE','GRADE','GPA','ACADEMIC_RESULT','GRADUATION','MODULE'}:
+        # A short field label inherits its education scope from its actual
+        # section, rather than selecting the latest degree by default.
+        text += ' ' + context
     if re.search(r"gdpr|privacy|terms|consent|notetaker|note taker|transcrib|transcription|future (?:job|recruit|opportunit).*contact|receive.*(?:future|recruit|marketing)", text):
         intent = "CONSENT"
     elif intent == "HYPOTHETICAL" and re.search(r"\b(?:will|would|do) you (?:need|require).{0,35}sponsor", text):
@@ -206,9 +230,12 @@ def interpret(question, field=None):
         intent = "ROLE_CONFIRMATION"
     # The requested head noun outranks a modifying clause (university from
     # which I graduated asks for an institution, not a graduation date).
-    institution = re.search(r"\b(?:university|institution|college|school)\b", text)
-    qualification = re.search(r"\b(?:degree|qualification|level|subject|discipline|major)\b", text)
-    temporal = re.search(r"\b(?:when|date|year|month|days|time)\b", text)
+    # Section scope constrains which education record to use, but must not
+    # replace the head noun that the actual question asks for.
+    head_text = normalize(question)
+    institution = re.search(r"\b(?:university|institution|college|school)\b", head_text)
+    qualification = re.search(r"\b(?:degree|qualification|levels?|subject|discipline|major|gcse)\b", head_text)
+    temporal = re.search(r"\b(?:when|date|year|month|days|time)\b", head_text)
     if (
         institution
         and (not qualification or institution.start() < qualification.start())
@@ -221,7 +248,7 @@ def interpret(question, field=None):
         selector = "completed"
     if re.search(r"bachelor|undergraduat|\bbsc\b", text):
         selector = "bachelor"
-    elif re.search(r"master|postgraduat|\bmsc\b", text):
+    elif re.search(r"master|post\s*graduat|\bmsc\b", text):
         selector = "master"
     elif re.search(r"pursu|working towards|in progress|enroll", text):
         selector = "pursued"
@@ -232,9 +259,9 @@ def interpret(question, field=None):
     level = None
     for pattern, label in (
         (r"primary|elementary", "primary"),
-        (r"high school|secondary|sixth form|baccalaureate|bachillerato|\beso\b", "secondary"),
+        (r"high school|secondary|sixth form|baccalaureate|bachillerato|\beso\b|\bgcse|\ba levels?\b", "secondary"),
         (r"bachelor|undergraduate|\bbsc\b|\bgrado\b|licenciatura", "bachelor"),
-        (r"master|postgraduate|\bmsc\b|posgrado|postgrado|maestria", "master"),
+        (r"master|post\s*graduate|\bmsc\b|posgrado|postgrado|maestria", "master"),
         (r"doctorat|doctoral|\bphd\b|doctorado", "doctorate"),
     ):
         if re.search(pattern, text):
@@ -304,6 +331,16 @@ def interpret(question, field=None):
             if re.search(r"discipline|subject|major|field", text)
             else "degree"
         )
+        if school_qualification:
+            selector = 'secondary'
+            attribute = 'degree'
+        elif academic_date:
+            attribute = academic_date
+        elif academic_context and normalize(question) == 'course':
+            attribute = 'subject'
+    if intent == 'GRADE' and year_result:
+        year = {'1st':1,'first':1,'2nd':2,'second':2,'3rd':3,'third':3,'4th':4,'fourth':4}[year_result.group(1)]
+        attribute = f'year_{year}_average'
     if intent == "IDENTITY":
         attribute = (
             "date_of_birth"

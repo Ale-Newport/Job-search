@@ -24,15 +24,16 @@ def action_key(element, operation, value=None, file_path=None, upload_name=None)
 
 
 def radio_group(element, elements):
-    """Only observed peers in this radio control's own document and form."""
-    if element.get("role") != "radio":
+    """Only observed radio or multiple-checkbox peers in the same document and form."""
+    role = element.get('role')
+    if role != 'radio' and not (role == 'checkbox' and element.get('multiple')):
         return []
     group = element.get("group")
     if not group:
         return [element]
     return [
         peer for peer in elements
-        if peer.get("role") == "radio"
+        if peer.get("role") == role
         and peer.get("group") == group
         and peer.get("document_id") == element.get("document_id")
         and peer.get("form_id") == element.get("form_id")

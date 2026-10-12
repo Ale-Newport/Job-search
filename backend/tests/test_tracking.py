@@ -214,6 +214,29 @@ async def test_daily_refresh_persists_date_and_errors_without_running_applicatio
     assert not db.query("SELECT * FROM applications")
 
 
+@pytest.mark.asyncio
+async def test_daily_refresh_checks_newly_observed_employer_boards_in_the_same_cycle(tmp_path,monkeypatch):
+    from jobagent.db import now
+    from jobagent.discovery import ingest_job
+    db = Database(tmp_path/'new-boards.sqlite3')
+    db.execute('INSERT INTO companies(id,name,created_at,updated_at) VALUES(?,?,?,?)',('employer','Fixture',now(),now()))
+    db.execute('INSERT INTO sources(id,name,kind,url,enabled,created_at,updated_at) VALUES(?,?,?,?,?,?,?)',
+               ('disabled','My disabled source','careers','https://example.test/custom',0,now(),now()))
+    calls = []
+    async def sources(*args,**kwargs):
+        calls.append(kwargs.get('due_only',False))
+        if not kwargs.get('due_only'):
+            ingest_job(db,{'title':'Engineer','company':'Fixture','url':'https://fixture.wd3.myworkdayjobs.com/External/job/London/Engineer_R1'})
+            return {'total':1,'new_jobs':1,'jobs_found':1,'items':[{'source_id':'original','new_jobs':1,'jobs_found':1,'error':None,'state':'PARTIAL'}]}
+        added = db.one("SELECT id FROM sources WHERE kind='workday'")
+        return {'total':1,'new_jobs':0,'jobs_found':1,'items':[{'source_id':added['id'],'new_jobs':0,'jobs_found':1,'error':None,'state':'HEALTHY'}]}
+    monkeypatch.setattr('jobagent.discovery.run_sources',sources)
+    result = await refresh_daily(db,tmp_path)
+    assert calls == [False,True] and result['total']==2 and result['new_jobs']==1
+    assert db.one("SELECT enabled FROM sources WHERE id='disabled'")['enabled']==0
+    assert daily_data(db)['last_refresh']['sources_checked']==2
+
+
 def test_plain_indeed_alerts_keep_employer_location_and_remove_personal_tracking(api):
     from jobagent.job_alerts import reprocess_alerts
 
@@ -291,3 +314,21 @@ def test_daily_and_opportunities_europe_only_london_first(api):
         assert [item['id'] for item in data['items']] == [rows[3]['id'], rows[0]['id']]
         assert data['total'] == 2
     assert api.get('/api/tracker').json()['total'] == 5
+
+
+def test_daily_deduplicates_legacy_workable_aliases_and_respects_submitted_alias(api):
+    api.patch('/api/settings', json={'daily_min_match':0})
+    first = api.post('/api/jobs', json={'title':'Graduate Engineer','company':'Example',
+        'url':'https://apply.workable.com/first-account/j/ABC123/','location':'London'}).json()
+    # A historical row uses an older identity scheme, before shortcode-only
+    # identity. Preserve its job and application IDs through the upgrade.
+    db = api.app.state.db
+    db.execute('UPDATE jobs SET identity_key=? WHERE id=?', ('legacy:ABC123',first['id']))
+    second = api.post('/api/jobs', json={'title':'Graduate Engineer','company':'Example',
+        'url':'https://apply.workable.com/j/ABC123/','location':'London'}).json()
+    assert first['id'] != second['id']
+    assert api.get('/api/daily').json()['total'] == 1
+    assert api.get('/api/tracker').json()['total'] == 2
+    api.post(f"/api/jobs/{first['id']}/record-application",json={})
+    assert api.get('/api/daily').json()['total'] == 0
+    assert db.one('SELECT COUNT(*) AS n FROM jobs')['n'] == 2

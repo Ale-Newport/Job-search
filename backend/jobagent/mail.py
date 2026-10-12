@@ -334,7 +334,7 @@ OAUTH = {
 }
 
 
-def oauth_exchange_error(provider: str, response: httpx.Response) -> str:
+def oauth_exchange_error(provider: str, response: httpx.Response, *, refresh=False) -> str:
     """Explain known OAuth failures without echoing credentials or provider payloads."""
     name = "Google" if provider == "gmail" else "Microsoft"
     try:
@@ -345,6 +345,8 @@ def oauth_exchange_error(provider: str, response: httpx.Response) -> str:
         payload = {}
     code = payload.get("error")
     description = payload.get("error_description", "")
+    if refresh and code == 'invalid_grant':
+        return f'{name} rejected the email refresh token (invalid_grant). Reconnect the account in Email > Manage connection.'
     if (
         code == "invalid_request"
         and isinstance(description, str)
@@ -578,11 +580,20 @@ class MailService:
     async def token(self, provider):
         raw = await self.credential("get", f"{provider}:tokens")
         if not raw:
-            raise ValueError("Connect this email account first")
-        tokens = json.loads(raw)
+            raise MailCredentialError("No email authorization tokens are stored in Keychain. Open Email > Manage connection and authorize this account again.")
+        try:
+            tokens = json.loads(raw)
+        except (ValueError, TypeError):
+            raise MailCredentialError('The stored email authorization is invalid. Reconnect the account.') from None
+        if not isinstance(tokens, dict) or not tokens.get('access_token'):
+            raise MailCredentialError('The stored email authorization has no access token. Reconnect the account.')
         if tokens.get("expires_at", 0) > time.time() + 60:
             return tokens["access_token"]
         config = self.config(provider)
+        if not config.get('client_id'):
+            raise MailCredentialError('The email OAuth client ID is missing. Open Email > Manage connection to configure it.')
+        if not tokens.get('refresh_token'):
+            raise MailCredentialError('Email authorization expired and has no refresh token. Reconnect the account.')
         data = {
             "grant_type": "refresh_token",
             "refresh_token": tokens.get("refresh_token", ""),
@@ -594,7 +605,7 @@ class MailService:
         async with httpx.AsyncClient(timeout=30) as client:
             response = await client.post(OAUTH[provider]["token"], data=data)
             if response.status_code != 200:
-                raise ValueError("Email authorization expired. Reconnect the account.")
+                raise MailCredentialError(oauth_exchange_error(provider, response, refresh=True))
             tokens.update(response.json())
         tokens["expires_at"] = time.time() + tokens.get("expires_in", 3600)
         await self.credential("set", f"{provider}:tokens", json.dumps(tokens))

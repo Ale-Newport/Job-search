@@ -237,7 +237,7 @@ for key, alias in {
     BY_KEY[key]["aliases"].append(alias)
 
 
-def memory_superseded(db, question, updated_at):
+def memory_superseded(db, question, updated_at, intelligence=None):
     """Concrete newer profile constraints supersede old form-specific guesses/skips.
 
     A saved general contractual notice remains authoritative. We do not delete
@@ -265,6 +265,17 @@ def memory_superseded(db, question, updated_at):
         )
         if row and row['updated_at'] > updated_at:
             return True
+    # A newly verified education record replaces an earlier answer/blank made
+    # while that record was unavailable. Keep the old memory as history.
+    from .intelligence.semantics import interpret
+    if interpret(question)['intent'] in {'EDUCATION','DEGREE','GRADUATION','GRADE','GPA','STUDY_YEAR','MODULE'}:
+        from .intelligence.engine import CandidateEngine
+        answer = (intelligence or CandidateEngine(db)).answer_question(question)
+        if answer.get('answer') is not None:
+            for identifier in answer.get('fact_ids',[]):
+                fact = db.one('SELECT updated_at FROM facts WHERE id=?',(identifier,))
+                if fact and fact['updated_at'] > updated_at:
+                    return True
     return False
 
 
@@ -319,8 +330,10 @@ def profile(db):
     memory = db.query(
         "SELECT m.*,f.value AS answer,f.verification_status FROM browser_answers m JOIN facts f ON m.fact_id=f.id ORDER BY m.updated_at DESC"
     )
+    from .intelligence.engine import CandidateEngine
+    intelligence = CandidateEngine(db)
     for row in memory:
-        row['superseded'] = memory_superseded(db, row['question'], row['updated_at'])
+        row['superseded'] = memory_superseded(db, row['question'], row['updated_at'], intelligence)
     return {"fields": rows, "answers": memory}
 
 
@@ -421,11 +434,13 @@ def application_knowledge(db, application, facts):
                     }
                 )
     skipped = []
+    from .intelligence.engine import CandidateEngine
+    intelligence = CandidateEngine(db)
     for row in db.query(
         "SELECT m.*,f.* FROM browser_answers m JOIN facts f ON f.id=m.fact_id WHERE m.application_id=? OR m.reusable=1",
         (application["id"],),
     ):
-        if memory_superseded(db, row['question'], row['updated_at']):
+        if memory_superseded(db, row['question'], row['updated_at'], intelligence):
             continue
         if row["verification_status"] != "verified" or not scope_matches(row["scope"], application):
             continue

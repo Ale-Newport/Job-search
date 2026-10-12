@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import re
 from datetime import datetime, timedelta, timezone
 from typing import Literal
@@ -186,15 +187,17 @@ def tracker(
 
 def daily_data(db):
     from .core import get_settings
-    from .discovery import discovery_busy
+    from .discovery import discovery_busy, source_health
     from .geography import location_evidence, recommendable
 
     settings = get_settings(db)
-    today = datetime.now().astimezone().date().isoformat()
+    from zoneinfo import ZoneInfo
+    local_zone = ZoneInfo(settings.get('discovery_timezone', 'Europe/London'))
+    today = datetime.now(local_zone).date().isoformat()
     rows = tracker_rows(db)
     for j in rows:
         try:
-            j["found_today"] = datetime.fromisoformat(j["created_at"]).astimezone().date().isoformat() == today
+            j["found_today"] = datetime.fromisoformat(j["created_at"]).astimezone(local_zone).date().isoformat() == today
         except (ValueError, TypeError):
             j["found_today"] = False
     from .job_validity import eligible
@@ -250,6 +253,24 @@ def daily_data(db):
             "SELECT provider,status,last_sync,last_error FROM integrations WHERE provider IN ('gmail','outlook','imap')"
         )
     ]
+    # Older saved URLs can identify the same posting through different ATS
+    # account aliases. Keep every history row, but recommend each vacancy once
+    # and respect an application recorded against any equivalent URL.
+    from .discovery import ats_identity, canonical_url
+    def posting_key(job):
+        url = job.get('application_url') or job.get('url') or ''
+        try:
+            return ats_identity(url)[1] or canonical_url(url)
+        except ValueError:
+            return job['id']
+    seen_postings = {posting_key(j) for j in rows if j['submitted']}
+    distinct = []
+    for job in recommended:
+        key = posting_key(job)
+        if key not in seen_postings:
+            distinct.append(job)
+            seen_postings.add(key)
+    recommended = distinct
     return {
         "date": today,
         "region": settings.get("suggested_region", "any"),
@@ -262,7 +283,7 @@ def daily_data(db):
         "last_refresh": settings.get("daily_last_refresh"),
         "refreshing": discovery_busy(db),
         "scheduler_enabled": settings.get("scheduler_enabled", False),
-        "sources": [decode_row(r) for r in db.query("SELECT * FROM sources ORDER BY name")],
+        "sources": [source_health(db, r) for r in db.query("SELECT * FROM sources ORDER BY name")],
         "email": integrations,
     }
 
@@ -280,11 +301,34 @@ async def refresh_daily(db, data_dir):
 
     result = await run_sources(db, data_dir)
     if result.get("status") != "already_running":
+        # Jobs can disclose a verified employer board that was unavailable at
+        # startup. Add and check those boards in this cycle, preserving every
+        # existing source and its enable/disable choice.
+        from .career_sources import import_observed_boards
+        known = {row['id'] for row in db.query('SELECT id FROM sources')}
+        await asyncio.to_thread(import_observed_boards,db)
+        added = {row['id'] for row in db.query('SELECT id FROM sources WHERE enabled=1')} - known
+        if added:
+            followup = await run_sources(db,data_dir,due_only=True)
+            fresh = [item for item in followup['items'] if item.get('source_id') in added]
+            result['items'].extend(fresh)
+            result['total'] = len(result['items'])
+            result['new_jobs'] += sum(item['new_jobs'] for item in fresh)
+            result['jobs_found'] = sum(item.get('jobs_found',0) for item in result['items'])
+        from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
+        setting = db.one("SELECT value FROM settings WHERE key='discovery_timezone'")
+        try:
+            zone = ZoneInfo(json.loads(setting['value']) if setting else 'Europe/London')
+        except (ZoneInfoNotFoundError, TypeError, ValueError):
+            zone = ZoneInfo('Europe/London')
         value = {
             "at": now(),
-            "day": datetime.now().astimezone().date().isoformat(),
+            "day": datetime.now(zone).date().isoformat(),
             "new_jobs": result["new_jobs"],
             "errors": sum(bool(r.get("error")) for r in result["items"]),
+            "sources_checked": sum(r.get('state') != 'EMAIL_DELIVERY' for r in result['items']),
+            "complete_sources": sum(r.get('state') in ('HEALTHY', 'EMPTY') for r in result['items']),
+            "partial_sources": sum(r.get('state') == 'PARTIAL' for r in result['items']),
         }
         db.execute("INSERT OR REPLACE INTO settings VALUES('daily_last_refresh',?)", (dumps(value),))
     return result

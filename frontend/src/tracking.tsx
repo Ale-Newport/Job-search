@@ -373,7 +373,9 @@ export function Daily({ ctx }: { ctx: AppContext }) {
             <div className="tracking-callout">
               <Mail size={17} />
               <p>
-                {email?.last_sync
+                {email?.last_error
+                  ? "Inbox sync needs attention. Open Email to reconnect or review the error."
+                  : email?.last_sync
                   ? `Email connected · last sync ${date(email.last_sync)}. Matching recruitment emails update your table.`
                   : email
                     ? "Gmail is connected. The first inbox sync is still pending; open Email to finish the macOS Keychain prompt."
@@ -479,6 +481,7 @@ export function Daily({ ctx }: { ctx: AppContext }) {
                 {(d.sources || []).map((s: Data) => (
                   <div className="daily-source" key={s.id}>
                     <strong>{s.name}</strong>
+                    <Status value={s.health || "not checked"} />
                     <small>
                       {s.config?.delivery === "email"
                         ? s.last_checked

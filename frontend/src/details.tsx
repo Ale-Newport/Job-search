@@ -922,6 +922,21 @@ export function ApplicationDetail({
                   description="Add a verified answer or let the browser surface a question. Unsupported information always requires your input."
                 />
               )}
+              {!!a.answer_history?.length && (
+                <details>
+                  <summary>Previous answers ({a.answer_history.length})</summary>
+                  <p className="muted">Retained for your records. Current review uses the answers above.</p>
+                  <div className="answer-list">
+                    {a.answer_history.map((v: Data) => (
+                      <div className="answer-card" key={v.id}>
+                        <h4>{v.question}</h4>
+                        <p className="prose-text">{v.answer}</p>
+                        <small className="muted">Superseded {date(v.superseded_at)}</small>
+                      </div>
+                    ))}
+                  </div>
+                </details>
+              )}
             </Panel>
           )}
           {tab === "documents" && (

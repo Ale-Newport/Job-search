@@ -34,6 +34,18 @@ async def run(args):
         usage_db = Database(usage_path)
         configure_from_live(db, usage_db)
     job = db.one("SELECT * FROM jobs WHERE id=?", (args.job,)) if args.job else {}
+    if args.job and not job:
+        raise ValueError('The calibration database does not contain the exact target job')
+    if job:
+        from jobagent.discovery import ats_identity
+        stored_kind, stored_identity = ats_identity(job['application_url'] or job['url'])
+        target_kind, target_identity = ats_identity(args.url)
+        if stored_identity and target_identity and (stored_kind, stored_identity) != (target_kind, target_identity):
+            raise ValueError('Calibration URL identifies a different vacancy from the stored target job')
+        if not stored_identity or not target_identity:
+            from jobagent.discovery import canonical_url
+            if canonical_url(job['application_url'] or job['url']) != canonical_url(args.url):
+                raise ValueError('Calibration URL must match the stored target when its posting identity cannot be verified')
     job = {**(job or {}), "id": args.job or "answer-regression", "job_id": args.job or "answer-regression", "application_id": "answer-regression",
            "application_url": args.url, "url": args.url,
            "company": args.company or (job or {}).get("company", ""),

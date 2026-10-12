@@ -29,7 +29,8 @@
     const refs = (node.getAttribute('aria-labelledby') || '').split(/\s+/)
       .map(id => node.getRootNode().getElementById?.(id)?.textContent || '').join(' ').trim();
     return (refs || node.getAttribute('aria-label') ||
-      [...(node.labels || [])].map(labelText).join(' ') ||
+      [...(node.labels || [])].filter(n => !['radio','checkbox'].includes(node.type) ||
+        !(node.labels.length > 1 && n.parentElement === node.closest('.form-group'))).map(labelText).join(' ') ||
       (['option','treeitem'].includes(node.getAttribute('role')) ? node.innerText : '') ||
       (['submit', 'button'].includes(node.type) ? node.value : '') ||
       (['BUTTON', 'A', 'SUMMARY', 'OPTION'].includes(node.tagName) ? node.innerText : '') ||
@@ -54,19 +55,25 @@
       '[role="alert"],.field-error,.error-message,[data-applicant-answer],[data-candidate-answer]').forEach(n => n.remove());
     return copy.textContent.replace(/\s+/g, ' ').trim();
   };
+  const groupQuestion = node => {
+    const field = node.closest('.form-group,.form-field,.field');
+    const captions = field ? [...field.querySelectorAll(':scope > label')].filter(n => visible(n)) : [];
+    return captions.length === 1 ? plainCopy(captions[0]) : '';
+  };
+  const meaningfulName = node => (node.name || node.id || '').replace(/([a-z])([A-Z])/g, '$1 $2').replace(/[_-]/g, ' ');
   const descriptionFor = node => {
     const root = node.getRootNode();
     const described = (node.getAttribute('aria-describedby') || '').split(/\s+/)
       .map(id => plainCopy(root.getElementById?.(id))).filter(Boolean);
-    const field = fieldFor(node) || node.closest('.application-question,.application-field,.form-field,.field');
+    const field = fieldFor(node) || node.closest('.application-question,.application-field,.form-field,.field,.form-group');
     const hints = field ? [...field.querySelectorAll('.ashby-application-form-question-description,' +
-      '.application-question-description,.field-description,.description,.help-text,.hint,[data-description]')]
+      '.application-question-description,.field-description,.description,.help-text,.hint,.form-notes,[data-description]')]
       .filter(hint => !hint.closest('[hidden],[aria-hidden="true"]')).map(plainCopy) : [];
     return [...new Set([...hints, ...described])].join(' ').slice(0, 20000);
   };
   const questionContainerText = node => {
     const container = node.closest('.application-question') || node.closest('.application-field')?.parentElement;
-    if (!container || container.tagName === 'FORM') return '';
+    if (!container || container.tagName === 'FORM') return groupQuestion(node);
     const copy = container.cloneNode(true);
     copy.querySelectorAll('input,textarea,select,button,script,.select2-container').forEach(n => n.remove());
     return copy.textContent.replace(/\s+/g, ' ').trim().slice(0, 20000);
@@ -137,8 +144,17 @@
   const elements = [];
   const sectionFor = node => {
     const container = node.closest('fieldset,section,[role="group"],[role="region"],.ashby-application-form-section');
-    const heading = container?.querySelector('legend,h1,h2,h3,h4,[role="heading"]');
-    return {section_id: container ? `section-${identity(container)}` : 'page',
+    let heading = container?.querySelector('legend,h1,h2,h3,h4,[role="heading"]');
+    // Many accessible forms use sibling headings rather than section wrappers.
+    // Walk only preceding siblings inside the same form, never another page.
+    if (!heading && node.closest('form')) {
+      for (let current = node; current && current !== node.closest('form') && !heading; current = current.parentElement) {
+        for (let sibling = current.previousElementSibling; sibling; sibling = sibling.previousElementSibling) {
+          if (sibling.matches('h1,h2,h3,h4,h5,h6,[role="heading"]') && visible(sibling)) { heading = sibling; break; }
+        }
+      }
+    }
+    return {section_id: container || heading ? `section-${identity(container || heading)}` : 'page',
       section_label: (heading?.innerText || container?.getAttribute('aria-label') || 'Application details').slice(0, 160)};
   };
   for (const node of all) {
@@ -180,7 +196,9 @@
     elements.push({node_id: identity(node), role, tag, type, explicit_type: node.getAttribute('type'),
       auxiliary_control: !!node.closest('search,[role="search"],[class*="search-widget"],[class*="jobsearch"],' +
         '[class*="chat-widget"],[class*="chatbot"],[id*="chatbot"],[data-chat-widget]'),
-      label: role === 'combobox' || role === 'upload' ? question || fileQuestion(node) || questionContainerText(node) || label(node) : label(node), ...sectionFor(node),
+      label: role === 'combobox' || role === 'upload' ? question || fileQuestion(node) || questionContainerText(node) || label(node) :
+        (role === 'textbox' && /^(?:YYYY|MM|DD|YYYY-MM-DD)$/i.test(node.placeholder || '') && !node.labels?.length
+          ? [groupQuestion(node), meaningfulName(node)].filter(Boolean).join(' — ') : label(node)), ...sectionFor(node),
       upload_proxy_id: type === 'file' && proxy && visible(proxy) ? identity(proxy) : null,
       interaction_proxy_id: role === 'combobox' && proxy && visible(proxy) ? identity(proxy) : null,
       dropdown_trigger_id: dropdown ? identity(dropdown) : null,

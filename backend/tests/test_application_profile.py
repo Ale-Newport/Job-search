@@ -174,6 +174,20 @@ def test_direct_browser_corrections_override_old_facts_and_remember_clears(db):
     assert not any(f['key'] == 'phone' and f['value'] == '0123456789' for f in facts)
 
 
+def test_new_verified_secondary_record_supersedes_old_blank_without_deleting_memory(db):
+    from jobagent.intelligence.store import entity,ingest_fact
+    first = application(db)
+    remember_answer(db,first,'High School Name','',skip=True,direct_edit=True)
+    before = db.query('SELECT * FROM browser_answers')
+    school = entity(db,'education','Example School')
+    for key,value in {'institution':'Example School','level':'Secondary education','status':'completed'}.items():
+        ingest_fact(db,school,key,value,source='New user confirmation',evidence={'excerpt':value},verified=True)
+    facts,skipped = knowledge(db,first)
+    assert 'high school name' not in skipped
+    assert not any(f.get('manual_correction') and f['key']=='High School Name' for f in facts)
+    assert db.query('SELECT * FROM browser_answers') == before
+
+
 def test_direct_edit_disclosures_still_respect_application_scope(db):
     first = application(db)
     second = application(db, 'Another employer')
@@ -198,7 +212,9 @@ def test_browser_edit_updates_parked_checkpoint_and_expires_approval(db, tmp_pat
                                        'element': {'type': 'text', 'label': 'Phone'}})
     checkpoint = json.loads(db.one("SELECT checkpoint FROM automation_runs WHERE id='parked'")['checkpoint'])
     assert checkpoint['snapshot_id'] is None and checkpoint['review_fingerprint'] is None
+    from jobagent.automation.answers import question_identity
     assert checkpoint['answers'] == [{'question': 'Phone', 'answer': 'new phone',
+                                      'question_id':question_identity(app['id'],{'type':'text','label':'Phone'},'Phone'),
                                       'fact_ids': [fact_id], 'verified': True, 'source': 'user_edit'}]
     assert db.one('SELECT answer FROM application_answers WHERE application_id=?', (app['id'],))['answer'] == 'new phone'
 

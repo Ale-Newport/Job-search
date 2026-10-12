@@ -69,6 +69,8 @@ export function Status({ value }: { value?: string }) {
     "verified",
     "offer",
     "connected",
+    "healthy",
+    "empty",
     "success",
     "succeeded",
     "complete",
@@ -83,9 +85,9 @@ export function Status({ value }: { value?: string }) {
       tone={
         positive.has(s)
           ? "green"
-          : /error|reject|failed|blocked/.test(s)
+          : /error|reject|failed|blocked|access_denied|rate_limited|timeout/.test(s)
             ? "red"
-            : /review|human|pending|unverified|interrupt|assessment/.test(s)
+            : /review|human|pending|unverified|interrupt|assessment|partial|not_verified/.test(s)
               ? "amber"
               : "neutral"
       }

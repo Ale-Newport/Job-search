@@ -10,10 +10,12 @@ def main(argv=None):
         prog="meridian-backend --meridian-calibration",
         description="Run authorized calibration with shared usage accounting; never submit applications.",
     )
-    parser.add_argument("mode", choices=("answers", "form"))
+    parser.add_argument("mode", choices=("answers", "form", "mail"))
     mode = parser.parse_args(arguments[:1]).mode
     if mode == "answers":
         from .answers import main as run
-    else:
+    elif mode == 'form':
         from .form import main as run
+    else:
+        from .mail import main as run
     return run(arguments[1:])

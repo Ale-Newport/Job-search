@@ -4,7 +4,7 @@ import re
 
 from ..automation.runner import BrowserManager
 from ..automation.reasoning import conditional_state
-from ..automation.answers import selected_choice_matches, normalize
+from ..automation.answers import selected_choice_matches, normalize, question_identity
 from ..intelligence.formatting import choice
 
 
@@ -28,7 +28,10 @@ def audit_fields(snapshot, adapter, intelligence, result, job):
     if adapter.manual_only:
         return []
     fields, seen = [], set()
-    recorded = {normalize(a["question"]): a for a in result.get("answers", [])}
+    recorded = {a['question_id']:a for a in result.get('answers', []) if a.get('question_id')}
+    by_question = {}
+    for answer in result.get('answers', []):
+        by_question.setdefault(normalize(answer['question']), []).append(answer)
     for field in snapshot["elements"]:
         if (
             not any(op in field["operations"] for op in ["TYPE_TEXT", "SELECT", "CHECK", "UPLOAD"])
@@ -43,7 +46,9 @@ def audit_fields(snapshot, adapter, intelligence, result, job):
         condition = conditional_state(field, snapshot["elements"], adapter)
         context = {**field, "_condition": condition or {}}
         reasoning = intelligence.answer_question(question, context, job)
-        answer = recorded.get(normalize(question))
+        question_id = question_identity(job.get('id'), field, question)
+        candidates = by_question.get(normalize(question), [])
+        answer = recorded.get(question_id) or (candidates[0] if len(candidates) == 1 else None)
         expected = answer.get("answer") if answer else reasoning["answer"]
         if condition and condition["applies"] is not True:
             expected = None
@@ -82,13 +87,18 @@ def audit_fields(snapshot, adapter, intelligence, result, job):
             match = True
         if field.get('role') == 'combobox' and field.get('tag') != 'select':
             diagnostic = next((d for d in result.get('answer_diagnostics', [])
-                               if normalize(d.get('question', '')) == normalize(question)), {})
+                               if d.get('question_id') == question_id), {})
             match = match and not field.get('expanded') and bool(
                 field.get('selected_text') or diagnostic.get('selection_verified'))
         match = match and (field.get('validity') or {}).get('valid', True)
         fields.append(
             {
                 "question": question,
+                "question_id": question_id,
+                "name": field.get('name'),
+                "section_label": field.get('section_label'),
+                "document_id": field.get('document_id'),
+                "node_id": field.get('node_id'),
                 "required": bool(field.get("required")),
                 "role": field["role"],
                 "value": value,

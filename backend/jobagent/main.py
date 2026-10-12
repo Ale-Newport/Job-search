@@ -721,6 +721,23 @@ def create_app(data_dir: Path | None = None, token: str | None = None, secret_st
     return app
 
 
+def daily_discovery_should_enqueue(db, key, *, at=None):
+    from datetime import datetime, timezone
+    latest = db.one('SELECT state,updated_at FROM automation_tasks WHERE dedupe_key=? ORDER BY created_at DESC LIMIT 1', (key,))
+    if not latest:
+        return True
+    if latest['state'] != 'FAILED':
+        return False
+    # The worker already retries each task. Permit one fresh task after a crash,
+    # without either abandoning the day or endlessly hammering failing sources.
+    failures = db.one("SELECT count(*) AS n FROM automation_tasks WHERE dedupe_key=? AND state='FAILED'", (key,))['n']
+    try:
+        elapsed = ((at or datetime.now(timezone.utc))-datetime.fromisoformat(latest['updated_at'])).total_seconds()
+    except (ValueError, TypeError):
+        return False
+    return failures < 2 and elapsed >= 1800
+
+
 async def schedule(app):
     from datetime import datetime
     from zoneinfo import ZoneInfo
@@ -746,8 +763,7 @@ async def schedule(app):
             if overdue and local.strftime('%H:%M') >= search_time:
                 if hasattr(getattr(app.state, 'automation', None), 'enqueue'):
                     key = f'discovery:{day}'
-                    previous = await asyncio.to_thread(app.state.db.one, 'SELECT state FROM automation_tasks WHERE dedupe_key=? ORDER BY created_at DESC LIMIT 1', (key,))
-                    if not previous:
+                    if await asyncio.to_thread(daily_discovery_should_enqueue, app.state.db, key):
                         app.state.automation.enqueue('discovery', dedupe_key=key)
                 else:
                     task = getattr(app.state, 'daily_refresh_task', None)

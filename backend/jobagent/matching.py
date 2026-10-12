@@ -228,8 +228,7 @@ def _config(profile):
     return json.loads(result) if isinstance(result, str) else result
 
 
-def match_job(job: dict, facts: list[dict], profile: dict | None = None, feedback: list[dict] | None = None) -> dict:
-    cfg = _config(profile)
+def candidate_match_evidence(facts: list[dict]) -> dict:
     trusted = [f for f in facts if f.get("verification_status") == "verified" or f.get("locked")]
     professional = [
         f
@@ -250,6 +249,15 @@ def match_job(job: dict, facts: list[dict], profile: dict | None = None, feedbac
     candidate_text = " ".join(f"{f.get('key', '')} {f.get('value', '')}" for f in professional)
     candidate_skills = set(extract_skills(candidate_text))
     explicit_skills = {normalized(f["value"]) for f in professional if f.get("category") == "skill"}
+    return {'trusted': trusted, 'candidate_skills': candidate_skills, 'explicit_skills': explicit_skills}
+
+
+def match_job(job: dict, facts: list[dict], profile: dict | None = None, feedback: list[dict] | None = None, *, candidate_evidence=None) -> dict:
+    cfg = _config(profile)
+    evidence = candidate_evidence if candidate_evidence is not None else candidate_match_evidence(facts)
+    trusted = evidence['trusted']
+    candidate_skills = evidence['candidate_skills']
+    explicit_skills = evidence['explicit_skills']
     raw_skills = job.get("skills", [])
     if isinstance(raw_skills, str):
         raw_skills = json.loads(raw_skills)

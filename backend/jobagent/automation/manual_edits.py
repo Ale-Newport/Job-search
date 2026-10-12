@@ -120,8 +120,11 @@ class ManualEdits:
             await asyncio.gather(*tuple(self.tasks))
 
     async def close(self):
-        await self.flush()
-        for state in self.pages.values():
+        # Retired frames can leave CDP calls unanswered. Cleanup must not keep
+        # the browser alive after its application task has ended.
+        with contextlib.suppress(Exception):
+            await asyncio.wait_for(self.flush(), timeout=2)
+        async def remove(state):
             for context in tuple(state['contexts']):
                 with contextlib.suppress(Exception):
                     await state['cdp'].send('Runtime.evaluate', {'contextId': context,
@@ -130,4 +133,6 @@ class ManualEdits:
                 await state['cdp'].send('Page.removeScriptToEvaluateOnNewDocument', {'identifier': state['script']})
             with contextlib.suppress(Exception):
                 await state['cdp'].detach()
+        with contextlib.suppress(Exception):
+            await asyncio.wait_for(asyncio.gather(*(remove(state) for state in self.pages.values())), timeout=1)
         self.pages.clear()

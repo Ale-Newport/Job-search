@@ -10,12 +10,12 @@ from pathlib import Path
 import re
 
 from .adapters import get_adapter
-from .answers import normalize, classify_question, SENSITIVE, dropdown_search_value
+from .answers import normalize, classify_question, SENSITIVE, dropdown_search_value, question_identity
 from ..intelligence.formatting import choice as option_for
 from .reasoning import conditional_state, profile_resolution
 from .disclosures import disclosure_resolution, disclosure_clear_operation, disclosure_memory_key, has_disclosure_value, inherit_disclosure_context, personal_disclosure_kind
 from .browser import BrowserSession, confirmation_evidence
-from .browser import PROGRESS, is_submit, application_entry_target, application_input_elements
+from .browser import PROGRESS, is_submit, application_entry_target, application_input_elements, lost_posting_target
 from .engines import make_engine
 from .job_context import enrich_job_context
 from .consent import action_key, dropdown_open_target, radio_group, resolution_element, section_plan, selected_resolution_matches
@@ -179,9 +179,7 @@ class BrowserManager(BrowserSession):
         async def resolve(element):
             element = resolution_element(element, snapshot['elements'])
             field = adapter.question(element)
-            question_id = hashlib.sha256(json.dumps([application.get('id'), element.get('name') or
-                element.get('field_path') or element.get('group') or element.get('node_id'), field],
-                ensure_ascii=False).encode()).hexdigest()
+            question_id = question_identity(application.get('id'), element, field)
             # Context is copied per question. A checkbox group shares one selection
             # result but every distinct question has its own immutable identity.
             element = {**element, 'question_id': question_id,
@@ -246,6 +244,9 @@ class BrowserManager(BrowserSession):
                 snapshot = await self.wait_until_ready()
             else:
                 snapshot = await self.open(url)
+            if lost_posting_target(url, snapshot):
+                return self._result('human_required', snapshot, adapter=adapter.name,
+                                    questions=[{'question': 'The vacancy redirected away from its application. Verify that this exact role is still accepting applications.', 'kind': 'job_unavailable'}])
             if adapter.manual_only:
                 return self._result("human_required", snapshot, adapter=adapter.name,
                                     questions=[{"question": "This source uses manual handoff. Complete the application in the visible browser.",
@@ -305,6 +306,9 @@ class BrowserManager(BrowserSession):
                     reason = "Human verification required" if snapshot["challenge"] else "Complete sign-in or multi-factor authentication in the visible browser."
                     return self._result("human_required", snapshot, answers=answers, steps=steps, adapter=adapter.name,
                                         questions=[{"question": reason, "kind": "captcha" if snapshot["challenge"] else "authentication"}])
+                if lost_posting_target(url, snapshot):
+                    return self._result('human_required', snapshot, answers=answers, steps=steps, adapter=adapter.name,
+                                        questions=[{'question': 'Navigation no longer identifies the intended vacancy. Verify the destination before continuing.', 'kind': 'job_unavailable'}])
                 evidence = confirmation_evidence(snapshot)
                 if evidence:
                     # A confirmation visible before any submission is evidence of the current page,
@@ -666,10 +670,8 @@ class BrowserManager(BrowserSession):
                         observed = next((e for e in snapshot['elements'] if e['node_id'] == target['node_id']
                                          and e['document_id'] == target['document_id']), None)
                         if observed:
-                            diagnostic = self._answer_diagnostics.get(hashlib.sha256(json.dumps([
-                                application.get('id'), target.get('name') or target.get('field_path') or
-                                target.get('group') or target.get('node_id'), adapter.question(target)],
-                                ensure_ascii=False).encode()).hexdigest())
+                            diagnostic = self._answer_diagnostics.get(question_identity(
+                                application.get('id'), target, adapter.question(target)))
                             if diagnostic:
                                 diagnostic['status'] = 'ANSWER_INSERTED'
                                 self._accepted_answer(diagnostic, observed)
@@ -695,6 +697,7 @@ class BrowserManager(BrowserSession):
                                             current_value=element.get("value", ""), node_id=element["node_id"],
                                             document_id=element["document_id"], type=element.get("type"),
                                             form_id=element.get("form_id"), group=element.get("group"),
+                                            multiple=bool(element.get('multiple')),
                                             role=element.get("role"), description=element.get("description", ""),
                                             context=element.get("context", ""), section_label=element.get("section_label", ""),
                                             _disclosure_parent_question=element.get("_disclosure_parent_question", ""),
@@ -704,8 +707,13 @@ class BrowserManager(BrowserSession):
                                 question["options"] = [{"label": e["label"], "value": e["value"]} for e in siblings]
                                 question["current_value"] = next((e["label"] for e in siblings if e["checked"]), "")
                             elif element["role"] == "checkbox":
-                                question["options"] = [{"label": "Yes"}, {"label": "No"}]
-                                question["current_value"] = "Yes" if element["checked"] else ""
+                                if element.get('multiple'):
+                                    group = resolution_element(element, snapshot['elements'])
+                                    question['options'] = group['options']
+                                    question['current_value'] = [e['label'] for e in radio_group(element, snapshot['elements']) if e.get('checked')]
+                                else:
+                                    question["options"] = [{"label": "Yes"}, {"label": "No"}]
+                                    question["current_value"] = "Yes" if element["checked"] else ""
                     questions = self._dedupe_questions(questions)
                     return self._result("human_required", snapshot, answers=answers, questions=questions,
                                         steps=steps, adapter=adapter.name)
@@ -968,7 +976,8 @@ class BrowserManager(BrowserSession):
         seen = set()
         result = []
         for question in questions:
-            control = (question.get("group") or question.get("node_id")) if question.get("role") == "radio" else question.get("node_id")
+            grouped = question.get('role') == 'radio' or question.get('role') == 'checkbox' and question.get('multiple')
+            control = (question.get("group") or question.get("node_id")) if grouped else question.get("node_id")
             identity = (question.get("document_id"), question.get("form_id"), control)
             key = (disclosure_memory_key(question["question"], question), question["kind"], identity)
             if key not in seen:

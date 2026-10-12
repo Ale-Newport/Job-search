@@ -42,13 +42,21 @@ def ensure_watchlist(db):
 
 
 def coverage(db):
+    from .discovery import source_health
     rows = []
     for company in db.query('SELECT * FROM companies ORDER BY name'):
-        sources = db.query("SELECT id,name,url,enabled,last_checked,last_error,jobs_found FROM sources WHERE json_extract(config,'$.company_id')=? OR lower(json_extract(config,'$.company'))=lower(?) OR (url=? AND url!='')", (company['id'], company['name'], company['careers_url']))
+        sources = [source_health(db, s) for s in db.query("SELECT * FROM sources WHERE json_extract(config,'$.company_id')=? OR lower(json_extract(config,'$.company'))=lower(?) OR (url=? AND url!='')", (company['id'], company['name'], company['careers_url']))]
+        enabled = [s for s in sources if s['enabled']]
+        healthy = [s for s in enabled if s['health'] in ('HEALTHY', 'EMPTY')]
+        partial = [s for s in enabled if s['health'] == 'PARTIAL']
+        health = ('UNCONFIGURED' if not sources else 'DISABLED' if not enabled else 'VERIFIED' if healthy else
+                  'PARTIAL' if partial else 'FAILED' if all(s['last_error'] for s in enabled) else 'NOT_VERIFIED')
         rows.append({'company_id': company['id'], 'company': company['name'], 'careers_url': company['careers_url'],
-                     'sources': sources, 'health': 'UNCONFIGURED' if not sources else 'DISABLED' if not any(s['enabled'] for s in sources) else 'FAILED' if all(s['last_error'] for s in sources if s['enabled']) else 'CONFIGURED',
+                     'sources': sources, 'health': health, 'daily_enabled': bool(enabled),
                      'reason': 'No verified career source is configured; add the official portal URL.' if not sources else None})
-    return {'items': rows, 'total': len(rows), 'configured': sum(bool(r['sources']) for r in rows)}
+    return {'items': rows, 'total': len(rows), 'configured': sum(bool(r['sources']) for r in rows),
+            'verified': sum(r['health'] == 'VERIFIED' for r in rows), 'partial': sum(r['health'] == 'PARTIAL' for r in rows),
+            'daily_enabled': sum(r['daily_enabled'] for r in rows)}
 
 
 def import_configured_sources(db):

@@ -708,3 +708,43 @@ async def test_model_still_interprets_an_unknown_concept(knowledge, monkeypatch)
     result = await CandidateEngine(knowledge, as_of="2026-10-03").answer("Which alma mater is mine nowadays?")
     assert result["answer"] == "South University"
     assert result["requires_review"] and not result["verified"]
+def test_repeated_education_fields_use_their_sections_and_never_substitute_overall_results(knowledge):
+    engine = CandidateEngine(knowledge)
+    under = {'section_label':'Education - Undergraduate'}
+    post = {'section_label':'Education - Postgraduate'}
+    assert engine.answer_question('University',under)['answer'] == 'North University'
+    assert engine.answer_question('University',post)['answer'] == 'South University'
+    assert engine.answer_question('Course',under)['answer'] == 'Computer Science'
+    assert engine.answer_question('A levels or equivalent',{'section_label':'Education - School'})['answer'] is None
+    assert engine.answer_question('3rd Year result',under)['answer'] is None
+    assert engine.answer_question('3rd Year result',under)['root_cause'] == 'MISSING_YEAR_SPECIFIC_RESULT'
+    field = under | {'name':'UniversityStartYear','placeholder':'YYYY','pattern':'(19|20)\\d\\d','max_length':4}
+    assert engine.answer_question('Start and end dates — University Start Year',field)['answer'] == '2023'
+    spaced_post = {'section_label':'Education - Post Graduate Degree (optional)','name':'pgc_qual'}
+    result = engine.answer_question('Result',spaced_post)
+    assert result['canonical_intent'] == 'GRADE' and result['answer'] is None
+    range_result = engine.answer_question('Start and end dates',spaced_post | {'name':'pgc_interval'})
+    assert range_result['canonical_intent'] == 'DEGREE'
+    assert range_result['answer'] == '28 September 2026 – 27 September 2027'
+
+
+def test_known_school_name_is_not_a_school_qualification_and_existing_degrees_are_not_additional(tmp_path):
+    db = Database(tmp_path/'school.sqlite3')
+    school = entity(db,'education','Example School')
+    for key,value in {'institution':'Example School','level':'Secondary education','status':'completed','graduation_year':2023}.items():
+        ingest_fact(db,school,key,value,source='Synthetic verified school record',evidence={'excerpt':str(value)},verified=True)
+    engine = CandidateEngine(db)
+    for question in ['GCSEs or equivalent','A levels or equivalent']:
+        assert engine.answer_question(question,{'section_label':'Education - School'})['answer'] is None
+    assert engine.answer_question('Other Degrees',{'section_label':'Education - Other'})['root_cause'] == 'MISSING_ADDITIONAL_QUALIFICATION'
+
+
+def test_confirmed_subgroup_maps_only_to_a_broader_category_and_nationality_categories_preserve_dual_ambiguity():
+    assert choice('White - Other',[{'label':'White','value':'white'}],question='What is your ethnicity?',disclosure_concept='ethnicity')['value'] == 'white'
+    assert choice('White',[{'label':'White - British','value':'british'}],question='What is your ethnicity?',disclosure_concept='ethnicity') is None
+    options = [{'label':'British','value':'uk'},{'label':'Non British','value':'other'}]
+    assert choice('Spanish',options,question='What is your nationality?')['value'] == 'other'
+    assert choice('UK',options,question='What is your nationality?')['value'] == 'uk'
+    assert choice('Undisclosed',options,question='What is your nationality?') is None
+    assert choice('Spanish and British',options,question='What is your nationality?') is None
+    assert choice('Spanish',options,question='Do you have British citizenship?') is None

@@ -5,6 +5,54 @@ employer publishes an accessible feed. Existing custom sources always take prior
 """
 from .db import dumps, now, uid
 
+VERIFIED_PUBLIC_FEEDS = {
+    'https://jobs.netflix.com/': {
+        'public_sitemap': {'url': 'https://explore.jobs.netflix.net/careers/sitemap.xml?domain=netflix.com&microsite=netflix.com'},
+        'feed_evidence_url': 'https://explore.jobs.netflix.net/robots.txt',
+    },
+    'https://careers.microsoft.com/': {
+        'published_board': {'kind': 'eightfold', 'url': 'https://apply.careers.microsoft.com/api/pcsx/search?domain=microsoft.com', 'config': {}},
+        'board_evidence_url': 'https://apply.careers.microsoft.com/careers?domain=microsoft.com',
+    },
+    'https://www.lifeatspotify.com/jobs': {
+        'public_job_feed': {'url': 'https://api.lifeatspotify.com/wp-json/animal/v1/job/search',
+                            'collection_key': 'result', 'title_key': 'text', 'location_key': 'locations',
+                            'employment_key': 'job_type.name', 'authoritative': True,
+                            'url_template': 'https://www.lifeatspotify.com/jobs/{id}'},
+        'feed_evidence_url': 'https://www.lifeatspotify.com/_next/static/chunks/877-41c48cdbcf73b2c9.js',
+    },
+    'https://careers.db.com/': {
+        'published_board': {'kind': 'workday', 'url': 'https://db.wd3.myworkdayjobs.com/DBWebsite', 'config': {'board': 'DBWebsite'}},
+        'board_evidence_url': 'https://api-deutschebank.beesite.de/search/',
+    },
+    'https://careers.deliveroo.co.uk/': {
+        'public_job_feed': {'url': 'https://careers.deliveroo.co.uk/wp-json/wp/v2/roles?per_page=100',
+                            'url_key': 'link', 'title_key': 'title.rendered', 'location_key': 'meta.ats_location',
+                            'description_keys': ['content.rendered'],
+                            'pagination': {'offset_param': 'offset', 'limit_param': 'per_page', 'total_header': 'x-wp-total'}},
+        'feed_evidence_url': 'https://careers.deliveroo.co.uk/join-the-team/',
+    },
+    'https://careers.adyen.com/': {
+        'published_board': {'kind': 'greenhouse', 'url': 'https://boards-api.greenhouse.io/v1/boards/adyen', 'config': {'board': 'adyen'}},
+        'board_evidence_url': 'https://careers.adyen.com/_nuxt/CbandRa3.js',
+    },
+    'https://www.janestreet.com/join-jane-street/open-roles/': {
+        'public_job_feed': {'url': 'https://www.janestreet.com/jobs/main.json',
+                            'listed_ids_url': 'https://www.janestreet.com/static/position-directories.json',
+                            'url_template': 'https://www.janestreet.com/join-jane-street/position/{id}/',
+                            'title_key': 'position', 'location_key': 'city', 'employment_key': 'availability',
+                            'description_keys': ['overview', 'aboutYou']},
+        'feed_evidence_url': 'https://www.janestreet.com/assets/pg/open_positions-83cf832cfb95d5005c850f2589657e791285b5d849568e6728a48fa80695a96a.js',
+    },
+    'https://www.amazon.jobs/': {
+        'public_job_feed': {'url': 'https://www.amazon.jobs/en/search.json', 'collection_key': 'jobs',
+                            'url_key': 'job_path', 'description_keys': ['description', 'basic_qualifications', 'preferred_qualifications'],
+                            'employment_key': 'job_schedule_type',
+                            'pagination': {'offset_param': 'offset', 'limit_param': 'result_limit', 'total_key': 'hits'}},
+        'feed_evidence_url': 'https://static.amazon.jobs/assets/bundles/search/index-f30f4e5ad13129ea5aba659e0b5ce2333d3e1ee25b96fc8f2caa42dfa5cfba85.js',
+    },
+}
+
 OFFICIAL_CAREERS = {
     'Monzo': 'https://monzo.com/careers',
     'Wise': 'https://wise.jobs/',
@@ -96,6 +144,13 @@ def seed_official_sources(db):
         db.execute('INSERT INTO sources(id,name,kind,url,config,poll_minutes,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?)',
                    (uid(), name+' careers', 'careers', entry, dumps({'company_id':company['id'],'company_name':name,'official_entry':True}),company['poll_minutes'],stamp,stamp))
         db.execute("UPDATE companies SET careers_url=? WHERE id=? AND careers_url=''", (entry,company['id']))
+    import json
+    for source in db.query("SELECT id,url,config FROM sources WHERE kind='careers'"):
+        verified = VERIFIED_PUBLIC_FEEDS.get(source['url'])
+        config = json.loads(source['config'])
+        if verified and 'public_job_feed' not in config and 'published_board' not in config and 'public_sitemap' not in config:
+            config.update(verified)
+            db.execute('UPDATE sources SET config=?,updated_at=? WHERE id=?', (dumps(config), now(), source['id']))
 
 
 def import_observed_boards(db):
@@ -103,6 +158,14 @@ def import_observed_boards(db):
     from urllib.parse import urlsplit, urlunsplit
     import re
     from .discovery import ats_identity
+    # Earlier automatically imported boards were restricted to the first 100
+    # global vacancies. Increase that generated default; retain custom caps.
+    for source in db.query("SELECT id,config FROM sources WHERE kind='workday' AND json_extract(config,'$.evidence_job_id') IS NOT NULL AND json_extract(config,'$.max_jobs')=100"):
+        import json
+        config = json.loads(source['config'])
+        config['max_jobs'] = 2000
+        db.execute('UPDATE sources SET config=?,updated_at=? WHERE id=?', (dumps(config), now(), source['id']))
+    existing_entries = {source['url'] for source in db.query('SELECT url FROM sources')}
     for company in db.query('SELECT * FROM companies'):
         for job in db.query('SELECT id,url,application_url FROM jobs WHERE company=? COLLATE NOCASE', (company['name'],)):
             url = job['application_url'] or job['url']
@@ -113,13 +176,14 @@ def import_observed_boards(db):
                 board = parts[0]
                 entry = urlunsplit((parsed.scheme,parsed.netloc,'/'+board,'',''))
             elif kind=='workday' and parsed.hostname.endswith('.myworkdayjobs.com') and len(parts)>=2:
-                site = parts[1] if re.fullmatch(r'[a-z]{2}-[A-Z]{2}',parts[0]) else parts[0]
+                site = parts[1] if re.fullmatch(r'[a-z]{2}-[a-z]{2}',parts[0], re.I) else parts[0]
                 board = site
                 entry = urlunsplit((parsed.scheme,parsed.netloc,'/'+site,'',''))
             else:
                 continue
-            if db.one('SELECT id FROM sources WHERE url=?',(entry,)):
+            if entry in existing_entries:
                 continue
             stamp=now()
             db.execute('INSERT INTO sources(id,name,kind,url,config,poll_minutes,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?)',
-                       (uid(),company['name']+' public board',kind,entry,dumps({'company_id':company['id'],'company_name':company['name'],'board':board,'evidence_job_id':job['id'],'max_jobs':100}),company['poll_minutes'],stamp,stamp))
+                       (uid(),company['name']+' public board',kind,entry,dumps({'company_id':company['id'],'company_name':company['name'],'board':board,'evidence_job_id':job['id'],'max_jobs':2000}),company['poll_minutes'],stamp,stamp))
+            existing_entries.add(entry)

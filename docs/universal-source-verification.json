@@ -1,0 +1,3419 @@
+{
+  "audited_at": "2026-10-12T18:06:56.373693+00:00",
+  "scope": "Read-only installed database; public discovery metadata only; no candidate facts, answers, documents or credentials.",
+  "source_count": 99,
+  "health_counts": {
+    "ACCESS_DENIED": 12,
+    "PARTIAL": 32,
+    "HEALTHY": 47,
+    "FAILED": 5,
+    "INBOX_ERROR": 2,
+    "RATE_LIMITED": 1
+  },
+  "company_count": 79,
+  "company_health_counts": {
+    "PARTIAL": 27,
+    "VERIFIED": 34,
+    "FAILED": 18
+  },
+  "daily_enabled_companies": 79,
+  "last_full_refresh": {
+    "at": "2026-10-12T17:50:04.551458+00:00",
+    "day": "2026-10-12",
+    "new_jobs": 418,
+    "errors": 18,
+    "sources_checked": 97,
+    "complete_sources": 47,
+    "partial_sources": 32
+  },
+  "sources": [
+    {
+      "name": "AMD careers",
+      "kind": "careers",
+      "url": "https://careers.amd.com/",
+      "enabled": true,
+      "last_checked": "2026-10-12T17:42:49.010043+00:00",
+      "health": "ACCESS_DENIED",
+      "jobs_found": 0,
+      "error": "ValueError: Public browser navigation returned HTTP 403",
+      "evidence": {
+        "complete": null,
+        "authoritative": null,
+        "method": null,
+        "published_total": null,
+        "matching_jobs": 0,
+        "limitations": null
+      },
+      "endpoints": []
+    },
+    {
+      "name": "Accenture public board",
+      "kind": "workday",
+      "url": "https://accenture.wd103.myworkdayjobs.com/accenturecareers",
+      "enabled": true,
+      "last_checked": "2026-10-12T17:38:13.557812+00:00",
+      "health": "PARTIAL",
+      "jobs_found": 1943,
+      "error": null,
+      "evidence": {
+        "complete": false,
+        "authoritative": true,
+        "method": "Workday public CXS",
+        "published_total": 2000,
+        "matching_jobs": 0,
+        "limitations": [
+          "Descriptions are not published in board listings",
+          "A Workday listing was omitted because it has no public job path or title"
+        ]
+      },
+      "endpoints": [
+        "https://accenture.wd103.myworkdayjobs.com/wday/cxs/accenture/accenturecareers/jobs"
+      ]
+    },
+    {
+      "name": "Adobe public board",
+      "kind": "workday",
+      "url": "https://adobe.wd5.myworkdayjobs.com/external_experienced",
+      "enabled": true,
+      "last_checked": "2026-10-12T17:36:08.870564+00:00",
+      "health": "PARTIAL",
+      "jobs_found": 338,
+      "error": null,
+      "evidence": {
+        "complete": false,
+        "authoritative": true,
+        "method": "Workday public CXS",
+        "published_total": 345,
+        "matching_jobs": 38,
+        "limitations": [
+          "Descriptions are not published in board listings",
+          "A Workday listing was omitted because it has no public job path or title"
+        ]
+      },
+      "endpoints": [
+        "https://adobe.wd5.myworkdayjobs.com/wday/cxs/adobe/external_experienced/jobs"
+      ]
+    },
+    {
+      "name": "Adyen careers",
+      "kind": "careers",
+      "url": "https://careers.adyen.com/",
+      "enabled": true,
+      "last_checked": "2026-10-12T17:46:39.281219+00:00",
+      "health": "HEALTHY",
+      "jobs_found": 238,
+      "error": null,
+      "evidence": {
+        "complete": true,
+        "authoritative": true,
+        "method": "greenhouse public API",
+        "published_total": 238,
+        "matching_jobs": 96,
+        "limitations": []
+      },
+      "endpoints": [
+        "https://boards-api.greenhouse.io/v1/boards/adyen/jobs?content=true",
+        "https://careers.adyen.com/_nuxt/CbandRa3.js"
+      ]
+    },
+    {
+      "name": "Adyen public board",
+      "kind": "greenhouse",
+      "url": "https://job-boards.greenhouse.io/adyen",
+      "enabled": true,
+      "last_checked": "2026-10-12T17:48:45.068887+00:00",
+      "health": "HEALTHY",
+      "jobs_found": 239,
+      "error": null,
+      "evidence": {
+        "complete": true,
+        "authoritative": true,
+        "method": "greenhouse public API",
+        "published_total": 239,
+        "matching_jobs": 97,
+        "limitations": []
+      },
+      "endpoints": [
+        "https://boards-api.greenhouse.io/v1/boards/adyen/jobs?content=true"
+      ]
+    },
+    {
+      "name": "Amazon careers",
+      "kind": "careers",
+      "url": "https://www.amazon.jobs/",
+      "enabled": true,
+      "last_checked": "2026-10-12T17:40:57.875981+00:00",
+      "health": "PARTIAL",
+      "jobs_found": 1854,
+      "error": null,
+      "evidence": {
+        "complete": false,
+        "authoritative": true,
+        "method": "Published JSON job feed",
+        "published_total": 10000,
+        "matching_jobs": 166,
+        "limitations": [
+          "Posting limit reached before the published total",
+          "Posting limit reached"
+        ]
+      },
+      "endpoints": [
+        "https://www.amazon.jobs/en/search.json"
+      ]
+    },
+    {
+      "name": "American Express careers",
+      "kind": "careers",
+      "url": "https://www.americanexpress.com/en-us/careers/",
+      "enabled": true,
+      "last_checked": "2026-10-12T17:47:28.399716+00:00",
+      "health": "HEALTHY",
+      "jobs_found": 459,
+      "error": null,
+      "evidence": {
+        "complete": true,
+        "authoritative": true,
+        "method": "Oracle public Candidate Experience API (isolated public browser)",
+        "published_total": 459,
+        "matching_jobs": 58,
+        "limitations": []
+      },
+      "endpoints": [
+        "https://egug.fa.us2.oraclecloud.com/hcmRestApi/resources/latest/recruitingCEJobRequisitions"
+      ]
+    },
+    {
+      "name": "Apple careers",
+      "kind": "careers",
+      "url": "https://jobs.apple.com/en-gb/search",
+      "enabled": true,
+      "last_checked": "2026-10-12T17:40:35.122578+00:00",
+      "health": "PARTIAL",
+      "jobs_found": 18,
+      "error": null,
+      "evidence": {
+        "complete": false,
+        "authoritative": false,
+        "method": "Published career data and ATS references",
+        "published_total": null,
+        "matching_jobs": 0,
+        "limitations": [
+          "Published career pages may show a subset; absence does not prove a job closed"
+        ]
+      },
+      "endpoints": [
+        "https://jobs.apple.com/en-gb/search?location=united-kingdom-GBR",
+        "https://jobs.apple.com/content/js/analytics/v4/packager-20201111A-JOBS.launch-20201111F-prod.js",
+        "https://jobs.apple.com/static/jobsite.vendors.96c2e6005a80b24c9aa8.js",
+        "https://jobs.apple.com/static/jobsite.main.6f4557d0431a06ce7e9e.js",
+        "https://www.apple.com/uk/search",
+        "https://jobs.apple.com/en-gb/search?location=united-kingdom-GBR",
+        "https://jobs.apple.com/en-gb/details/114438145/uk-specialist-seasonal-part-time?team=APPST",
+        "https://jobs.apple.com/en-gb/details/200682978-2114/international-commercial-lead-apple-tv?team=SFTWR",
+        "https://jobs.apple.com/en-gb/details/200634236-2114/software-engineer-icloud-platform?team=SFTWR",
+        "https://jobs.apple.com/en-gb/details/200687142-2114/development-manager?team=CORSV",
+        "https://jobs.apple.com/en-gb/details/200688187-2114/early-career-front-end-implementation-engineer-synthesis?team=HRDWR",
+        "https://jobs.apple.com/en-gb/details/200688145-2114/front-end-implementation-synthesis-engineer?team=HRDWR",
+        "https://jobs.apple.com/en-gb/details/200687932-2114/experienced-ams-design-verification-engineer?team=HRDWR",
+        "https://jobs.apple.com/en-gb/details/200686567-2114/software-development-engineer-manager-ais?team=SFTWR",
+        "https://jobs.apple.com/en-gb/details/200687698-2114/people-business-partner-director-emeia-retail?team=CORSV",
+        "https://jobs.apple.com/en-gb/details/200687712-2114/mac-metal-framework-and-compiler-engineer?team=SFTWR",
+        "https://jobs.apple.com/en-gb/details/200683509-2114/site-reliability-engineer-sre-london?team=SFTWR",
+        "https://jobs.apple.com/en-gb/details/200679321-2114/strategy-and-business-development-executive-ww-business-planning?team=SLDEV",
+        "https://www.apple.com/careers/uk/",
+        "https://www.apple.com/uk/search?src=aos&tab=explore",
+        "https://www.apple.com/uk/search?src=aos&tab=accessories"
+      ]
+    },
+    {
+      "name": "Arm careers",
+      "kind": "careers",
+      "url": "https://careers.arm.com/",
+      "enabled": true,
+      "last_checked": "2026-10-12T17:42:50.755498+00:00",
+      "health": "PARTIAL",
+      "jobs_found": 15,
+      "error": null,
+      "evidence": {
+        "complete": false,
+        "authoritative": false,
+        "method": "Published career data and ATS references",
+        "published_total": null,
+        "matching_jobs": 7,
+        "limitations": [
+          "Published career pages may show a subset; absence does not prove a job closed"
+        ]
+      },
+      "endpoints": [
+        "https://careers.arm.com/",
+        "https://careers.arm.com/search-jobs",
+        "https://careers.arm.com/job/cambridge/graphics-engineer/33099/96521990288",
+        "https://careers.arm.com/job/austin/theorem-proving-engineer/33099/97584421536",
+        "https://careers.arm.com/job/lund/compiler-engineer-machine-learning/33099/94847322016",
+        "https://careers.arm.com/job/cambridge/staff-ai-solutions-specialist/33099/100391233328",
+        "https://careers.arm.com/job/cambridge/staff-software-performance-engineer-team-lead/33099/74720022336",
+        "https://careers.arm.com/job/budapest/staff-release-and-test-automation-engineer/33099/83921379616",
+        "https://careers.arm.com/job/san-jose/manager-tax/33099/69872372960",
+        "https://careers.arm.com/job/austin/principal-soc-ras-architect/33099/80327386912",
+        "https://careers.arm.com/job/san-jose/principal-high-speed-i-o-architect-pcie-cxl-ua-link/33099/79892773616",
+        "https://careers.arm.com/job/san-jose/senior-principal-system-architect/33099/81809923920",
+        "https://careers.arm.com/job/budapest/software-system-test-engineer/33099/87324865328",
+        "https://careers.arm.com/job/cambridge/staff-linux-support-engineer/33099/92155582128"
+      ]
+    },
+    {
+      "name": "BNP Paribas careers",
+      "kind": "careers",
+      "url": "https://group.bnpparibas/en/careers",
+      "enabled": true,
+      "last_checked": "2026-10-12T17:45:24.260012+00:00",
+      "health": "ACCESS_DENIED",
+      "jobs_found": 0,
+      "error": "HTTP 403: public career source rejected the request",
+      "evidence": {
+        "complete": null,
+        "authoritative": null,
+        "method": null,
+        "published_total": null,
+        "matching_jobs": 0,
+        "limitations": null
+      },
+      "endpoints": []
+    },
+    {
+      "name": "Bank of America careers",
+      "kind": "careers",
+      "url": "https://careers.bankofamerica.com/",
+      "enabled": true,
+      "last_checked": "2026-10-12T17:45:58.344776+00:00",
+      "health": "PARTIAL",
+      "jobs_found": 1957,
+      "error": null,
+      "evidence": {
+        "complete": false,
+        "authoritative": false,
+        "method": "Published career data and ATS references",
+        "published_total": null,
+        "matching_jobs": 21,
+        "limitations": [
+          "Descriptions are not published in board listings",
+          "A Workday listing was omitted because it has no public job path or title",
+          "Published career pages may show a subset; absence does not prove a job closed"
+        ]
+      },
+      "endpoints": [
+        "https://careers.bankofamerica.com/en-us",
+        "https://ghr.wd1.myworkdayjobs.com/wday/cxs/ghr/lateral-us/jobs"
+      ]
+    },
+    {
+      "name": "Bank of America public board",
+      "kind": "workday",
+      "url": "https://ghr.wd1.myworkdayjobs.com/lateral-us",
+      "enabled": true,
+      "last_checked": "2026-10-12T17:49:28.468679+00:00",
+      "health": "PARTIAL",
+      "jobs_found": 1957,
+      "error": null,
+      "evidence": {
+        "complete": false,
+        "authoritative": true,
+        "method": "Workday public CXS",
+        "published_total": 1958,
+        "matching_jobs": 21,
+        "limitations": [
+          "Descriptions are not published in board listings",
+          "A Workday listing was omitted because it has no public job path or title"
+        ]
+      },
+      "endpoints": [
+        "https://ghr.wd1.myworkdayjobs.com/wday/cxs/ghr/lateral-us/jobs"
+      ]
+    },
+    {
+      "name": "Barclays public board",
+      "kind": "workday",
+      "url": "https://barclays.wd3.myworkdayjobs.com/External_Career_Site_Barclays",
+      "enabled": true,
+      "last_checked": "2026-10-12T17:36:36.708102+00:00",
+      "health": "PARTIAL",
+      "jobs_found": 754,
+      "error": null,
+      "evidence": {
+        "complete": false,
+        "authoritative": true,
+        "method": "Workday public CXS",
+        "published_total": 755,
+        "matching_jobs": 107,
+        "limitations": [
+          "Descriptions are not published in board listings",
+          "A Workday listing was omitted because it has no public job path or title"
+        ]
+      },
+      "endpoints": [
+        "https://barclays.wd3.myworkdayjobs.com/wday/cxs/barclays/External_Career_Site_Barclays/jobs"
+      ]
+    },
+    {
+      "name": "Barclays public board",
+      "kind": "workday",
+      "url": "https://barclays.wd3.myworkdayjobs.com/external_career_site_barclays",
+      "enabled": true,
+      "last_checked": "2026-10-12T17:36:59.384193+00:00",
+      "health": "PARTIAL",
+      "jobs_found": 754,
+      "error": null,
+      "evidence": {
+        "complete": false,
+        "authoritative": true,
+        "method": "Workday public CXS",
+        "published_total": 755,
+        "matching_jobs": 107,
+        "limitations": [
+          "Descriptions are not published in board listings",
+          "A Workday listing was omitted because it has no public job path or title"
+        ]
+      },
+      "endpoints": [
+        "https://barclays.wd3.myworkdayjobs.com/wday/cxs/barclays/external_career_site_barclays/jobs"
+      ]
+    },
+    {
+      "name": "BlackRock public board",
+      "kind": "workday",
+      "url": "https://blackrock.wd1.myworkdayjobs.com/blackrock_professional",
+      "enabled": true,
+      "last_checked": "2026-10-12T17:36:54.336129+00:00",
+      "health": "HEALTHY",
+      "jobs_found": 298,
+      "error": null,
+      "evidence": {
+        "complete": true,
+        "authoritative": true,
+        "method": "Workday public CXS",
+        "published_total": 298,
+        "matching_jobs": 59,
+        "limitations": [
+          "Descriptions are not published in board listings"
+        ]
+      },
+      "endpoints": [
+        "https://blackrock.wd1.myworkdayjobs.com/wday/cxs/blackrock/blackrock_professional/jobs"
+      ]
+    },
+    {
+      "name": "Blackstone public board",
+      "kind": "workday",
+      "url": "https://blackstone.wd1.myworkdayjobs.com/blackstone_campus_careers",
+      "enabled": true,
+      "last_checked": "2026-10-12T17:36:56.923391+00:00",
+      "health": "HEALTHY",
+      "jobs_found": 31,
+      "error": null,
+      "evidence": {
+        "complete": true,
+        "authoritative": true,
+        "method": "Workday public CXS",
+        "published_total": 31,
+        "matching_jobs": 19,
+        "limitations": [
+          "Descriptions are not published in board listings"
+        ]
+      },
+      "endpoints": [
+        "https://blackstone.wd1.myworkdayjobs.com/wday/cxs/blackstone/blackstone_campus_careers/jobs"
+      ]
+    },
+    {
+      "name": "Blenheim Chalcot",
+      "kind": "greenhouse",
+      "url": "https://job-boards.greenhouse.io/blenheimchalcot",
+      "enabled": true,
+      "last_checked": "2026-10-12T17:35:02.362174+00:00",
+      "health": "HEALTHY",
+      "jobs_found": 14,
+      "error": null,
+      "evidence": {
+        "complete": true,
+        "authoritative": true,
+        "method": "greenhouse public API",
+        "published_total": 14,
+        "matching_jobs": 10,
+        "limitations": []
+      },
+      "endpoints": [
+        "https://boards-api.greenhouse.io/v1/boards/blenheimchalcot/jobs?content=true"
+      ]
+    },
+    {
+      "name": "Bloomberg careers",
+      "kind": "careers",
+      "url": "https://www.bloomberg.com/company/careers/",
+      "enabled": true,
+      "last_checked": "2026-10-12T17:38:39.256221+00:00",
+      "health": "ACCESS_DENIED",
+      "jobs_found": 0,
+      "error": "HTTP 403: public career source rejected the request",
+      "evidence": {
+        "complete": null,
+        "authoritative": null,
+        "method": null,
+        "published_total": null,
+        "matching_jobs": 0,
+        "limitations": null
+      },
+      "endpoints": []
+    },
+    {
+      "name": "ByteDance careers",
+      "kind": "careers",
+      "url": "https://jobs.bytedance.com/en/",
+      "enabled": true,
+      "last_checked": "2026-10-12T17:43:35.361261+00:00",
+      "health": "PARTIAL",
+      "jobs_found": 12,
+      "error": null,
+      "evidence": {
+        "complete": false,
+        "authoritative": false,
+        "method": "Published career data and ATS references (isolated public browser)",
+        "published_total": null,
+        "matching_jobs": 0,
+        "limitations": [
+          "Published career pages may show a subset; absence does not prove a job closed"
+        ]
+      },
+      "endpoints": [
+        "https://joinbytedance.com/search?limit=12&offset=0",
+        "https://joinbytedance.com/search",
+        "https://joinbytedance.com/search/7265979259523991868",
+        "https://joinbytedance.com/search/7679892629651310901",
+        "https://joinbytedance.com/search/7673470671408072965",
+        "https://joinbytedance.com/search/7624640076043471157",
+        "https://joinbytedance.com/search/7624637489953130805",
+        "https://joinbytedance.com/search/7612960660104350005",
+        "https://joinbytedance.com/search/7538946858355476743",
+        "https://joinbytedance.com/search/7670330161462364421",
+        "https://joinbytedance.com/search/7667820003361671477",
+        "https://joinbytedance.com/search/7623550778255165701",
+        "https://joinbytedance.com/search/7534618882385758482",
+        "https://joinbytedance.com/search/7673274430383032629",
+        "https://jobs.bytedance.com/en/position/application"
+      ]
+    },
+    {
+      "name": "Capital One public board",
+      "kind": "workday",
+      "url": "https://capitalone.wd12.myworkdayjobs.com/Capital_One",
+      "enabled": true,
+      "last_checked": "2026-10-12T17:39:17.453339+00:00",
+      "health": "HEALTHY",
+      "jobs_found": 1965,
+      "error": null,
+      "evidence": {
+        "complete": true,
+        "authoritative": true,
+        "method": "Workday public CXS",
+        "published_total": 1965,
+        "matching_jobs": 58,
+        "limitations": [
+          "Descriptions are not published in board listings"
+        ]
+      },
+      "endpoints": [
+        "https://capitalone.wd12.myworkdayjobs.com/wday/cxs/capitalone/Capital_One/jobs"
+      ]
+    },
+    {
+      "name": "Capital One public board",
+      "kind": "workday",
+      "url": "https://capitalone.wd12.myworkdayjobs.com/capital_one",
+      "enabled": true,
+      "last_checked": "2026-10-12T17:40:15.007408+00:00",
+      "health": "HEALTHY",
+      "jobs_found": 1965,
+      "error": null,
+      "evidence": {
+        "complete": true,
+        "authoritative": true,
+        "method": "Workday public CXS",
+        "published_total": 1965,
+        "matching_jobs": 58,
+        "limitations": [
+          "Descriptions are not published in board listings"
+        ]
+      },
+      "endpoints": [
+        "https://capitalone.wd12.myworkdayjobs.com/wday/cxs/capitalone/capital_one/jobs"
+      ]
+    },
+    {
+      "name": "Checkout.com public board",
+      "kind": "ashby",
+      "url": "https://jobs.ashbyhq.com/checkout.com",
+      "enabled": true,
+      "last_checked": "2026-10-12T17:38:23.694452+00:00",
+      "health": "HEALTHY",
+      "jobs_found": 156,
+      "error": null,
+      "evidence": {
+        "complete": true,
+        "authoritative": true,
+        "method": "ashby public API",
+        "published_total": 158,
+        "matching_jobs": 91,
+        "limitations": []
+      },
+      "endpoints": [
+        "https://api.ashbyhq.com/posting-api/job-board/checkout.com?includeCompensation=true"
+      ]
+    },
+    {
+      "name": "Cisco careers",
+      "kind": "careers",
+      "url": "https://jobs.cisco.com/",
+      "enabled": true,
+      "last_checked": "2026-10-12T17:43:27.156346+00:00",
+      "health": "PARTIAL",
+      "jobs_found": 1362,
+      "error": null,
+      "evidence": {
+        "complete": false,
+        "authoritative": false,
+        "method": "Published career data and ATS references",
+        "published_total": null,
+        "matching_jobs": 175,
+        "limitations": [
+          "Descriptions are not published in board listings",
+          "A Workday listing was omitted because it has no public job path or title",
+          "Published career pages may show a subset; absence does not prove a job closed"
+        ]
+      },
+      "endpoints": [
+        "https://careers.cisco.com/global/en",
+        "https://careers.cisco.com/global/en/search-results",
+        "https://cisco.wd5.myworkdayjobs.com/wday/cxs/cisco/Cisco_Careers/jobs"
+      ]
+    },
+    {
+      "name": "Cisco public board",
+      "kind": "workday",
+      "url": "https://cisco.wd5.myworkdayjobs.com/Cisco_Careers",
+      "enabled": true,
+      "last_checked": "2026-10-12T17:48:15.340250+00:00",
+      "health": "PARTIAL",
+      "jobs_found": 1362,
+      "error": null,
+      "evidence": {
+        "complete": false,
+        "authoritative": true,
+        "method": "Workday public CXS",
+        "published_total": 1364,
+        "matching_jobs": 174,
+        "limitations": [
+          "Descriptions are not published in board listings",
+          "A Workday listing was omitted because it has no public job path or title",
+          "Board returned a short page before its published total",
+          "Posting limit reached before the final page"
+        ]
+      },
+      "endpoints": [
+        "https://cisco.wd5.myworkdayjobs.com/wday/cxs/cisco/Cisco_Careers/jobs"
+      ]
+    },
+    {
+      "name": "Citadel Securities careers",
+      "kind": "careers",
+      "url": "https://www.citadelsecurities.com/careers/",
+      "enabled": true,
+      "last_checked": "2026-10-12T17:45:44.742329+00:00",
+      "health": "ACCESS_DENIED",
+      "jobs_found": 0,
+      "error": "HTTP 403: public career source rejected the request",
+      "evidence": {
+        "complete": null,
+        "authoritative": null,
+        "method": null,
+        "published_total": null,
+        "matching_jobs": 0,
+        "limitations": null
+      },
+      "endpoints": []
+    },
+    {
+      "name": "Citadel careers",
+      "kind": "careers",
+      "url": "https://www.citadel.com/careers/",
+      "enabled": true,
+      "last_checked": "2026-10-12T17:45:44.209990+00:00",
+      "health": "ACCESS_DENIED",
+      "jobs_found": 0,
+      "error": "HTTP 403: public career source rejected the request",
+      "evidence": {
+        "complete": null,
+        "authoritative": null,
+        "method": null,
+        "published_total": null,
+        "matching_jobs": 0,
+        "limitations": null
+      },
+      "endpoints": []
+    },
+    {
+      "name": "Citigroup careers",
+      "kind": "careers",
+      "url": "https://jobs.citi.com/",
+      "enabled": true,
+      "last_checked": "2026-10-12T17:47:39.304708+00:00",
+      "health": "PARTIAL",
+      "jobs_found": 2000,
+      "error": null,
+      "evidence": {
+        "complete": false,
+        "authoritative": false,
+        "method": "Published career data and ATS references",
+        "published_total": null,
+        "matching_jobs": 258,
+        "limitations": [
+          "Descriptions are not published in board listings",
+          "Posting limit reached",
+          "Published career pages may show a subset; absence does not prove a job closed",
+          "Posting limit reached"
+        ]
+      },
+      "endpoints": [
+        "https://jobs.citi.com/",
+        "https://citi.wd5.myworkdayjobs.com/wday/cxs/citi/2/jobs"
+      ]
+    },
+    {
+      "name": "Citigroup public board",
+      "kind": "workday",
+      "url": "https://citi.wd5.myworkdayjobs.com/2",
+      "enabled": true,
+      "last_checked": "2026-10-12T17:49:59.910406+00:00",
+      "health": "PARTIAL",
+      "jobs_found": 2000,
+      "error": null,
+      "evidence": {
+        "complete": false,
+        "authoritative": true,
+        "method": "Workday public CXS",
+        "published_total": 2000,
+        "matching_jobs": 258,
+        "limitations": [
+          "Descriptions are not published in board listings",
+          "Posting limit reached"
+        ]
+      },
+      "endpoints": [
+        "https://citi.wd5.myworkdayjobs.com/wday/cxs/citi/2/jobs"
+      ]
+    },
+    {
+      "name": "Cloudflare careers",
+      "kind": "careers",
+      "url": "https://www.cloudflare.com/careers/jobs/",
+      "enabled": true,
+      "last_checked": "2026-10-12T17:41:40.872631+00:00",
+      "health": "HEALTHY",
+      "jobs_found": 431,
+      "error": null,
+      "evidence": {
+        "complete": true,
+        "authoritative": true,
+        "method": "Published career data and ATS references",
+        "published_total": null,
+        "matching_jobs": 1,
+        "limitations": []
+      },
+      "endpoints": [
+        "https://www.cloudflare.com/careers/jobs/",
+        "https://www.cloudflare.com/_astro/index.DfApMd4Z.js",
+        "https://boards-api.greenhouse.io/v1/boards/cloudflare/jobs?content=true"
+      ]
+    },
+    {
+      "name": "Cloudflare public board",
+      "kind": "greenhouse",
+      "url": "https://boards.greenhouse.io/cloudflare",
+      "enabled": true,
+      "last_checked": "2026-10-12T17:47:43.966735+00:00",
+      "health": "HEALTHY",
+      "jobs_found": 431,
+      "error": null,
+      "evidence": {
+        "complete": true,
+        "authoritative": true,
+        "method": "greenhouse public API",
+        "published_total": 432,
+        "matching_jobs": 1,
+        "limitations": []
+      },
+      "endpoints": [
+        "https://boards-api.greenhouse.io/v1/boards/cloudflare/jobs?content=true"
+      ]
+    },
+    {
+      "name": "Databricks careers",
+      "kind": "careers",
+      "url": "https://www.databricks.com/company/careers/open-positions",
+      "enabled": true,
+      "last_checked": "2026-10-12T17:42:32.947958+00:00",
+      "health": "PARTIAL",
+      "jobs_found": 892,
+      "error": null,
+      "evidence": {
+        "complete": false,
+        "authoritative": false,
+        "method": "Published career data and ATS references (isolated public browser)",
+        "published_total": null,
+        "matching_jobs": 167,
+        "limitations": [
+          "Published career pages may show a subset; absence does not prove a job closed"
+        ]
+      },
+      "endpoints": [
+        "https://www.databricks.com/company/careers/open-positions"
+      ]
+    },
+    {
+      "name": "Datadog careers",
+      "kind": "careers",
+      "url": "https://careers.datadoghq.com/",
+      "enabled": true,
+      "last_checked": "2026-10-12T17:42:16.423023+00:00",
+      "health": "HEALTHY",
+      "jobs_found": 434,
+      "error": null,
+      "evidence": {
+        "complete": true,
+        "authoritative": true,
+        "method": "Published career data and ATS references (isolated public browser)",
+        "published_total": null,
+        "matching_jobs": 106,
+        "limitations": []
+      },
+      "endpoints": [
+        "https://careers.datadoghq.com/all-jobs/",
+        "https://careers.datadoghq.com/assets/scripts/main-KPF7CSFQ.js",
+        "https://careers.datadoghq.com/detail/8267561/?gh_jid=8267561",
+        "https://careers.datadoghq.com/detail/8267546/?gh_jid=8267546",
+        "https://careers.datadoghq.com/detail/8262004/?gh_jid=8262004",
+        "https://careers.datadoghq.com/detail/8259180/?gh_jid=8259180",
+        "https://careers.datadoghq.com/detail/8250109/?gh_jid=8250109",
+        "https://careers.datadoghq.com/detail/7982644/?gh_jid=7982644",
+        "https://careers.datadoghq.com/detail/8263146/?gh_jid=8263146",
+        "https://careers.datadoghq.com/detail/8195878/?gh_jid=8195878",
+        "https://careers.datadoghq.com/detail/8243071/?gh_jid=8243071",
+        "https://careers.datadoghq.com/detail/7993198/?gh_jid=7993198",
+        "https://boards-api.greenhouse.io/v1/boards/datadog/jobs?content=true"
+      ]
+    },
+    {
+      "name": "Deliveroo careers",
+      "kind": "careers",
+      "url": "https://careers.deliveroo.co.uk/",
+      "enabled": true,
+      "last_checked": "2026-10-12T17:43:11.892447+00:00",
+      "health": "HEALTHY",
+      "jobs_found": 204,
+      "error": null,
+      "evidence": {
+        "complete": true,
+        "authoritative": true,
+        "method": "Published JSON job feed",
+        "published_total": 205,
+        "matching_jobs": 169,
+        "limitations": []
+      },
+      "endpoints": [
+        "https://careers.deliveroo.co.uk/wp-json/wp/v2/roles?per_page=100"
+      ]
+    },
+    {
+      "name": "Dell Technologies careers",
+      "kind": "careers",
+      "url": "https://jobs.dell.com/",
+      "enabled": true,
+      "last_checked": "2026-10-12T17:42:33.612764+00:00",
+      "health": "ACCESS_DENIED",
+      "jobs_found": 0,
+      "error": "HTTP 403: public career source rejected the request",
+      "evidence": {
+        "complete": null,
+        "authoritative": null,
+        "method": null,
+        "published_total": null,
+        "matching_jobs": 0,
+        "limitations": null
+      },
+      "endpoints": []
+    },
+    {
+      "name": "Deloitte careers",
+      "kind": "careers",
+      "url": "https://www.deloitte.com/global/en/careers.html",
+      "enabled": true,
+      "last_checked": "2026-10-12T17:43:17.146652+00:00",
+      "health": "PARTIAL",
+      "jobs_found": 58,
+      "error": null,
+      "evidence": {
+        "complete": false,
+        "authoritative": false,
+        "method": "Published career data and ATS references",
+        "published_total": null,
+        "matching_jobs": 42,
+        "limitations": [
+          "Descriptions are not published in board listings",
+          "Published lever board could not be read: HTTPStatusError",
+          "Published career pages may show a subset; absence does not prove a job closed"
+        ]
+      },
+      "endpoints": [
+        "https://www.deloitte.com/global/en/careers.html",
+        "https://www.deloitte.com/global/en/careers/job-search.html",
+        "https://deloitteie.wd3.myworkdayjobs.com/wday/cxs/deloitteie/Experienced_Professionals/jobs"
+      ]
+    },
+    {
+      "name": "Deloitte public board",
+      "kind": "workday",
+      "url": "https://deloitteie.wd3.myworkdayjobs.com/Experienced_Professionals",
+      "enabled": true,
+      "last_checked": "2026-10-12T17:47:44.380135+00:00",
+      "health": "HEALTHY",
+      "jobs_found": 58,
+      "error": null,
+      "evidence": {
+        "complete": true,
+        "authoritative": true,
+        "method": "Workday public CXS",
+        "published_total": 58,
+        "matching_jobs": 42,
+        "limitations": [
+          "Descriptions are not published in board listings"
+        ]
+      },
+      "endpoints": [
+        "https://deloitteie.wd3.myworkdayjobs.com/wday/cxs/deloitteie/Experienced_Professionals/jobs"
+      ]
+    },
+    {
+      "name": "Deutsche Bank careers",
+      "kind": "careers",
+      "url": "https://careers.db.com/",
+      "enabled": true,
+      "last_checked": "2026-10-12T17:44:56.174171+00:00",
+      "health": "HEALTHY",
+      "jobs_found": 1195,
+      "error": null,
+      "evidence": {
+        "complete": true,
+        "authoritative": true,
+        "method": "Workday public CXS",
+        "published_total": 1195,
+        "matching_jobs": 345,
+        "limitations": [
+          "Descriptions are not published in board listings"
+        ]
+      },
+      "endpoints": [
+        "https://db.wd3.myworkdayjobs.com/wday/cxs/db/DBWebsite/jobs",
+        "https://api-deutschebank.beesite.de/search/"
+      ]
+    },
+    {
+      "name": "Deutsche Bank public board",
+      "kind": "workday",
+      "url": "https://db.wd3.myworkdayjobs.com/DBWebsite",
+      "enabled": true,
+      "last_checked": "2026-10-12T17:48:36.748378+00:00",
+      "health": "HEALTHY",
+      "jobs_found": 1195,
+      "error": null,
+      "evidence": {
+        "complete": true,
+        "authoritative": true,
+        "method": "Workday public CXS",
+        "published_total": 1195,
+        "matching_jobs": 345,
+        "limitations": [
+          "Descriptions are not published in board listings"
+        ]
+      },
+      "endpoints": [
+        "https://db.wd3.myworkdayjobs.com/wday/cxs/db/DBWebsite/jobs"
+      ]
+    },
+    {
+      "name": "EY careers",
+      "kind": "careers",
+      "url": "https://careers.ey.com/",
+      "enabled": true,
+      "last_checked": "2026-10-12T17:43:47.027554+00:00",
+      "health": "PARTIAL",
+      "jobs_found": 39,
+      "error": null,
+      "evidence": {
+        "complete": false,
+        "authoritative": false,
+        "method": "Published career data and ATS references",
+        "published_total": null,
+        "matching_jobs": 0,
+        "limitations": [
+          "Published career pages may show a subset; absence does not prove a job closed"
+        ]
+      },
+      "endpoints": [
+        "https://careers.ey.com/",
+        "https://careers.ey.com/search/",
+        "https://careers.ey.com/ey/search/?createNewAlert=false&locale=en_US",
+        "https://eyglobal.yello.co/job_boards/c1riT--B2O-KySgYWsZO1Q",
+        "https://careers.ey.com/search/?locale=de_DE",
+        "https://careers.ey.com/ey/job/San-Antonio-Government-and-Infrastructure-ACE-Assurance-Technology-Risk-Analyst-TX-78205/1416361533/",
+        "https://careers.ey.com/ey/job/Nicosia-AI-Engineer-1087/1405857333/",
+        "https://careers.ey.com/ey/job/Cairo-Turnaround-&-Restructuring-Strategy-ManagerSenior-Manager%2C-Cairo/1435961133/",
+        "https://careers.ey.com/ey/job/New-York-FY27-Financial-Services-Private-Client-Services-Tax-Services-Manager-EDGE-NY-10001-8604/1406192933/",
+        "https://careers.ey.com/ey/job/CABA-RMS-Americas-Data-Stewardship-Office-Senior-Associate-EY-Global-Delivery-Services-B-1001/1416283033/",
+        "https://careers.ey.com/ey/job/Camana-Bay-FSO-Core-Business-Services-Document-Specialist-KY11106/1406208133/",
+        "https://careers.ey.com/ey/job/New-York-Financial-Services-Information-Reporting-and-Withholding-Senior-Services-Manager-EDGE-NY-10001-8604/1416416133/",
+        "https://careers.ey.com/ey/job/San-Francisco-Sales-Executive-Associate-Director%2C-San-Francisco-CA-94105-2907/1395732333/",
+        "https://careers.ey.com/ey/job/Amsterdam-Senior-Consultant-Quality-Assurance-1083-HP/1416096733/",
+        "https://careers.ey.com/ey/job/New-York-Sales-Executive%2C-Financial-Services-Associate-Director%2C-New-York-BCM-NY-10001-8604/1395732033/",
+        "https://careers.ey.com/ey/job/Bengaluru-Senior-Consultant-Business-Consulting-PI-TMT-CNS-BC-FINANCE-Bangalore-KA-560001/1416185333/",
+        "https://careers.ey.com/ey/job/Legal-Counsel-048583/1405811533/",
+        "https://careers.ey.com/ey/search/",
+        "https://eyglobal.yello.co/jobs/N3cN_ei1idgFKC3noAZ5lA?job_board_id=c1riT--B2O-KySgYWsZO1Q",
+        "https://eyglobal.yello.co/jobs/jBhzN3GbGmjPCRf1aQIYwA?job_board_id=c1riT--B2O-KySgYWsZO1Q",
+        "https://eyglobal.yello.co/jobs/U09G-LTkEwQ8MY-pejxk0A?job_board_id=c1riT--B2O-KySgYWsZO1Q"
+      ]
+    },
+    {
+      "name": "Fifty One Degrees",
+      "kind": "ashby",
+      "url": "https://jobs.ashbyhq.com/51d",
+      "enabled": true,
+      "last_checked": "2026-10-12T17:34:59.746709+00:00",
+      "health": "HEALTHY",
+      "jobs_found": 3,
+      "error": null,
+      "evidence": {
+        "complete": true,
+        "authoritative": true,
+        "method": "ashby public API",
+        "published_total": 3,
+        "matching_jobs": 3,
+        "limitations": []
+      },
+      "endpoints": [
+        "https://api.ashbyhq.com/posting-api/job-board/51d?includeCompensation=true"
+      ]
+    },
+    {
+      "name": "GitHub \u00b7 New Grad 2027",
+      "kind": "github",
+      "url": "https://github.com/vanshb03/New-Grad-2027",
+      "enabled": true,
+      "last_checked": "2026-10-12T17:35:21.456125+00:00",
+      "health": "HEALTHY",
+      "jobs_found": 595,
+      "error": null,
+      "evidence": {
+        "complete": true,
+        "authoritative": false,
+        "method": "Published GitHub job feed",
+        "published_total": 596,
+        "matching_jobs": 1,
+        "limitations": []
+      },
+      "endpoints": [
+        "https://github.com/vanshb03/New-Grad-2027"
+      ]
+    },
+    {
+      "name": "GitHub \u00b7 SpeedyApply International New Grad",
+      "kind": "github",
+      "url": "https://github.com/speedyapply/2027-SWE-College-Jobs",
+      "enabled": true,
+      "last_checked": "2026-10-12T17:35:22.846188+00:00",
+      "health": "HEALTHY",
+      "jobs_found": 681,
+      "error": null,
+      "evidence": {
+        "complete": true,
+        "authoritative": false,
+        "method": "Published GitHub job feed",
+        "published_total": 681,
+        "matching_jobs": 217,
+        "limitations": []
+      },
+      "endpoints": [
+        "https://github.com/speedyapply/2027-SWE-College-Jobs"
+      ]
+    },
+    {
+      "name": "Goldman Sachs careers",
+      "kind": "careers",
+      "url": "https://www.goldmansachs.com/careers",
+      "enabled": true,
+      "last_checked": "2026-10-12T17:44:49.794502+00:00",
+      "health": "HEALTHY",
+      "jobs_found": 888,
+      "error": null,
+      "evidence": {
+        "complete": true,
+        "authoritative": true,
+        "method": "Published career data and ATS references (isolated public browser)",
+        "published_total": null,
+        "matching_jobs": 225,
+        "limitations": []
+      },
+      "endpoints": [
+        "https://higher.gs.com/results?page=1&sort=RELEVANCE",
+        "https://higher.gs.com/roles/185920",
+        "https://higher.gs.com/roles/185926",
+        "https://higher.gs.com/roles/186441",
+        "https://higher.gs.com/roles/186440",
+        "https://higher.gs.com/roles/186684",
+        "https://higher.gs.com/roles/186310",
+        "https://higher.gs.com/roles/185168",
+        "https://higher.gs.com/roles/186683",
+        "https://higher.gs.com/roles/186315",
+        "https://higher.gs.com/roles/186316",
+        "https://higher.gs.com/roles/167540",
+        "https://higher.gs.com/roles/149771",
+        "https://hdpc.fa.us2.oraclecloud.com/hcmRestApi/resources/latest/recruitingCEJobRequisitions"
+      ]
+    },
+    {
+      "name": "Google careers",
+      "kind": "careers",
+      "url": "https://www.google.com/about/careers/applications/",
+      "enabled": true,
+      "last_checked": "2026-10-12T17:39:43.309305+00:00",
+      "health": "PARTIAL",
+      "jobs_found": 30,
+      "error": null,
+      "evidence": {
+        "complete": false,
+        "authoritative": false,
+        "method": "Published career data and ATS references",
+        "published_total": null,
+        "matching_jobs": 0,
+        "limitations": [
+          "Published career pages may show a subset; absence does not prove a job closed"
+        ]
+      },
+      "endpoints": [
+        "https://www.google.com/about/careers/applications/",
+        "https://www.google.com/about/careers/applications/jobs/results",
+        "https://accounts.google.com/v3/signin/identifier?continue=https%3A%2F%2Fwww.google.com%2Fabout%2Fcareers%2Fapplications%2Fjobs%2Frecommendations&followup=https%3A%2F%2Fwww.google.com%2Fabout%2Fcareers%2Fapplications%2Fjobs%2Frecommendations&passive=1209600&flowName=WebLiteSignIn&flowEntry=ServiceLogin&dsh=S-283065179%3A1791826765119625",
+        "https://accounts.google.com/v3/signin/identifier?continue=https%3A%2F%2Fwww.google.com%2Fabout%2Fcareers%2Fapplications%2Fjobs%2Fsaved&followup=https%3A%2F%2Fwww.google.com%2Fabout%2Fcareers%2Fapplications%2Fjobs%2Fsaved&passive=1209600&flowName=WebLiteSignIn&flowEntry=ServiceLogin&dsh=S992794422%3A1791826766660160",
+        "https://www.google.com/about/careers/applications/jobs/results/94374574337991366-account-strategist-sbs-scaled-google-customer-solutions-english-japanese",
+        "https://www.google.com/about/careers/applications/jobs/results/87959894652527302-account-manager-large-customer-sales-export",
+        "https://www.google.com/about/careers/applications/jobs/results/89761581893591750-account-manager-engage-gcs",
+        "https://www.google.com/about/careers/applications/jobs/results/114395727597052614-data-center-technician-night-shift",
+        "https://www.google.com/about/careers/applications/jobs/results/85289301167743686-data-center-site-lead-data-center-operations",
+        "https://www.google.com/about/careers/applications/jobs/results/102721860457636550-product-marketing-manager-developer-programs-google-cloud",
+        "https://www.google.com/about/careers/applications/jobs/results/97802370557059782-network-implementation-engineer-network-delivery-implementation",
+        "https://www.google.com/about/careers/applications/jobs/results/73305472681026246-senior-ios-developer-search-app",
+        "https://www.google.com/about/careers/applications/jobs/results/77734694212248262-ai-outcome-engineer-forward-deployed-engineering",
+        "https://www.google.com/about/careers/applications/jobs/results/109329274653024966-staff-software-engineer-data-processing-platform",
+        "https://www.google.com/about/careers/applications/jobs/results/73475435274347206-senior-pcb-layout-engineer-google-cloud",
+        "https://www.google.com/about/careers/applications/jobs/results/134325535491662534-field-sales-representative-hcls-google-cloud",
+        "https://www.google.com/about/careers/applications/jobs/results/75289373909623494-group-product-manager-finance-agent-ai-workflows"
+      ]
+    },
+    {
+      "name": "HSBC careers",
+      "kind": "careers",
+      "url": "https://www.hsbc.com/careers",
+      "enabled": true,
+      "last_checked": "2026-10-12T17:44:06.687643+00:00",
+      "health": "ACCESS_DENIED",
+      "jobs_found": 0,
+      "error": "ValueError: No readable public job collection found; the career page is not evidence of an empty board; Public browser navigation returned HTTP 403; No readable public job collection found; the career page is not evidence of an empty board: Published career link could not be read: HTTPStatusError",
+      "evidence": {
+        "complete": null,
+        "authoritative": null,
+        "method": null,
+        "published_total": null,
+        "matching_jobs": 0,
+        "limitations": null
+      },
+      "endpoints": []
+    },
+    {
+      "name": "Huawei Technologies careers",
+      "kind": "careers",
+      "url": "https://career.huawei.com/",
+      "enabled": true,
+      "last_checked": "2026-10-12T17:43:46.954570+00:00",
+      "health": "FAILED",
+      "jobs_found": 0,
+      "error": "ValueError: No readable public job collection found; the career page is not evidence of an empty board",
+      "evidence": {
+        "complete": null,
+        "authoritative": null,
+        "method": null,
+        "published_total": null,
+        "matching_jobs": 0,
+        "limitations": null
+      },
+      "endpoints": []
+    },
+    {
+      "name": "IBM careers",
+      "kind": "careers",
+      "url": "https://www.ibm.com/careers/",
+      "enabled": true,
+      "last_checked": "2026-10-12T17:42:47.016731+00:00",
+      "health": "PARTIAL",
+      "jobs_found": 23,
+      "error": null,
+      "evidence": {
+        "complete": false,
+        "authoritative": false,
+        "method": "Published career data and ATS references (isolated public browser)",
+        "published_total": null,
+        "matching_jobs": 0,
+        "limitations": [
+          "Published career pages may show a subset; absence does not prove a job closed"
+        ]
+      },
+      "endpoints": [
+        "https://www.ibm.com/careers/search",
+        "https://careers.ibm.com/en_US/careers/JobDetail?jobId=123797&source=WEB_Search_NA",
+        "https://careers.ibm.com/en_US/careers/JobDetail?jobId=123754&source=WEB_Search_NA",
+        "https://careers.ibm.com/en_US/careers/JobDetail?jobId=116203&source=WEB_Search_NA",
+        "https://careers.ibm.com/en_US/careers/JobDetail?jobId=120066&source=WEB_Search_NA",
+        "https://careers.ibm.com/en_US/careers/JobDetail?jobId=120562&source=WEB_Search_NA",
+        "https://careers.ibm.com/en_US/careers/JobDetail?jobId=136338&source=WEB_Search_NA",
+        "https://careers.ibm.com/en_US/careers/JobDetail?jobId=128711&source=WEB_Search_NA",
+        "https://careers.ibm.com/en_US/careers/JobDetail?jobId=110298&source=WEB_Search_NA",
+        "https://careers.ibm.com/en_US/careers/JobDetail?jobId=136311&source=WEB_Search_NA",
+        "https://careers.ibm.com/en_US/careers/JobDetail?jobId=132446&source=WEB_Search_NA",
+        "https://careers.ibm.com/en_US/careers/JobDetail?jobId=133513&source=WEB_Search_NA",
+        "https://careers.ibm.com/en_US/careers/JobDetail?jobId=132934&source=WEB_Search_NA"
+      ]
+    },
+    {
+      "name": "Indeed alerts",
+      "kind": "indeed",
+      "url": "https://www.indeed.com/",
+      "enabled": true,
+      "last_checked": "2026-10-04T12:33:14.446035+00:00",
+      "health": "INBOX_ERROR",
+      "jobs_found": 160,
+      "error": null,
+      "evidence": {
+        "complete": null,
+        "authoritative": null,
+        "method": null,
+        "published_total": null,
+        "matching_jobs": null,
+        "limitations": null
+      },
+      "endpoints": []
+    },
+    {
+      "name": "Intel public board",
+      "kind": "workday",
+      "url": "https://intel.wd1.myworkdayjobs.com/external",
+      "enabled": true,
+      "last_checked": "2026-10-12T17:36:34.553125+00:00",
+      "health": "PARTIAL",
+      "jobs_found": 671,
+      "error": null,
+      "evidence": {
+        "complete": false,
+        "authoritative": true,
+        "method": "Workday public CXS",
+        "published_total": 673,
+        "matching_jobs": 33,
+        "limitations": [
+          "Descriptions are not published in board listings",
+          "A Workday listing was omitted because it has no public job path or title"
+        ]
+      },
+      "endpoints": [
+        "https://intel.wd1.myworkdayjobs.com/wday/cxs/intel/external/jobs"
+      ]
+    },
+    {
+      "name": "JPMorgan Chase careers",
+      "kind": "careers",
+      "url": "https://www.jpmorganchase.com/careers",
+      "enabled": true,
+      "last_checked": "2026-10-12T17:41:01.534933+00:00",
+      "health": "PARTIAL",
+      "jobs_found": 1989,
+      "error": null,
+      "evidence": {
+        "complete": false,
+        "authoritative": false,
+        "method": "Published career data and ATS references",
+        "published_total": null,
+        "matching_jobs": 204,
+        "limitations": [
+          "Posting limit reached before the final page",
+          "Posting limit reached",
+          "Published career pages may show a subset; absence does not prove a job closed",
+          "Posting limit reached"
+        ]
+      },
+      "endpoints": [
+        "https://www.jpmorganchase.com/careers",
+        "https://jpmc.fa.oraclecloud.com/hcmRestApi/resources/latest/recruitingCEJobRequisitions"
+      ]
+    },
+    {
+      "name": "Jane Street careers",
+      "kind": "careers",
+      "url": "https://www.janestreet.com/join-jane-street/open-roles/",
+      "enabled": true,
+      "last_checked": "2026-10-12T17:45:43.705215+00:00",
+      "health": "HEALTHY",
+      "jobs_found": 230,
+      "error": null,
+      "evidence": {
+        "complete": true,
+        "authoritative": true,
+        "method": "Published JSON job feed",
+        "published_total": 230,
+        "matching_jobs": 1,
+        "limitations": []
+      },
+      "endpoints": [
+        "https://www.janestreet.com/jobs/main.json",
+        "https://www.janestreet.com/static/position-directories.json"
+      ]
+    },
+    {
+      "name": "Klarna careers",
+      "kind": "careers",
+      "url": "https://www.klarna.com/careers/",
+      "enabled": true,
+      "last_checked": "2026-10-12T17:46:25.345485+00:00",
+      "health": "PARTIAL",
+      "jobs_found": 82,
+      "error": null,
+      "evidence": {
+        "complete": false,
+        "authoritative": false,
+        "method": "Published career data and ATS references",
+        "published_total": null,
+        "matching_jobs": 0,
+        "limitations": [
+          "Published career pages may show a subset; absence does not prove a job closed"
+        ]
+      },
+      "endpoints": [
+        "https://www.klarna.com/careers/",
+        "https://jobs.deel.com/klarna"
+      ]
+    },
+    {
+      "name": "LSEG public board",
+      "kind": "workday",
+      "url": "https://lseg.wd3.myworkdayjobs.com/careers",
+      "enabled": true,
+      "last_checked": "2026-10-12T17:35:53.227926+00:00",
+      "health": "HEALTHY",
+      "jobs_found": 662,
+      "error": null,
+      "evidence": {
+        "complete": true,
+        "authoritative": true,
+        "method": "Workday public CXS",
+        "published_total": 662,
+        "matching_jobs": 139,
+        "limitations": [
+          "Descriptions are not published in board listings"
+        ]
+      },
+      "endpoints": [
+        "https://lseg.wd3.myworkdayjobs.com/wday/cxs/lseg/careers/jobs"
+      ]
+    },
+    {
+      "name": "LinkedIn alerts",
+      "kind": "linkedin",
+      "url": "https://www.linkedin.com/jobs/",
+      "enabled": true,
+      "last_checked": null,
+      "health": "INBOX_ERROR",
+      "jobs_found": 0,
+      "error": null,
+      "evidence": {
+        "complete": null,
+        "authoritative": null,
+        "method": null,
+        "published_total": null,
+        "matching_jobs": null,
+        "limitations": null
+      },
+      "endpoints": []
+    },
+    {
+      "name": "Lloyds Banking Group public board",
+      "kind": "workday",
+      "url": "https://lbg.wd3.myworkdayjobs.com/Graduate_careers",
+      "enabled": true,
+      "last_checked": "2026-10-12T17:36:38.124918+00:00",
+      "health": "HEALTHY",
+      "jobs_found": 33,
+      "error": null,
+      "evidence": {
+        "complete": true,
+        "authoritative": true,
+        "method": "Workday public CXS",
+        "published_total": 33,
+        "matching_jobs": 25,
+        "limitations": [
+          "Descriptions are not published in board listings"
+        ]
+      },
+      "endpoints": [
+        "https://lbg.wd3.myworkdayjobs.com/wday/cxs/lbg/Graduate_careers/jobs"
+      ]
+    },
+    {
+      "name": "Man Group careers",
+      "kind": "careers",
+      "url": "https://www.man.com/careers",
+      "enabled": true,
+      "last_checked": "2026-10-12T17:46:20.485561+00:00",
+      "health": "HEALTHY",
+      "jobs_found": 56,
+      "error": null,
+      "evidence": {
+        "complete": true,
+        "authoritative": true,
+        "method": "Published career data and ATS references",
+        "published_total": null,
+        "matching_jobs": 36,
+        "limitations": []
+      },
+      "endpoints": [
+        "https://www.man.com/careers",
+        "https://boards-api.greenhouse.io/v1/boards/mangroup/jobs?content=true"
+      ]
+    },
+    {
+      "name": "Man Group public board",
+      "kind": "greenhouse",
+      "url": "https://job-boards.eu.greenhouse.io/mangroup",
+      "enabled": true,
+      "last_checked": "2026-10-12T17:46:56.180403+00:00",
+      "health": "HEALTHY",
+      "jobs_found": 56,
+      "error": null,
+      "evidence": {
+        "complete": true,
+        "authoritative": true,
+        "method": "greenhouse public API",
+        "published_total": 56,
+        "matching_jobs": 36,
+        "limitations": []
+      },
+      "endpoints": [
+        "https://boards-api.greenhouse.io/v1/boards/mangroup/jobs?content=true"
+      ]
+    },
+    {
+      "name": "Marshall Wace - Graduate & Associate",
+      "kind": "greenhouse",
+      "url": "https://job-boards.greenhouse.io/mw-tech-grad",
+      "enabled": true,
+      "last_checked": "2026-10-12T17:34:59.915050+00:00",
+      "health": "HEALTHY",
+      "jobs_found": 6,
+      "error": null,
+      "evidence": {
+        "complete": true,
+        "authoritative": true,
+        "method": "greenhouse public API",
+        "published_total": 6,
+        "matching_jobs": 2,
+        "limitations": []
+      },
+      "endpoints": [
+        "https://boards-api.greenhouse.io/v1/boards/mw-tech-grad/jobs?content=true"
+      ]
+    },
+    {
+      "name": "Mastercard public board",
+      "kind": "workday",
+      "url": "https://mastercard.wd1.myworkdayjobs.com/corporatecareers",
+      "enabled": true,
+      "last_checked": "2026-10-12T17:38:27.500374+00:00",
+      "health": "HEALTHY",
+      "jobs_found": 1095,
+      "error": null,
+      "evidence": {
+        "complete": true,
+        "authoritative": true,
+        "method": "Workday public CXS",
+        "published_total": 1095,
+        "matching_jobs": 168,
+        "limitations": [
+          "Descriptions are not published in board listings"
+        ]
+      },
+      "endpoints": [
+        "https://mastercard.wd1.myworkdayjobs.com/wday/cxs/mastercard/corporatecareers/jobs"
+      ]
+    },
+    {
+      "name": "Mastercard public board",
+      "kind": "workday",
+      "url": "https://mastercard.wd1.myworkdayjobs.com/contractorconversion",
+      "enabled": true,
+      "last_checked": "2026-10-12T17:46:57.774693+00:00",
+      "health": "HEALTHY",
+      "jobs_found": 8,
+      "error": null,
+      "evidence": {
+        "complete": true,
+        "authoritative": true,
+        "method": "Workday public CXS",
+        "published_total": 8,
+        "matching_jobs": 0,
+        "limitations": [
+          "Descriptions are not published in board listings"
+        ]
+      },
+      "endpoints": [
+        "https://mastercard.wd1.myworkdayjobs.com/wday/cxs/mastercard/contractorconversion/jobs"
+      ]
+    },
+    {
+      "name": "Meta careers",
+      "kind": "careers",
+      "url": "https://www.metacareers.com/jobs/",
+      "enabled": true,
+      "last_checked": "2026-10-12T17:39:50.415895+00:00",
+      "health": "FAILED",
+      "jobs_found": 0,
+      "error": "ValueError: No readable public job collection found; the career page is not evidence of an empty board",
+      "evidence": {
+        "complete": null,
+        "authoritative": null,
+        "method": null,
+        "published_total": null,
+        "matching_jobs": 0,
+        "limitations": null
+      },
+      "endpoints": []
+    },
+    {
+      "name": "Microsoft careers",
+      "kind": "careers",
+      "url": "https://careers.microsoft.com/",
+      "enabled": true,
+      "last_checked": "2026-10-12T17:39:21.705971+00:00",
+      "health": "RATE_LIMITED",
+      "jobs_found": 0,
+      "error": "HTTP 429: public career source rejected the request",
+      "evidence": {
+        "complete": null,
+        "authoritative": null,
+        "method": null,
+        "published_total": null,
+        "matching_jobs": 0,
+        "limitations": null
+      },
+      "endpoints": []
+    },
+    {
+      "name": "Millennium careers",
+      "kind": "careers",
+      "url": "https://www.mlp.com/careers/",
+      "enabled": true,
+      "last_checked": "2026-10-12T17:46:02.735293+00:00",
+      "health": "PARTIAL",
+      "jobs_found": 1,
+      "error": null,
+      "evidence": {
+        "complete": false,
+        "authoritative": false,
+        "method": "Published career data and ATS references",
+        "published_total": null,
+        "matching_jobs": 0,
+        "limitations": [
+          "Published career pages may show a subset; absence does not prove a job closed"
+        ]
+      },
+      "endpoints": [
+        "https://www.mlp.com/careers/",
+        "https://career.mlp.com/careers",
+        "https://career.mlp.com/careers?domain=mlp.com&sort_by=relevance&pid=755936615453"
+      ]
+    },
+    {
+      "name": "Modo Energy",
+      "kind": "greenhouse",
+      "url": "https://job-boards.eu.greenhouse.io/modoenergy",
+      "enabled": true,
+      "last_checked": "2026-10-12T17:35:06.455037+00:00",
+      "health": "HEALTHY",
+      "jobs_found": 11,
+      "error": null,
+      "evidence": {
+        "complete": true,
+        "authoritative": true,
+        "method": "greenhouse public API",
+        "published_total": 11,
+        "matching_jobs": 7,
+        "limitations": []
+      },
+      "endpoints": [
+        "https://boards-api.greenhouse.io/v1/boards/modoenergy/jobs?content=true"
+      ]
+    },
+    {
+      "name": "Monzo careers",
+      "kind": "careers",
+      "url": "https://monzo.com/careers",
+      "enabled": true,
+      "last_checked": "2026-10-12T17:38:29.053641+00:00",
+      "health": "HEALTHY",
+      "jobs_found": 66,
+      "error": null,
+      "evidence": {
+        "complete": true,
+        "authoritative": true,
+        "method": "Published career data and ATS references",
+        "published_total": null,
+        "matching_jobs": 66,
+        "limitations": []
+      },
+      "endpoints": [
+        "https://monzo.com/careers",
+        "https://boards-api.greenhouse.io/v1/boards/monzo/jobs?content=true"
+      ]
+    },
+    {
+      "name": "Monzo public board",
+      "kind": "greenhouse",
+      "url": "https://job-boards.greenhouse.io/monzo",
+      "enabled": true,
+      "last_checked": "2026-10-12T17:46:46.426865+00:00",
+      "health": "HEALTHY",
+      "jobs_found": 66,
+      "error": null,
+      "evidence": {
+        "complete": true,
+        "authoritative": true,
+        "method": "greenhouse public API",
+        "published_total": 66,
+        "matching_jobs": 66,
+        "limitations": []
+      },
+      "endpoints": [
+        "https://boards-api.greenhouse.io/v1/boards/monzo/jobs?content=true"
+      ]
+    },
+    {
+      "name": "Morgan Stanley careers",
+      "kind": "careers",
+      "url": "https://www.morganstanley.com/people-opportunities",
+      "enabled": true,
+      "last_checked": "2026-10-12T17:43:53.445010+00:00",
+      "health": "FAILED",
+      "jobs_found": 0,
+      "error": "ValueError: Public browser navigation failed: net::ERR_HTTP2_PROTOCOL_ERROR",
+      "evidence": {
+        "complete": null,
+        "authoritative": null,
+        "method": null,
+        "published_total": null,
+        "matching_jobs": 0,
+        "limitations": null
+      },
+      "endpoints": []
+    },
+    {
+      "name": "Mytos",
+      "kind": "lever",
+      "url": "https://jobs.lever.co/mytos",
+      "enabled": true,
+      "last_checked": "2026-10-12T17:35:03.564072+00:00",
+      "health": "HEALTHY",
+      "jobs_found": 13,
+      "error": null,
+      "evidence": {
+        "complete": true,
+        "authoritative": true,
+        "method": "lever public API",
+        "published_total": 13,
+        "matching_jobs": 12,
+        "limitations": []
+      },
+      "endpoints": [
+        "https://api.lever.co/v0/postings/mytos?mode=json&limit=100&skip=0"
+      ]
+    },
+    {
+      "name": "NVIDIA public board",
+      "kind": "workday",
+      "url": "https://nvidia.wd5.myworkdayjobs.com/nvidiaexternalcareersite",
+      "enabled": true,
+      "last_checked": "2026-10-12T17:37:36.765354+00:00",
+      "health": "PARTIAL",
+      "jobs_found": 2000,
+      "error": null,
+      "evidence": {
+        "complete": false,
+        "authoritative": true,
+        "method": "Workday public CXS",
+        "published_total": 2000,
+        "matching_jobs": 31,
+        "limitations": [
+          "Descriptions are not published in board listings",
+          "Posting limit reached"
+        ]
+      },
+      "endpoints": [
+        "https://nvidia.wd5.myworkdayjobs.com/wday/cxs/nvidia/nvidiaexternalcareersite/jobs"
+      ]
+    },
+    {
+      "name": "NatWest careers",
+      "kind": "careers",
+      "url": "https://jobs.natwestgroup.com/",
+      "enabled": true,
+      "last_checked": "2026-10-12T17:44:56.281891+00:00",
+      "health": "ACCESS_DENIED",
+      "jobs_found": 0,
+      "error": "HTTP 403: public career source rejected the request",
+      "evidence": {
+        "complete": null,
+        "authoritative": null,
+        "method": null,
+        "published_total": null,
+        "matching_jobs": 0,
+        "limitations": null
+      },
+      "endpoints": []
+    },
+    {
+      "name": "Netflix careers",
+      "kind": "careers",
+      "url": "https://jobs.netflix.com/",
+      "enabled": true,
+      "last_checked": "2026-10-12T17:42:26.398500+00:00",
+      "health": "PARTIAL",
+      "jobs_found": 453,
+      "error": null,
+      "evidence": {
+        "complete": false,
+        "authoritative": false,
+        "method": "Published job sitemap and structured role pages",
+        "published_total": 456,
+        "matching_jobs": 43,
+        "limitations": [
+          "A sitemap proves published role pages, not that every application is currently accepting candidates",
+          "3 role pages could not be verified"
+        ]
+      },
+      "endpoints": [
+        "https://explore.jobs.netflix.net/careers/sitemap.xml?domain=netflix.com&microsite=netflix.com"
+      ]
+    },
+    {
+      "name": "Oracle careers",
+      "kind": "careers",
+      "url": "https://www.oracle.com/careers/",
+      "enabled": true,
+      "last_checked": "2026-10-12T17:44:14.606816+00:00",
+      "health": "PARTIAL",
+      "jobs_found": 1805,
+      "error": null,
+      "evidence": {
+        "complete": false,
+        "authoritative": true,
+        "method": "Oracle public Candidate Experience API (isolated public browser)",
+        "published_total": 2307,
+        "matching_jobs": 79,
+        "limitations": [
+          "Posting limit reached before the final page",
+          "Posting limit reached",
+          "Posting limit reached"
+        ]
+      },
+      "endpoints": [
+        "https://eeho.fa.us2.oraclecloud.com/hcmRestApi/resources/latest/recruitingCEJobRequisitions"
+      ]
+    },
+    {
+      "name": "Palantir public board",
+      "kind": "lever",
+      "url": "https://jobs.lever.co/palantir",
+      "enabled": true,
+      "last_checked": "2026-10-12T17:35:46.000579+00:00",
+      "health": "HEALTHY",
+      "jobs_found": 309,
+      "error": null,
+      "evidence": {
+        "complete": true,
+        "authoritative": true,
+        "method": "lever public API",
+        "published_total": 309,
+        "matching_jobs": 54,
+        "limitations": []
+      },
+      "endpoints": [
+        "https://api.lever.co/v0/postings/palantir?mode=json&limit=100&skip=0"
+      ]
+    },
+    {
+      "name": "Point72 careers",
+      "kind": "careers",
+      "url": "https://careers.point72.com/",
+      "enabled": true,
+      "last_checked": "2026-10-12T17:46:16.436847+00:00",
+      "health": "HEALTHY",
+      "jobs_found": 219,
+      "error": null,
+      "evidence": {
+        "complete": true,
+        "authoritative": true,
+        "method": "Published career data and ATS references",
+        "published_total": null,
+        "matching_jobs": 33,
+        "limitations": []
+      },
+      "endpoints": [
+        "https://careers.point72.com/",
+        "https://boards-api.greenhouse.io/v1/boards/point72/jobs?content=true"
+      ]
+    },
+    {
+      "name": "Point72 public board",
+      "kind": "greenhouse",
+      "url": "https://boards.greenhouse.io/point72",
+      "enabled": true,
+      "last_checked": "2026-10-12T17:47:06.356037+00:00",
+      "health": "HEALTHY",
+      "jobs_found": 220,
+      "error": null,
+      "evidence": {
+        "complete": true,
+        "authoritative": true,
+        "method": "greenhouse public API",
+        "published_total": 221,
+        "matching_jobs": 33,
+        "limitations": []
+      },
+      "endpoints": [
+        "https://boards-api.greenhouse.io/v1/boards/point72/jobs?content=true"
+      ]
+    },
+    {
+      "name": "Relay Technologies",
+      "kind": "ashby",
+      "url": "https://jobs.ashbyhq.com/relay",
+      "enabled": true,
+      "last_checked": "2026-10-12T17:35:07.294101+00:00",
+      "health": "HEALTHY",
+      "jobs_found": 27,
+      "error": null,
+      "evidence": {
+        "complete": true,
+        "authoritative": true,
+        "method": "ashby public API",
+        "published_total": 27,
+        "matching_jobs": 26,
+        "limitations": []
+      },
+      "endpoints": [
+        "https://api.ashbyhq.com/posting-api/job-board/relay?includeCompensation=true"
+      ]
+    },
+    {
+      "name": "Revolut careers",
+      "kind": "careers",
+      "url": "https://www.revolut.com/careers/",
+      "enabled": true,
+      "last_checked": "2026-10-12T17:38:30.479205+00:00",
+      "health": "ACCESS_DENIED",
+      "jobs_found": 0,
+      "error": "HTTP 403: public career source rejected the request",
+      "evidence": {
+        "complete": null,
+        "authoritative": null,
+        "method": null,
+        "published_total": null,
+        "matching_jobs": 0,
+        "limitations": null
+      },
+      "endpoints": []
+    },
+    {
+      "name": "Salesforce careers",
+      "kind": "careers",
+      "url": "https://careers.salesforce.com/",
+      "enabled": true,
+      "last_checked": "2026-10-12T17:42:26.347272+00:00",
+      "health": "ACCESS_DENIED",
+      "jobs_found": 0,
+      "error": "ValueError: Public browser navigation returned HTTP 403",
+      "evidence": {
+        "complete": null,
+        "authoritative": null,
+        "method": null,
+        "published_total": null,
+        "matching_jobs": 0,
+        "limitations": null
+      },
+      "endpoints": []
+    },
+    {
+      "name": "Santander careers",
+      "kind": "careers",
+      "url": "https://www.santander.com/en/careers",
+      "enabled": true,
+      "last_checked": "2026-10-12T17:46:15.534854+00:00",
+      "health": "HEALTHY",
+      "jobs_found": 1005,
+      "error": null,
+      "evidence": {
+        "complete": true,
+        "authoritative": true,
+        "method": "Published career data and ATS references",
+        "published_total": null,
+        "matching_jobs": 89,
+        "limitations": [
+          "Descriptions are not published in board listings"
+        ]
+      },
+      "endpoints": [
+        "https://www.santander.com/en/careers",
+        "https://santander.wd3.myworkdayjobs.com/wday/cxs/santander/SantanderCareers/jobs"
+      ]
+    },
+    {
+      "name": "Santander public board",
+      "kind": "workday",
+      "url": "https://santander.wd3.myworkdayjobs.com/SantanderCareers",
+      "enabled": true,
+      "last_checked": "2026-10-12T17:49:29.149922+00:00",
+      "health": "HEALTHY",
+      "jobs_found": 1005,
+      "error": null,
+      "evidence": {
+        "complete": true,
+        "authoritative": true,
+        "method": "Workday public CXS",
+        "published_total": 1005,
+        "matching_jobs": 89,
+        "limitations": [
+          "Descriptions are not published in board listings"
+        ]
+      },
+      "endpoints": [
+        "https://santander.wd3.myworkdayjobs.com/wday/cxs/santander/SantanderCareers/jobs"
+      ]
+    },
+    {
+      "name": "Shift Technology",
+      "kind": "greenhouse",
+      "url": "https://job-boards.greenhouse.io/shifttechnology",
+      "enabled": true,
+      "last_checked": "2026-10-12T17:35:05.099780+00:00",
+      "health": "HEALTHY",
+      "jobs_found": 29,
+      "error": null,
+      "evidence": {
+        "complete": true,
+        "authoritative": true,
+        "method": "greenhouse public API",
+        "published_total": 29,
+        "matching_jobs": 17,
+        "limitations": []
+      },
+      "endpoints": [
+        "https://boards-api.greenhouse.io/v1/boards/shifttechnology/jobs?content=true"
+      ]
+    },
+    {
+      "name": "Snowflake careers",
+      "kind": "careers",
+      "url": "https://careers.snowflake.com/",
+      "enabled": true,
+      "last_checked": "2026-10-12T17:42:23.111441+00:00",
+      "health": "HEALTHY",
+      "jobs_found": 353,
+      "error": null,
+      "evidence": {
+        "complete": true,
+        "authoritative": true,
+        "method": "Published career data and ATS references",
+        "published_total": null,
+        "matching_jobs": 72,
+        "limitations": []
+      },
+      "endpoints": [
+        "https://careers.snowflake.com/us/en",
+        "https://careers.snowflake.com/us/en/search-results",
+        "https://api.ashbyhq.com/posting-api/job-board/snowflake?includeCompensation=true"
+      ]
+    },
+    {
+      "name": "Snowflake public board",
+      "kind": "ashby",
+      "url": "https://jobs.ashbyhq.com/snowflake",
+      "enabled": true,
+      "last_checked": "2026-10-12T17:47:43.854695+00:00",
+      "health": "HEALTHY",
+      "jobs_found": 353,
+      "error": null,
+      "evidence": {
+        "complete": true,
+        "authoritative": true,
+        "method": "ashby public API",
+        "published_total": 356,
+        "matching_jobs": 72,
+        "limitations": []
+      },
+      "endpoints": [
+        "https://api.ashbyhq.com/posting-api/job-board/snowflake?includeCompensation=true"
+      ]
+    },
+    {
+      "name": "Soci\u00e9t\u00e9 G\u00e9n\u00e9rale careers",
+      "kind": "careers",
+      "url": "https://careers.societegenerale.com/en",
+      "enabled": true,
+      "last_checked": "2026-10-12T17:45:35.041230+00:00",
+      "health": "PARTIAL",
+      "jobs_found": 27,
+      "error": null,
+      "evidence": {
+        "complete": false,
+        "authoritative": false,
+        "method": "Published career data and ATS references",
+        "published_total": null,
+        "matching_jobs": 0,
+        "limitations": [
+          "Published oraclehcm board could not be read: HTTPStatusError",
+          "Published career pages may show a subset; absence does not prove a job closed"
+        ]
+      },
+      "endpoints": [
+        "https://careers.societegenerale.com/en",
+        "https://careers.societegenerale.com/en/jobs/data/data-analyst",
+        "https://careers.societegenerale.com/en/jobs/data/data-scientist",
+        "https://careers.societegenerale.com/en/jobs/risk/quantitative-risk-analyst",
+        "https://careers.societegenerale.com/en/jobs/it/software-engineer",
+        "https://careers.societegenerale.com/en/job-offers/lead-analyst-data-26000JSB-en",
+        "https://careers.societegenerale.com/en/job-offers/lead-business-analyst-26000CR6-en",
+        "https://careers.societegenerale.com/en/job-offers/sr-analyst-treasury-26000G52-en",
+        "https://careers.societegenerale.com/en/job-offers/consultant-software-engineer-java-full-stack-react-26000GHW-en",
+        "https://careers.societegenerale.com/en/job-offers/senior-analyst-2600042D-en",
+        "https://careers.societegenerale.com/en/jobs/it/is-architect",
+        "https://careers.societegenerale.com/en/jobs/it/business-analyst",
+        "https://careers.societegenerale.com/en/jobs/data/data-quality-manager",
+        "https://careers.societegenerale.com/en/jobs/data/big-data-architect",
+        "https://careers.societegenerale.com/en/jobs/data/data-engineer",
+        "https://careers.societegenerale.com/en/jobs/risk/risk-analyst",
+        "https://careers.societegenerale.com/en/jobs/it/developer",
+        "https://careers.societegenerale.com/en/jobs",
+        "https://careers.societegenerale.com/en/jobs/it",
+        "https://careers.societegenerale.com/en/jobs/data",
+        "https://careers.societegenerale.com/en/jobs/global-banking-investor-solutions"
+      ]
+    },
+    {
+      "name": "Softwire careers",
+      "kind": "careers",
+      "url": "https://www.softwire.com/careers/",
+      "enabled": true,
+      "last_checked": "2026-10-12T17:38:30.248230+00:00",
+      "health": "PARTIAL",
+      "jobs_found": 10,
+      "error": null,
+      "evidence": {
+        "complete": false,
+        "authoritative": false,
+        "method": "Published career data and ATS references",
+        "published_total": null,
+        "matching_jobs": 10,
+        "limitations": [
+          "Published career pages may show a subset; absence does not prove a job closed"
+        ]
+      },
+      "endpoints": [
+        "https://www.softwire.com/careers/working-at-softwire",
+        "https://www.softwire.com/careers/open-roles"
+      ]
+    },
+    {
+      "name": "Spotify careers",
+      "kind": "careers",
+      "url": "https://www.lifeatspotify.com/jobs",
+      "enabled": true,
+      "last_checked": "2026-10-12T17:42:57.183738+00:00",
+      "health": "HEALTHY",
+      "jobs_found": 75,
+      "error": null,
+      "evidence": {
+        "complete": true,
+        "authoritative": true,
+        "method": "Published JSON job feed",
+        "published_total": 75,
+        "matching_jobs": 39,
+        "limitations": [
+          "Descriptions are not published in the listing feed"
+        ]
+      },
+      "endpoints": [
+        "https://api.lifeatspotify.com/wp-json/animal/v1/job/search"
+      ]
+    },
+    {
+      "name": "Standard Chartered careers",
+      "kind": "careers",
+      "url": "https://www.sc.com/en/global-careers/",
+      "enabled": true,
+      "last_checked": "2026-10-12T17:45:23.126549+00:00",
+      "health": "PARTIAL",
+      "jobs_found": 221,
+      "error": null,
+      "evidence": {
+        "complete": false,
+        "authoritative": true,
+        "method": "Published SuccessFactors search (isolated public browser)",
+        "published_total": 1074,
+        "matching_jobs": 3,
+        "limitations": [
+          "Descriptions are not published in board listings",
+          "Pagination stopped: Published pagination ended early or repeated postings",
+          "Category search does not cover all company jobs",
+          "Published search is incomplete"
+        ]
+      },
+      "endpoints": [
+        "https://jobs.standardchartered.com/services/recruiting/v1/jobs",
+        "https://jobs.standardchartered.com/go/Experienced-Professional-jobs/9783657/?feedid=363857"
+      ]
+    },
+    {
+      "name": "Starling Bank careers",
+      "kind": "careers",
+      "url": "https://www.starlingbank.com/careers/",
+      "enabled": true,
+      "last_checked": "2026-10-12T17:46:51.079843+00:00",
+      "health": "HEALTHY",
+      "jobs_found": 46,
+      "error": null,
+      "evidence": {
+        "complete": true,
+        "authoritative": true,
+        "method": "Published career data and ATS references (isolated public browser)",
+        "published_total": null,
+        "matching_jobs": 39,
+        "limitations": []
+      },
+      "endpoints": [
+        "https://www.starlingbank.com/careers/",
+        "https://apply.workable.com/api/v1/widget/accounts/starling-bank"
+      ]
+    },
+    {
+      "name": "Stripe careers",
+      "kind": "careers",
+      "url": "https://stripe.com/jobs/search",
+      "enabled": true,
+      "last_checked": "2026-10-12T17:41:45.634174+00:00",
+      "health": "PARTIAL",
+      "jobs_found": 679,
+      "error": null,
+      "evidence": {
+        "complete": false,
+        "authoritative": false,
+        "method": "Published career data and ATS references",
+        "published_total": null,
+        "matching_jobs": 140,
+        "limitations": [
+          "Published career pages may show a subset; absence does not prove a job closed"
+        ]
+      },
+      "endpoints": [
+        "https://stripe.com/careers/search"
+      ]
+    },
+    {
+      "name": "TikTok careers",
+      "kind": "careers",
+      "url": "https://lifeattiktok.com/search",
+      "enabled": true,
+      "last_checked": "2026-10-12T17:42:56.132674+00:00",
+      "health": "FAILED",
+      "jobs_found": 0,
+      "error": "ValueError: No readable public job collection found; the career page is not evidence of an empty board",
+      "evidence": {
+        "complete": null,
+        "authoritative": null,
+        "method": null,
+        "published_total": null,
+        "matching_jobs": 0,
+        "limitations": null
+      },
+      "endpoints": []
+    },
+    {
+      "name": "Trackr \u00b7 UK Tech Graduate 2027",
+      "kind": "trackr",
+      "url": "https://app.the-trackr.com/uk-tech/graduate-programmes",
+      "enabled": true,
+      "last_checked": "2026-10-12T17:35:12.103324+00:00",
+      "health": "HEALTHY",
+      "jobs_found": 149,
+      "error": null,
+      "evidence": {
+        "complete": true,
+        "authoritative": false,
+        "method": "Trackr public programme API",
+        "published_total": 151,
+        "matching_jobs": 121,
+        "limitations": []
+      },
+      "endpoints": [
+        "https://app.the-trackr.com/uk-tech/graduate-programmes"
+      ]
+    },
+    {
+      "name": "Trainline",
+      "kind": "ashby",
+      "url": "https://jobs.ashbyhq.com/trainline",
+      "enabled": true,
+      "last_checked": "2026-10-12T17:35:06.752344+00:00",
+      "health": "HEALTHY",
+      "jobs_found": 29,
+      "error": null,
+      "evidence": {
+        "complete": true,
+        "authoritative": true,
+        "method": "ashby public API",
+        "published_total": 29,
+        "matching_jobs": 29,
+        "limitations": []
+      },
+      "endpoints": [
+        "https://api.ashbyhq.com/posting-api/job-board/trainline?includeCompensation=true"
+      ]
+    },
+    {
+      "name": "Two Sigma careers",
+      "kind": "careers",
+      "url": "https://careers.twosigma.com/",
+      "enabled": true,
+      "last_checked": "2026-10-12T17:46:22.362451+00:00",
+      "health": "PARTIAL",
+      "jobs_found": 17,
+      "error": null,
+      "evidence": {
+        "complete": false,
+        "authoritative": false,
+        "method": "Published career data and ATS references",
+        "published_total": null,
+        "matching_jobs": 0,
+        "limitations": [
+          "Published career pages may show a subset; absence does not prove a job closed"
+        ]
+      },
+      "endpoints": [
+        "https://careers.twosigma.com/",
+        "https://careers.twosigma.com/careers/OpenRoles",
+        "https://careers.twosigma.com/careers/InternshipsAndEarlyCareers",
+        "https://careers.twosigma.com/careers/ExperiencedRoles",
+        "https://careers.twosigma.com/careers/JobDetail/Tokyo-New-York-Japan-Data-Operations-Analyst-Global-Data-Operations-Tokyo/14322",
+        "https://careers.twosigma.com/careers/JobDetail/New-York-United-States-Kubernetes-Tech-Lead/14316",
+        "https://careers.twosigma.com/careers/JobDetail/London-United-Kingdom-of-Great-Britain-and-Northern-Ireland-Engineering-Manager-Risk-Engineering/14314",
+        "https://careers.twosigma.com/careers/JobDetail/Tokyo-Tokyo-Japan-Infrastructure-Engineer/14306",
+        "https://www.twosigma.com/interviewing-at-two-sigma/",
+        "https://careers.twosigma.com/",
+        "https://careers.twosigma.com/careers/JobDetail/New-York-United-States-AI-Fluency-Program-Manager/14291",
+        "https://careers.twosigma.com/careers/JobDetail/New-York-New-York-United-States-AI-Research-Scientist-Campus-Full-Time/13671",
+        "https://careers.twosigma.com/careers/JobDetail/New-York-New-York-United-States-AI-Research-Scientist-Intern-2027-Summer/14096",
+        "https://careers.twosigma.com/careers/JobDetail/New-York-New-York-United-States-AI-Solutions-Developer/14102",
+        "https://careers.twosigma.com/careers/JobDetail/New-York-New-York-United-States-Client-Services-Manager/13930",
+        "https://careers.twosigma.com/careers/JobDetail/New-York-New-York-United-States-Corporate-Recruiter/13905",
+        "https://careers.twosigma.com/careers/JobDetail/New-York-New-York-United-States-Corporate-Strategy-Associate/13832",
+        "https://careers.twosigma.com/careers/JobDetail/New-York-New-York-United-States-Credit-Analyst-Convertible-Arbitrage/14300",
+        "https://careers.twosigma.com/careers/JobDetail/London-United-Kingdom-of-Great-Britain-and-Northern-Ireland-Data-Operations-Analyst-Global-Data-Operations/14201",
+        "https://careers.twosigma.com/careers/JobDetail/New-York-New-York-United-States-Data-Scientist-Campus-Full-Time/14272",
+        "https://careers.twosigma.com/careers/JobDetail/New-York-New-York-United-States-Quantitative-Researcher-Full-Time-Campus-Hire/13946"
+      ]
+    },
+    {
+      "name": "UBS careers",
+      "kind": "careers",
+      "url": "https://www.ubs.com/global/en/careers.html",
+      "enabled": true,
+      "last_checked": "2026-10-12T17:43:27.706081+00:00",
+      "health": "ACCESS_DENIED",
+      "jobs_found": 0,
+      "error": "HTTP 403: public career source rejected the request",
+      "evidence": {
+        "complete": null,
+        "authoritative": null,
+        "method": null,
+        "published_total": null,
+        "matching_jobs": 0,
+        "limitations": null
+      },
+      "endpoints": []
+    },
+    {
+      "name": "Uber careers",
+      "kind": "careers",
+      "url": "https://www.uber.com/global/en/careers/",
+      "enabled": true,
+      "last_checked": "2026-10-12T17:41:26.429131+00:00",
+      "health": "HEALTHY",
+      "jobs_found": 626,
+      "error": null,
+      "evidence": {
+        "complete": true,
+        "authoritative": true,
+        "method": "Published career data and ATS references",
+        "published_total": null,
+        "matching_jobs": 103,
+        "limitations": []
+      },
+      "endpoints": [
+        "https://jobs.uber.com/en/",
+        "https://iaziqy.fa.ocs.oraclecloud.com/hcmRestApi/resources/latest/recruitingCEJobRequisitions"
+      ]
+    },
+    {
+      "name": "University College London (UCL) careers",
+      "kind": "careers",
+      "url": "https://www.ucl.ac.uk/work-at-ucl/search-ucl-jobs",
+      "enabled": true,
+      "last_checked": "2026-10-12T17:43:37.234241+00:00",
+      "health": "ACCESS_DENIED",
+      "jobs_found": 0,
+      "error": "ValueError: Public browser navigation returned HTTP 400; Public browser navigation returned HTTP 403",
+      "evidence": {
+        "complete": null,
+        "authoritative": null,
+        "method": null,
+        "published_total": null,
+        "matching_jobs": 0,
+        "limitations": null
+      },
+      "endpoints": []
+    },
+    {
+      "name": "Visa public board",
+      "kind": "workday",
+      "url": "https://visa.wd5.myworkdayjobs.com/visa",
+      "enabled": true,
+      "last_checked": "2026-10-12T17:37:56.945722+00:00",
+      "health": "HEALTHY",
+      "jobs_found": 809,
+      "error": null,
+      "evidence": {
+        "complete": true,
+        "authoritative": true,
+        "method": "Workday public CXS",
+        "published_total": 809,
+        "matching_jobs": 110,
+        "limitations": [
+          "Descriptions are not published in board listings"
+        ]
+      },
+      "endpoints": [
+        "https://visa.wd5.myworkdayjobs.com/wday/cxs/visa/visa/jobs"
+      ]
+    },
+    {
+      "name": "Wise careers",
+      "kind": "careers",
+      "url": "https://wise.jobs/",
+      "enabled": true,
+      "last_checked": "2026-10-12T17:38:39.031229+00:00",
+      "health": "PARTIAL",
+      "jobs_found": 16,
+      "error": null,
+      "evidence": {
+        "complete": false,
+        "authoritative": false,
+        "method": "Published career data and ATS references",
+        "published_total": null,
+        "matching_jobs": 9,
+        "limitations": [
+          "Published career pages may show a subset; absence does not prove a job closed"
+        ]
+      },
+      "endpoints": [
+        "https://wise.jobs/",
+        "https://wise.jobs/jobs",
+        "https://wise.jobs/job/director-of-business-operations-north-america-in-austin-jid-4163",
+        "https://wise.jobs/job/senior-b2b-crm-manager-in-singapore-jid-4284",
+        "https://wise.jobs/job/kyc-operations-senior-analyst-deactivations-in-budapest-jid-4306",
+        "https://wise.jobs/job/head-of-technical-accounting-in-london-jid-2399",
+        "https://wise.jobs/job/fincrime-operations-team-lead-pep-in-hyderabad-jid-4116",
+        "https://wise.jobs/job/fincrime-operations-team-lead-aml-investigations-in-hyderabad-jid-4305",
+        "https://wise.jobs/job/identity-and-access-management-technician-in-hyderabad-jid-4303",
+        "https://wise.jobs/job/technical-program-manager-in-hyderabad-jid-4230",
+        "https://wise.jobs/job/fincrime-operations-senior-lead-aml-investigations-in-kuala-lumpur-jid-4285",
+        "https://wise.jobs/job/senior-software-engineer-ii-kyc-experience-in-london-jid-4052",
+        "https://wise.jobs/job/senior-design-researcher-account-sharing-in-london-jid-4302",
+        "https://wise.jobs/job/engineering-lead-embedded-solutions-in-london-jid-3755",
+        "https://wise.jobs/"
+      ]
+    },
+    {
+      "name": "Zopa careers",
+      "kind": "careers",
+      "url": "https://www.zopa.com/careers",
+      "enabled": true,
+      "last_checked": "2026-10-12T17:46:25.490059+00:00",
+      "health": "FAILED",
+      "jobs_found": 0,
+      "error": "HTTP 503: public career source rejected the request",
+      "evidence": {
+        "complete": null,
+        "authoritative": null,
+        "method": null,
+        "published_total": null,
+        "matching_jobs": 0,
+        "limitations": null
+      },
+      "endpoints": []
+    }
+  ],
+  "companies": [
+    {
+      "company": "Accenture",
+      "health": "PARTIAL",
+      "daily_enabled": true,
+      "sources": [
+        {
+          "name": "Accenture public board",
+          "url": "https://accenture.wd103.myworkdayjobs.com/accenturecareers",
+          "health": "PARTIAL"
+        }
+      ]
+    },
+    {
+      "company": "Adobe",
+      "health": "PARTIAL",
+      "daily_enabled": true,
+      "sources": [
+        {
+          "name": "Adobe public board",
+          "url": "https://adobe.wd5.myworkdayjobs.com/external_experienced",
+          "health": "PARTIAL"
+        }
+      ]
+    },
+    {
+      "company": "Adyen",
+      "health": "VERIFIED",
+      "daily_enabled": true,
+      "sources": [
+        {
+          "name": "Adyen careers",
+          "url": "https://careers.adyen.com/",
+          "health": "HEALTHY"
+        },
+        {
+          "name": "Adyen public board",
+          "url": "https://job-boards.greenhouse.io/adyen",
+          "health": "HEALTHY"
+        }
+      ]
+    },
+    {
+      "company": "Amazon",
+      "health": "PARTIAL",
+      "daily_enabled": true,
+      "sources": [
+        {
+          "name": "Amazon careers",
+          "url": "https://www.amazon.jobs/",
+          "health": "PARTIAL"
+        }
+      ]
+    },
+    {
+      "company": "AMD",
+      "health": "FAILED",
+      "daily_enabled": true,
+      "sources": [
+        {
+          "name": "AMD careers",
+          "url": "https://careers.amd.com/",
+          "health": "ACCESS_DENIED"
+        }
+      ]
+    },
+    {
+      "company": "American Express",
+      "health": "VERIFIED",
+      "daily_enabled": true,
+      "sources": [
+        {
+          "name": "American Express careers",
+          "url": "https://www.americanexpress.com/en-us/careers/",
+          "health": "HEALTHY"
+        }
+      ]
+    },
+    {
+      "company": "Apple",
+      "health": "PARTIAL",
+      "daily_enabled": true,
+      "sources": [
+        {
+          "name": "Apple careers",
+          "url": "https://jobs.apple.com/en-gb/search",
+          "health": "PARTIAL"
+        }
+      ]
+    },
+    {
+      "company": "Arm",
+      "health": "PARTIAL",
+      "daily_enabled": true,
+      "sources": [
+        {
+          "name": "Arm careers",
+          "url": "https://careers.arm.com/",
+          "health": "PARTIAL"
+        }
+      ]
+    },
+    {
+      "company": "Bank of America",
+      "health": "PARTIAL",
+      "daily_enabled": true,
+      "sources": [
+        {
+          "name": "Bank of America careers",
+          "url": "https://careers.bankofamerica.com/",
+          "health": "PARTIAL"
+        },
+        {
+          "name": "Bank of America public board",
+          "url": "https://ghr.wd1.myworkdayjobs.com/lateral-us",
+          "health": "PARTIAL"
+        }
+      ]
+    },
+    {
+      "company": "Barclays",
+      "health": "PARTIAL",
+      "daily_enabled": true,
+      "sources": [
+        {
+          "name": "Barclays public board",
+          "url": "https://barclays.wd3.myworkdayjobs.com/External_Career_Site_Barclays",
+          "health": "PARTIAL"
+        },
+        {
+          "name": "Barclays public board",
+          "url": "https://barclays.wd3.myworkdayjobs.com/external_career_site_barclays",
+          "health": "PARTIAL"
+        }
+      ]
+    },
+    {
+      "company": "BlackRock",
+      "health": "VERIFIED",
+      "daily_enabled": true,
+      "sources": [
+        {
+          "name": "BlackRock public board",
+          "url": "https://blackrock.wd1.myworkdayjobs.com/blackrock_professional",
+          "health": "HEALTHY"
+        }
+      ]
+    },
+    {
+      "company": "Blackstone",
+      "health": "VERIFIED",
+      "daily_enabled": true,
+      "sources": [
+        {
+          "name": "Blackstone public board",
+          "url": "https://blackstone.wd1.myworkdayjobs.com/blackstone_campus_careers",
+          "health": "HEALTHY"
+        }
+      ]
+    },
+    {
+      "company": "Blenheim Chalcot",
+      "health": "VERIFIED",
+      "daily_enabled": true,
+      "sources": [
+        {
+          "name": "Blenheim Chalcot",
+          "url": "https://job-boards.greenhouse.io/blenheimchalcot",
+          "health": "HEALTHY"
+        }
+      ]
+    },
+    {
+      "company": "Bloomberg",
+      "health": "FAILED",
+      "daily_enabled": true,
+      "sources": [
+        {
+          "name": "Bloomberg careers",
+          "url": "https://www.bloomberg.com/company/careers/",
+          "health": "ACCESS_DENIED"
+        }
+      ]
+    },
+    {
+      "company": "BNP Paribas",
+      "health": "FAILED",
+      "daily_enabled": true,
+      "sources": [
+        {
+          "name": "BNP Paribas careers",
+          "url": "https://group.bnpparibas/en/careers",
+          "health": "ACCESS_DENIED"
+        }
+      ]
+    },
+    {
+      "company": "ByteDance",
+      "health": "PARTIAL",
+      "daily_enabled": true,
+      "sources": [
+        {
+          "name": "ByteDance careers",
+          "url": "https://jobs.bytedance.com/en/",
+          "health": "PARTIAL"
+        }
+      ]
+    },
+    {
+      "company": "Capital One",
+      "health": "VERIFIED",
+      "daily_enabled": true,
+      "sources": [
+        {
+          "name": "Capital One public board",
+          "url": "https://capitalone.wd12.myworkdayjobs.com/Capital_One",
+          "health": "HEALTHY"
+        },
+        {
+          "name": "Capital One public board",
+          "url": "https://capitalone.wd12.myworkdayjobs.com/capital_one",
+          "health": "HEALTHY"
+        }
+      ]
+    },
+    {
+      "company": "Checkout.com",
+      "health": "VERIFIED",
+      "daily_enabled": true,
+      "sources": [
+        {
+          "name": "Checkout.com public board",
+          "url": "https://jobs.ashbyhq.com/checkout.com",
+          "health": "HEALTHY"
+        }
+      ]
+    },
+    {
+      "company": "Cisco",
+      "health": "PARTIAL",
+      "daily_enabled": true,
+      "sources": [
+        {
+          "name": "Cisco careers",
+          "url": "https://jobs.cisco.com/",
+          "health": "PARTIAL"
+        },
+        {
+          "name": "Cisco public board",
+          "url": "https://cisco.wd5.myworkdayjobs.com/Cisco_Careers",
+          "health": "PARTIAL"
+        }
+      ]
+    },
+    {
+      "company": "Citadel",
+      "health": "FAILED",
+      "daily_enabled": true,
+      "sources": [
+        {
+          "name": "Citadel careers",
+          "url": "https://www.citadel.com/careers/",
+          "health": "ACCESS_DENIED"
+        }
+      ]
+    },
+    {
+      "company": "Citadel Securities",
+      "health": "FAILED",
+      "daily_enabled": true,
+      "sources": [
+        {
+          "name": "Citadel Securities careers",
+          "url": "https://www.citadelsecurities.com/careers/",
+          "health": "ACCESS_DENIED"
+        }
+      ]
+    },
+    {
+      "company": "Citigroup",
+      "health": "PARTIAL",
+      "daily_enabled": true,
+      "sources": [
+        {
+          "name": "Citigroup careers",
+          "url": "https://jobs.citi.com/",
+          "health": "PARTIAL"
+        },
+        {
+          "name": "Citigroup public board",
+          "url": "https://citi.wd5.myworkdayjobs.com/2",
+          "health": "PARTIAL"
+        }
+      ]
+    },
+    {
+      "company": "Cloudflare",
+      "health": "VERIFIED",
+      "daily_enabled": true,
+      "sources": [
+        {
+          "name": "Cloudflare careers",
+          "url": "https://www.cloudflare.com/careers/jobs/",
+          "health": "HEALTHY"
+        },
+        {
+          "name": "Cloudflare public board",
+          "url": "https://boards.greenhouse.io/cloudflare",
+          "health": "HEALTHY"
+        }
+      ]
+    },
+    {
+      "company": "Databricks",
+      "health": "PARTIAL",
+      "daily_enabled": true,
+      "sources": [
+        {
+          "name": "Databricks careers",
+          "url": "https://www.databricks.com/company/careers/open-positions",
+          "health": "PARTIAL"
+        }
+      ]
+    },
+    {
+      "company": "Datadog",
+      "health": "VERIFIED",
+      "daily_enabled": true,
+      "sources": [
+        {
+          "name": "Datadog careers",
+          "url": "https://careers.datadoghq.com/",
+          "health": "HEALTHY"
+        }
+      ]
+    },
+    {
+      "company": "Deliveroo",
+      "health": "VERIFIED",
+      "daily_enabled": true,
+      "sources": [
+        {
+          "name": "Deliveroo careers",
+          "url": "https://careers.deliveroo.co.uk/",
+          "health": "HEALTHY"
+        }
+      ]
+    },
+    {
+      "company": "Dell Technologies",
+      "health": "FAILED",
+      "daily_enabled": true,
+      "sources": [
+        {
+          "name": "Dell Technologies careers",
+          "url": "https://jobs.dell.com/",
+          "health": "ACCESS_DENIED"
+        }
+      ]
+    },
+    {
+      "company": "Deloitte",
+      "health": "VERIFIED",
+      "daily_enabled": true,
+      "sources": [
+        {
+          "name": "Deloitte careers",
+          "url": "https://www.deloitte.com/global/en/careers.html",
+          "health": "PARTIAL"
+        },
+        {
+          "name": "Deloitte public board",
+          "url": "https://deloitteie.wd3.myworkdayjobs.com/Experienced_Professionals",
+          "health": "HEALTHY"
+        }
+      ]
+    },
+    {
+      "company": "Deutsche Bank",
+      "health": "VERIFIED",
+      "daily_enabled": true,
+      "sources": [
+        {
+          "name": "Deutsche Bank careers",
+          "url": "https://careers.db.com/",
+          "health": "HEALTHY"
+        },
+        {
+          "name": "Deutsche Bank public board",
+          "url": "https://db.wd3.myworkdayjobs.com/DBWebsite",
+          "health": "HEALTHY"
+        }
+      ]
+    },
+    {
+      "company": "EY",
+      "health": "PARTIAL",
+      "daily_enabled": true,
+      "sources": [
+        {
+          "name": "EY careers",
+          "url": "https://careers.ey.com/",
+          "health": "PARTIAL"
+        }
+      ]
+    },
+    {
+      "company": "Fifty One Degrees",
+      "health": "VERIFIED",
+      "daily_enabled": true,
+      "sources": [
+        {
+          "name": "Fifty One Degrees",
+          "url": "https://jobs.ashbyhq.com/51d",
+          "health": "HEALTHY"
+        }
+      ]
+    },
+    {
+      "company": "Goldman Sachs",
+      "health": "VERIFIED",
+      "daily_enabled": true,
+      "sources": [
+        {
+          "name": "Goldman Sachs careers",
+          "url": "https://www.goldmansachs.com/careers",
+          "health": "HEALTHY"
+        }
+      ]
+    },
+    {
+      "company": "Google",
+      "health": "PARTIAL",
+      "daily_enabled": true,
+      "sources": [
+        {
+          "name": "Google careers",
+          "url": "https://www.google.com/about/careers/applications/",
+          "health": "PARTIAL"
+        }
+      ]
+    },
+    {
+      "company": "HSBC",
+      "health": "FAILED",
+      "daily_enabled": true,
+      "sources": [
+        {
+          "name": "HSBC careers",
+          "url": "https://www.hsbc.com/careers",
+          "health": "ACCESS_DENIED"
+        }
+      ]
+    },
+    {
+      "company": "Huawei Technologies",
+      "health": "FAILED",
+      "daily_enabled": true,
+      "sources": [
+        {
+          "name": "Huawei Technologies careers",
+          "url": "https://career.huawei.com/",
+          "health": "FAILED"
+        }
+      ]
+    },
+    {
+      "company": "IBM",
+      "health": "PARTIAL",
+      "daily_enabled": true,
+      "sources": [
+        {
+          "name": "IBM careers",
+          "url": "https://www.ibm.com/careers/",
+          "health": "PARTIAL"
+        }
+      ]
+    },
+    {
+      "company": "Intel",
+      "health": "PARTIAL",
+      "daily_enabled": true,
+      "sources": [
+        {
+          "name": "Intel public board",
+          "url": "https://intel.wd1.myworkdayjobs.com/external",
+          "health": "PARTIAL"
+        }
+      ]
+    },
+    {
+      "company": "Jane Street",
+      "health": "VERIFIED",
+      "daily_enabled": true,
+      "sources": [
+        {
+          "name": "Jane Street careers",
+          "url": "https://www.janestreet.com/join-jane-street/open-roles/",
+          "health": "HEALTHY"
+        }
+      ]
+    },
+    {
+      "company": "JPMorgan Chase",
+      "health": "PARTIAL",
+      "daily_enabled": true,
+      "sources": [
+        {
+          "name": "JPMorgan Chase careers",
+          "url": "https://www.jpmorganchase.com/careers",
+          "health": "PARTIAL"
+        }
+      ]
+    },
+    {
+      "company": "Klarna",
+      "health": "PARTIAL",
+      "daily_enabled": true,
+      "sources": [
+        {
+          "name": "Klarna careers",
+          "url": "https://www.klarna.com/careers/",
+          "health": "PARTIAL"
+        }
+      ]
+    },
+    {
+      "company": "Lloyds Banking Group",
+      "health": "VERIFIED",
+      "daily_enabled": true,
+      "sources": [
+        {
+          "name": "Lloyds Banking Group public board",
+          "url": "https://lbg.wd3.myworkdayjobs.com/Graduate_careers",
+          "health": "HEALTHY"
+        }
+      ]
+    },
+    {
+      "company": "LSEG",
+      "health": "VERIFIED",
+      "daily_enabled": true,
+      "sources": [
+        {
+          "name": "LSEG public board",
+          "url": "https://lseg.wd3.myworkdayjobs.com/careers",
+          "health": "HEALTHY"
+        }
+      ]
+    },
+    {
+      "company": "Man Group",
+      "health": "VERIFIED",
+      "daily_enabled": true,
+      "sources": [
+        {
+          "name": "Man Group careers",
+          "url": "https://www.man.com/careers",
+          "health": "HEALTHY"
+        },
+        {
+          "name": "Man Group public board",
+          "url": "https://job-boards.eu.greenhouse.io/mangroup",
+          "health": "HEALTHY"
+        }
+      ]
+    },
+    {
+      "company": "Marshall Wace",
+      "health": "VERIFIED",
+      "daily_enabled": true,
+      "sources": [
+        {
+          "name": "Marshall Wace - Graduate & Associate",
+          "url": "https://job-boards.greenhouse.io/mw-tech-grad",
+          "health": "HEALTHY"
+        }
+      ]
+    },
+    {
+      "company": "Mastercard",
+      "health": "VERIFIED",
+      "daily_enabled": true,
+      "sources": [
+        {
+          "name": "Mastercard public board",
+          "url": "https://mastercard.wd1.myworkdayjobs.com/corporatecareers",
+          "health": "HEALTHY"
+        },
+        {
+          "name": "Mastercard public board",
+          "url": "https://mastercard.wd1.myworkdayjobs.com/contractorconversion",
+          "health": "HEALTHY"
+        }
+      ]
+    },
+    {
+      "company": "Meta",
+      "health": "FAILED",
+      "daily_enabled": true,
+      "sources": [
+        {
+          "name": "Meta careers",
+          "url": "https://www.metacareers.com/jobs/",
+          "health": "FAILED"
+        }
+      ]
+    },
+    {
+      "company": "Microsoft",
+      "health": "FAILED",
+      "daily_enabled": true,
+      "sources": [
+        {
+          "name": "Microsoft careers",
+          "url": "https://careers.microsoft.com/",
+          "health": "RATE_LIMITED"
+        }
+      ]
+    },
+    {
+      "company": "Millennium",
+      "health": "PARTIAL",
+      "daily_enabled": true,
+      "sources": [
+        {
+          "name": "Millennium careers",
+          "url": "https://www.mlp.com/careers/",
+          "health": "PARTIAL"
+        }
+      ]
+    },
+    {
+      "company": "Modo Energy",
+      "health": "VERIFIED",
+      "daily_enabled": true,
+      "sources": [
+        {
+          "name": "Modo Energy",
+          "url": "https://job-boards.eu.greenhouse.io/modoenergy",
+          "health": "HEALTHY"
+        }
+      ]
+    },
+    {
+      "company": "Monzo",
+      "health": "VERIFIED",
+      "daily_enabled": true,
+      "sources": [
+        {
+          "name": "Monzo careers",
+          "url": "https://monzo.com/careers",
+          "health": "HEALTHY"
+        },
+        {
+          "name": "Monzo public board",
+          "url": "https://job-boards.greenhouse.io/monzo",
+          "health": "HEALTHY"
+        }
+      ]
+    },
+    {
+      "company": "Morgan Stanley",
+      "health": "FAILED",
+      "daily_enabled": true,
+      "sources": [
+        {
+          "name": "Morgan Stanley careers",
+          "url": "https://www.morganstanley.com/people-opportunities",
+          "health": "FAILED"
+        }
+      ]
+    },
+    {
+      "company": "Mytos",
+      "health": "VERIFIED",
+      "daily_enabled": true,
+      "sources": [
+        {
+          "name": "Mytos",
+          "url": "https://jobs.lever.co/mytos",
+          "health": "HEALTHY"
+        }
+      ]
+    },
+    {
+      "company": "NatWest",
+      "health": "FAILED",
+      "daily_enabled": true,
+      "sources": [
+        {
+          "name": "NatWest careers",
+          "url": "https://jobs.natwestgroup.com/",
+          "health": "ACCESS_DENIED"
+        }
+      ]
+    },
+    {
+      "company": "Netflix",
+      "health": "PARTIAL",
+      "daily_enabled": true,
+      "sources": [
+        {
+          "name": "Netflix careers",
+          "url": "https://jobs.netflix.com/",
+          "health": "PARTIAL"
+        }
+      ]
+    },
+    {
+      "company": "NVIDIA",
+      "health": "PARTIAL",
+      "daily_enabled": true,
+      "sources": [
+        {
+          "name": "NVIDIA public board",
+          "url": "https://nvidia.wd5.myworkdayjobs.com/nvidiaexternalcareersite",
+          "health": "PARTIAL"
+        }
+      ]
+    },
+    {
+      "company": "Oracle",
+      "health": "PARTIAL",
+      "daily_enabled": true,
+      "sources": [
+        {
+          "name": "Oracle careers",
+          "url": "https://www.oracle.com/careers/",
+          "health": "PARTIAL"
+        }
+      ]
+    },
+    {
+      "company": "Palantir",
+      "health": "VERIFIED",
+      "daily_enabled": true,
+      "sources": [
+        {
+          "name": "Palantir public board",
+          "url": "https://jobs.lever.co/palantir",
+          "health": "HEALTHY"
+        }
+      ]
+    },
+    {
+      "company": "Point72",
+      "health": "VERIFIED",
+      "daily_enabled": true,
+      "sources": [
+        {
+          "name": "Point72 careers",
+          "url": "https://careers.point72.com/",
+          "health": "HEALTHY"
+        },
+        {
+          "name": "Point72 public board",
+          "url": "https://boards.greenhouse.io/point72",
+          "health": "HEALTHY"
+        }
+      ]
+    },
+    {
+      "company": "Relay Technologies",
+      "health": "VERIFIED",
+      "daily_enabled": true,
+      "sources": [
+        {
+          "name": "Relay Technologies",
+          "url": "https://jobs.ashbyhq.com/relay",
+          "health": "HEALTHY"
+        }
+      ]
+    },
+    {
+      "company": "Revolut",
+      "health": "FAILED",
+      "daily_enabled": true,
+      "sources": [
+        {
+          "name": "Revolut careers",
+          "url": "https://www.revolut.com/careers/",
+          "health": "ACCESS_DENIED"
+        }
+      ]
+    },
+    {
+      "company": "Salesforce",
+      "health": "FAILED",
+      "daily_enabled": true,
+      "sources": [
+        {
+          "name": "Salesforce careers",
+          "url": "https://careers.salesforce.com/",
+          "health": "ACCESS_DENIED"
+        }
+      ]
+    },
+    {
+      "company": "Santander",
+      "health": "VERIFIED",
+      "daily_enabled": true,
+      "sources": [
+        {
+          "name": "Santander careers",
+          "url": "https://www.santander.com/en/careers",
+          "health": "HEALTHY"
+        },
+        {
+          "name": "Santander public board",
+          "url": "https://santander.wd3.myworkdayjobs.com/SantanderCareers",
+          "health": "HEALTHY"
+        }
+      ]
+    },
+    {
+      "company": "Shift Technology",
+      "health": "VERIFIED",
+      "daily_enabled": true,
+      "sources": [
+        {
+          "name": "Shift Technology",
+          "url": "https://job-boards.greenhouse.io/shifttechnology",
+          "health": "HEALTHY"
+        }
+      ]
+    },
+    {
+      "company": "Snowflake",
+      "health": "VERIFIED",
+      "daily_enabled": true,
+      "sources": [
+        {
+          "name": "Snowflake careers",
+          "url": "https://careers.snowflake.com/",
+          "health": "HEALTHY"
+        },
+        {
+          "name": "Snowflake public board",
+          "url": "https://jobs.ashbyhq.com/snowflake",
+          "health": "HEALTHY"
+        }
+      ]
+    },
+    {
+      "company": "Soci\u00e9t\u00e9 G\u00e9n\u00e9rale",
+      "health": "PARTIAL",
+      "daily_enabled": true,
+      "sources": [
+        {
+          "name": "Soci\u00e9t\u00e9 G\u00e9n\u00e9rale careers",
+          "url": "https://careers.societegenerale.com/en",
+          "health": "PARTIAL"
+        }
+      ]
+    },
+    {
+      "company": "Softwire",
+      "health": "PARTIAL",
+      "daily_enabled": true,
+      "sources": [
+        {
+          "name": "Softwire careers",
+          "url": "https://www.softwire.com/careers/",
+          "health": "PARTIAL"
+        }
+      ]
+    },
+    {
+      "company": "Spotify",
+      "health": "VERIFIED",
+      "daily_enabled": true,
+      "sources": [
+        {
+          "name": "Spotify careers",
+          "url": "https://www.lifeatspotify.com/jobs",
+          "health": "HEALTHY"
+        }
+      ]
+    },
+    {
+      "company": "Standard Chartered",
+      "health": "PARTIAL",
+      "daily_enabled": true,
+      "sources": [
+        {
+          "name": "Standard Chartered careers",
+          "url": "https://www.sc.com/en/global-careers/",
+          "health": "PARTIAL"
+        }
+      ]
+    },
+    {
+      "company": "Starling Bank",
+      "health": "VERIFIED",
+      "daily_enabled": true,
+      "sources": [
+        {
+          "name": "Starling Bank careers",
+          "url": "https://www.starlingbank.com/careers/",
+          "health": "HEALTHY"
+        }
+      ]
+    },
+    {
+      "company": "Stripe",
+      "health": "PARTIAL",
+      "daily_enabled": true,
+      "sources": [
+        {
+          "name": "Stripe careers",
+          "url": "https://stripe.com/jobs/search",
+          "health": "PARTIAL"
+        }
+      ]
+    },
+    {
+      "company": "TikTok",
+      "health": "FAILED",
+      "daily_enabled": true,
+      "sources": [
+        {
+          "name": "TikTok careers",
+          "url": "https://lifeattiktok.com/search",
+          "health": "FAILED"
+        }
+      ]
+    },
+    {
+      "company": "Trainline",
+      "health": "VERIFIED",
+      "daily_enabled": true,
+      "sources": [
+        {
+          "name": "Trainline",
+          "url": "https://jobs.ashbyhq.com/trainline",
+          "health": "HEALTHY"
+        }
+      ]
+    },
+    {
+      "company": "Two Sigma",
+      "health": "PARTIAL",
+      "daily_enabled": true,
+      "sources": [
+        {
+          "name": "Two Sigma careers",
+          "url": "https://careers.twosigma.com/",
+          "health": "PARTIAL"
+        }
+      ]
+    },
+    {
+      "company": "Uber",
+      "health": "VERIFIED",
+      "daily_enabled": true,
+      "sources": [
+        {
+          "name": "Uber careers",
+          "url": "https://www.uber.com/global/en/careers/",
+          "health": "HEALTHY"
+        }
+      ]
+    },
+    {
+      "company": "UBS",
+      "health": "FAILED",
+      "daily_enabled": true,
+      "sources": [
+        {
+          "name": "UBS careers",
+          "url": "https://www.ubs.com/global/en/careers.html",
+          "health": "ACCESS_DENIED"
+        }
+      ]
+    },
+    {
+      "company": "University College London (UCL)",
+      "health": "FAILED",
+      "daily_enabled": true,
+      "sources": [
+        {
+          "name": "University College London (UCL) careers",
+          "url": "https://www.ucl.ac.uk/work-at-ucl/search-ucl-jobs",
+          "health": "ACCESS_DENIED"
+        }
+      ]
+    },
+    {
+      "company": "Visa",
+      "health": "VERIFIED",
+      "daily_enabled": true,
+      "sources": [
+        {
+          "name": "Visa public board",
+          "url": "https://visa.wd5.myworkdayjobs.com/visa",
+          "health": "HEALTHY"
+        }
+      ]
+    },
+    {
+      "company": "Wise",
+      "health": "PARTIAL",
+      "daily_enabled": true,
+      "sources": [
+        {
+          "name": "Wise careers",
+          "url": "https://wise.jobs/",
+          "health": "PARTIAL"
+        }
+      ]
+    },
+    {
+      "company": "Zopa",
+      "health": "FAILED",
+      "daily_enabled": true,
+      "sources": [
+        {
+          "name": "Zopa careers",
+          "url": "https://www.zopa.com/careers",
+          "health": "FAILED"
+        }
+      ]
+    }
+  ]
+}

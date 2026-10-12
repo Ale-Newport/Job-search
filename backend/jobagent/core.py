@@ -294,7 +294,7 @@ def invalidate_fact_evidence(db, conn, fact, seen=None):
         (now(), fact["id"]),
     )
     applications = conn.execute(
-        "SELECT DISTINCT a.id,a.status FROM applications a JOIN application_answers aa ON aa.application_id=a.id WHERE EXISTS(SELECT 1 FROM json_each(aa.fact_ids) WHERE value=?)",
+        "SELECT DISTINCT a.id,a.status FROM applications a JOIN application_answers aa ON aa.application_id=a.id WHERE NOT EXISTS(SELECT 1 FROM superseded_application_answers WHERE answer_id=aa.id) AND EXISTS(SELECT 1 FROM json_each(aa.fact_ids) WHERE value=?)",
         (fact["id"],),
     ).fetchall()
     for application in applications:
@@ -779,6 +779,8 @@ class SourcePayload(Payload):
         "linkedin",
         "indeed",
         "workday",
+        "oraclehcm",
+        "eightfold",
         "generic",
         "html",
         "rss",
@@ -809,7 +811,11 @@ def validate_source(values):
 
 @router.get("/sources")
 def sources_list(request: Request):
-    return list_result(get_db(request), "sources", limit=500)
+    from .discovery import source_health
+    db = get_db(request)
+    result = list_result(db, "sources", limit=500)
+    result['items'] = [source_health(db, source) for source in result['items']]
+    return result
 
 
 @router.post("/sources", status_code=201)
@@ -848,7 +854,8 @@ class RunPayload(Payload):
 @router.post("/sources/run")
 async def sources_run(payload: RunPayload, request: Request):
     if hasattr(request.app.state.automation, 'enqueue'):
-        return request.app.state.automation.enqueue('discovery', {'source_id': payload.source_id}, dedupe_key='discovery:manual')
+        key = 'discovery:source:' + payload.source_id if payload.source_id else 'discovery:manual'
+        return request.app.state.automation.enqueue('discovery', {'source_id': payload.source_id}, dedupe_key=key)
     try:
         return await run_sources(get_db(request), request.app.state.data_dir, payload.source_id)
     except ValueError as exc:
@@ -1100,8 +1107,14 @@ async def application_detail(application_id: str, request: Request):
     ):
         result[name] = [
             decode_row(row)
-            for row in db.query(f"SELECT * FROM {table} WHERE application_id=? ORDER BY created_at", (application_id,))
+            for row in db.query(f"SELECT * FROM {table} WHERE application_id=?" +
+                                (" AND NOT EXISTS(SELECT 1 FROM superseded_application_answers WHERE answer_id=application_answers.id)" if name == 'answers' else "") +
+                                " ORDER BY created_at", (application_id,))
         ]
+    result['answer_history'] = [decode_row(row) for row in db.query(
+        'SELECT a.*,s.superseded_at FROM application_answers a JOIN superseded_application_answers s ON s.answer_id=a.id WHERE a.application_id=? ORDER BY a.created_at',
+        (application_id,),
+    )]
     latest_answers = {
         a['question']: a for a in (result['runs'][-1].get('checkpoint', {}).get('answers', []) if result['runs'] else [])
     }
@@ -1212,6 +1225,8 @@ def save_answer(
                 (saved_id, key, answer, dumps(provenance), verified, stamp, stamp),
             )
         if application_id:
+            from .answer_history import supersede_answers
+            supersede_answers(conn,application_id,question)
             conn.execute(
                 "INSERT INTO application_answers VALUES(?,?,?,?,?,?,?)",
                 (identifier, application_id, question, answer, dumps(provenance), verified, stamp),
@@ -1426,8 +1441,12 @@ async def settings_patch(payload: dict, request: Request):
             raise HTTPException(422, "Confidence must be between 0.5 and 1")
         if key in {"min_match", "daily_min_match"} and (not isinstance(value, (int, float)) or not 0 <= value <= 100):
             raise HTTPException(422, "Minimum match must be between 0 and 100")
-        if key == "monthly_budget" and (not isinstance(value, (int, float)) or value < 0):
-            raise HTTPException(422, "Budget must be nonnegative")
+        if key == "monthly_budget":
+            from .usage import validate_budget
+            try:
+                validate_budget(value)
+            except ValueError as exc:
+                raise HTTPException(422, str(exc)) from exc
         if key == "allowed_domains" and any(
             not isinstance(domain, str) or not re.fullmatch(r"[a-zA-Z0-9.-]+", domain) or "." not in domain
             for domain in value

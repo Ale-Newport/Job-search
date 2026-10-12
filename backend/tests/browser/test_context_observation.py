@@ -199,3 +199,37 @@ async def test_unassociated_label_cannot_expose_a_hidden_control(context_browser
     snapshot = await context_browser.observe()
     assert not any(e.get("id") == "hidden" for e in snapshot["elements"])
     assert snapshot["unresolved_required"]
+
+
+async def test_unknown_checkbox_group_keeps_real_choices_and_one_review_question(context_browser):
+    await context_browser.page.set_content('''<form><fieldset><legend>Preferred internship dates</legend>
+      <input type="checkbox" name="dates" id="a" value="first" required><label for="a">Start 1 June, finish 20 August</label>
+      <input type="checkbox" name="dates" id="b" value="second" required><label for="b">Start 30 June, finish 17 September</label>
+      </fieldset><button type="submit">Submit application</button></form>''')
+    context_browser._active_application_id = 'dates'
+    result = await context_browser.fill_application({'id':'dates', 'url':'https://example.test/application'}, [], [],
+        settings={'assisted_autofill':True, 'skip_optional_unknown':True})
+    assert result['status'] == 'human_required', result
+    assert len(result['questions']) == 1
+    question = result['questions'][0]
+    assert question['multiple'] is True
+    assert [option['label'] for option in question['options']] == ['Start 1 June, finish 20 August', 'Start 30 June, finish 17 September']
+    assert question['current_value'] == []
+    assert not await context_browser.page.locator('input:checked').count()
+
+
+async def test_bootstrap_form_groups_retain_question_captions_and_sibling_sections(context_browser):
+    await context_browser.page.set_content('''<form><h3>Job preferences</h3>
+      <div class="form-group"><label for="wrong-id">Preferred start date</label><input id="start" name="PreferredStart" required></div>
+      <div class="form-group"><label for="">Do you need visa sponsorship?</label><div>
+        <input type="radio" name="visa" id="yes"><label for="yes">Yes</label>
+        <input type="radio" name="visa" id="no"><label for="no">No</label></div></div>
+      <h3>Education - Undergraduate</h3><div class="form-group"><label for="university">University</label><select id="university"><option>North University</option></select></div>
+      <div class="form-group"><label for="">Start and end dates</label><div><input name="UniversityStartYear" placeholder="YYYY"><input name="UniversityEndYear" placeholder="YYYY"></div></div>
+      <h3>Education - Postgraduate</h3><div class="form-group"><label for="masters">University</label><select id="masters"><option>South University</option></select></div></form>''')
+    fields = {e.get('id') or e.get('name'):e for e in (await context_browser.observe())['elements']}
+    assert fields['start']['label'] == 'Preferred start date'
+    assert fields['yes']['context'] == fields['no']['context'] == 'Do you need visa sponsorship?'
+    assert fields['university']['section_label'] == 'Education - Undergraduate'
+    assert fields['masters']['section_label'] == 'Education - Postgraduate'
+    assert fields['UniversityEndYear']['label'] == 'Start and end dates — University End Year'

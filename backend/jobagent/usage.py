@@ -6,22 +6,36 @@ import json
 import math
 from datetime import datetime, timezone
 
+MAX_MONTHLY_BUDGET = 20.0
+
+
+def validate_budget(value):
+    if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value) or not 0 <= value <= MAX_MONTHLY_BUDGET:
+        raise ValueError('Monthly AI budget must be a finite amount between $0 and $20')
+    return float(value)
+
 
 def price_config(db, provider):
     row = db.one("SELECT config FROM integrations WHERE provider=?", (provider,))
     prices = json.loads(row["config"]) if row else {}
     keys = ("input_cost_per_million", "output_cost_per_million")
-    if any(not isinstance(prices.get(k), (int, float)) or not math.isfinite(prices[k]) or prices[k] < 0 for k in keys):
+    if any(isinstance(prices.get(k), bool) or not isinstance(prices.get(k), (int, float)) or not math.isfinite(prices[k]) or prices[k] < 0 for k in keys):
         raise ValueError(f"Configure finite nonnegative token prices for {provider} to enforce the monthly budget")
     return prices
 
 
 class Reservation:
     def __init__(self, db, maximum_cost: float, budget: float, provider: str):
+        budget = validate_budget(budget)
+        if isinstance(maximum_cost, bool) or not isinstance(maximum_cost, (int, float)) or not math.isfinite(maximum_cost) or maximum_cost < 0:
+            raise ValueError('Invalid maximum AI request cost')
         self.db, self.maximum_cost, self.provider = db, maximum_cost, provider
         self.key = "ai_usage:" + datetime.now(timezone.utc).strftime("%Y-%m")
         self.settled = False
         with db.transaction() as connection:
+            configured = connection.execute("SELECT value FROM settings WHERE key='monthly_budget'").fetchone()
+            if configured:
+                budget = min(budget, validate_budget(json.loads(configured['value'])))
             usage = self._read(connection)
             if maximum_cost > 0 and usage["cost"] + maximum_cost > budget:
                 raise ValueError("Monthly AI budget would be exceeded")

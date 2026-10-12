@@ -119,6 +119,26 @@ def application_entry_target(snapshot: dict) -> dict | None:
     return None
 
 
+def lost_posting_target(url: str, snapshot: dict) -> bool:
+    """Do not treat a redirected board's search filters as an application."""
+    from ..discovery import ats_identity
+    expected_kind, expected_identity = ats_identity(url)
+    actual_kind, actual_identity = ats_identity(snapshot.get('url') or url)
+    if not expected_identity or snapshot.get('blocked') or actual_kind != expected_kind:
+        return False
+    if any(re.search(r"\b(?:job not found|position not found|job (?:is )?no longer available|no longer accepting applications|the page you are looking for doesn.t exist)\b",
+                     frame.get('text',''), re.I) for frame in snapshot.get('frames', [])):
+        return True
+    if actual_identity:
+        return actual_identity != expected_identity
+    fields = application_input_elements(snapshot)
+    applicant = any('UPLOAD' in field.get('operations', []) or
+                    re.search(r'\b(?:full|first|last|preferred) name\b|\be-?mail\b', field.get('label', ''), re.I)
+                    for field in fields)
+    return not applicant and not any(APPLICATION_ENTRY.fullmatch(e.get('label', '').strip())
+                                     for e in snapshot.get('elements', []))
+
+
 def confirmation_evidence(snapshot: dict) -> list[dict]:
     evidence = []
     for frame in snapshot.get("frames", []):
@@ -717,10 +737,12 @@ class BrowserSession:
     @bounded(15)
     async def close(self) -> None:
         async with self._lifecycle_lock:
-            if self.edits:
-                await self.edits.close()
-                self.edits = None
             context, driver = self.context, self._playwright
-            self.page = self.context = self._playwright = None
-            self._invalidate_approvals()
-            await self._release(context, driver)
+            try:
+                if self.edits:
+                    await self.edits.close()
+            finally:
+                self.edits = None
+                self.page = self.context = self._playwright = None
+                self._invalidate_approvals()
+                await self._release(context, driver)

@@ -219,11 +219,7 @@ export function Dashboard({ ctx }: { ctx: AppContext }) {
                     </div>
                     <Status
                       value={
-                        source.last_error
-                          ? "error"
-                          : source.last_checked
-                            ? "connected"
-                            : "not checked"
+                        source.health || "not checked"
                       }
                     />
                   </div>
@@ -467,6 +463,8 @@ const sourceFields: Field[] = [
       "lever",
       "ashby",
       "smartrecruiters",
+      "oraclehcm",
+      "eightfold",
       "workable",
       "teamtailor",
       "icims",
@@ -660,9 +658,9 @@ export function Discover({ ctx }: { ctx: AppContext }) {
               const r = await ctx.act(
                 "search",
                 () => api("/sources/run", "POST", {}),
-                "Discovery finished.",
+                "Checking your job sources. Results appear in source health.",
               );
-              if (r) setResult(r);
+              if (r && !r.task_id) setResult(r);
             }}
           >
             <Play size={16} />
@@ -791,15 +789,11 @@ export function Discover({ ctx }: { ctx: AppContext }) {
                           value={
                             !s.enabled
                               ? "paused"
-                              : s.config?.delivery === "email"
+                              : s.health || (s.config?.delivery === "email"
                                 ? s.last_checked
                                   ? "receiving alerts"
                                   : "awaiting alerts"
-                                : s.last_error
-                                  ? "error"
-                                  : s.last_checked
-                                    ? "connected"
-                                    : "not checked"
+                                : "not checked")
                           }
                         />
                       </td>
@@ -821,7 +815,7 @@ export function Discover({ ctx }: { ctx: AppContext }) {
                                   api("/sources/run", "POST", {
                                     source_id: s.id,
                                   }),
-                                "Source checked.",
+                                "Checking this source. Results appear in source health.",
                               )
                             }
                           >
@@ -1355,6 +1349,7 @@ const companyFields: Field[] = [
 ];
 export function Companies({ ctx }: { ctx: AppContext }) {
   const r = useResource("/companies", ctx.refresh),
+    coverage = useResource("/discovery/coverage", ctx.refresh),
     [q, setQ] = useState(""),
     [edit, setEdit] = useState<Data | null>(null),
     [del, setDel] = useState<Data | null>(null),
@@ -1372,6 +1367,7 @@ export function Companies({ ctx }: { ctx: AppContext }) {
       <div className="toolbar">
         <SearchInput value={q} onChange={setQ} placeholder="Find a company" />
         <Tag>{companies.length} companies</Tag>
+        {coverage.data && <Tag>{coverage.data.verified ?? 0} verified · {coverage.data.partial ?? 0} partial</Tag>}
       </div>
       <Resource {...r} retry={r.reload}>
         {companies.length ? (
@@ -1405,8 +1401,10 @@ export function Companies({ ctx }: { ctx: AppContext }) {
                   </p>
                   <div className="tags">
                     <Tag>Priority {c.priority ?? 50}</Tag>
+                    <Status value={items(coverage.data).find((row) => row.company_id === c.id)?.health || "not checked"} />
                     {c.auto_apply && <Tag tone="amber">Auto eligible</Tag>}
                   </div>
+                  {coverage.data && <small>{items(coverage.data).find((row) => row.company_id === c.id)?.daily_enabled ? "Included in daily discovery" : "Daily discovery source needs attention"}</small>}
                   <p className="company-notes">
                     {c.notes ||
                       "Add notes about what makes this company interesting to you."}

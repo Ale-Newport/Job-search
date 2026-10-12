@@ -137,6 +137,27 @@ async def test_native_provider_contracts_exact_question_and_independent_review(d
     assert db.one("SELECT value FROM settings WHERE key LIKE 'ai_usage:%'")
 
 
+async def test_weak_caption_carries_help_to_generation_and_review_without_entered_values(db,evidence):
+    calls=[]
+    def handler(request):
+        payload=request_payload(request)
+        calls.append(payload)
+        if 'generated_answer' in payload:
+            generated={'question_id':payload['question_id'],'passed':True,'scores':{name:.95 for name in SCORE_NAMES},
+                       'unsupported_claims':[],'issues':[],'reason':'Uses the actual field explanation.'}
+        else:
+            generated=complete(payload,fid=evidence)
+        return response_for(request,generated)
+    field={'label':'Other','placeholder':'Describe a coding project','section_label':'Technical experience',
+           'value':'do-not-send-entered-value','private_metadata':'do-not-send-opaque-metadata'}
+    result=await ApplicationAnswerLLM(db,Keys(),transport=httpx.MockTransport(handler)).generate(settings(),'Other',{},field=field,question_id='weak-caption')
+    assert result['state']=='ANSWER_VALIDATED' and len(calls)==2
+    for payload in calls:
+        assert payload['exact_question']=='Other'
+        assert payload['field_context']['placeholder']=='Describe a coding project'
+        assert 'do-not-send' not in json.dumps(payload)
+
+
 async def test_prior_form_history_is_private_in_generation_regeneration_and_review(db, evidence):
     safe = {'question_id': 'professional', 'intent': 'ROLE_PREFERENCE', 'state': 'ANSWER_VALIDATED',
             'quality': {'passed': True}, 'answer': 'I prefer reusable platform engineering.',
@@ -928,6 +949,30 @@ def test_cross_answer_review_detects_reused_prose_and_openings():
     review = ApplicationConsistencyReviewer().review(answers)
     assert not review['passed']
     assert review['issues'][0]['code'] == 'REPEATED_LLM_ANSWER'
+
+
+async def test_repeated_neighboring_experience_answer_regenerates_with_distinct_grounded_subject(db,evidence):
+    employment = entity(db,'experience','Teaching')
+    old = 'I taught mathematics and physics at a school.'
+    old_id = ingest_fact(db,employment,'story',old,source='user',evidence={'excerpt':old},verified=True)
+    calls = []
+    def handler(request):
+        payload = request_payload(request)
+        if 'generated_answer' in payload:
+            generated = {'question_id':payload['question_id'],'passed':True,'scores':{name:.95 for name in SCORE_NAMES},
+                         'unsupported_claims':[],'issues':[],'reason':'Distinct supported coding evidence.'}
+        else:
+            calls.append(payload)
+            generated = complete(payload,fid=old_id,answer=old) if len(calls)==1 else complete(payload,fid=evidence)
+        return response_for(request,generated)
+    prior = {'question_id':'employment','exact_question':'Employment Experience','intent':'WORK_EXPERIENCE',
+             'state':'ANSWER_VALIDATED','quality':{'passed':True},'answer':old,'facts_used':[old_id]}
+    llm = ApplicationAnswerLLM(db,Keys(),transport=httpx.MockTransport(handler))
+    answer = await llm.generate(settings() | {'text_full_professional_context':True},'What coding experience do you have?',{},
+                                question_id='coding',previous_answers=[prior])
+    assert len(calls)==2 and 'repetition_revision' in calls[1]
+    assert answer['state']=='ANSWER_VALIDATED' and answer['facts_used']==[evidence]
+    assert answer['answer'] != old
 
 
 async def test_real_configured_provider_opt_in(tmp_path):

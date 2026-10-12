@@ -7,6 +7,19 @@ from jobagent.db import Database
 from jobagent.mail import classify_message, ingest_message, link_candidate, parse_message
 
 
+@pytest.mark.asyncio
+async def test_missing_oauth_tokens_produce_an_actionable_redacted_sync_error(tmp_path):
+    from jobagent.mail import MailService
+    class EmptyKeychain:
+        def get(self, name):return None
+    db = Database(tmp_path/'mail.sqlite3')
+    db.execute("INSERT INTO integrations(id,provider,status) VALUES('gmail','gmail','connected')")
+    report = await MailService(db,EmptyKeychain()).sync()
+    assert report['imported'] == 0
+    assert 'No email authorization tokens are stored in Keychain' in report['errors'][0]['error']
+    assert 'authorize this account again' in db.one("SELECT last_error FROM integrations WHERE provider='gmail'")['last_error']
+
+
 @pytest.mark.parametrize(
     "subject,body,category,status",
     [

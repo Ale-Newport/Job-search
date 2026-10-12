@@ -599,6 +599,7 @@ function AnswerLLMForm({
                         aria-label="Monthly AI usage limit (USD)"
                         type="number"
                         min={0}
+                        max={20}
                         step={0.01}
                         value={values.monthly_budget}
                         required
@@ -608,7 +609,8 @@ function AnswerLLMForm({
                       />
                       <small>
                         A positive cap is required for cloud calls. Connection
-                        tests count toward this shared cap; zero disables them.
+                        tests and all AI providers count toward this shared cap.
+                        The maximum is $20/month; zero disables paid calls.
                       </small>
                     </label>
                     {(["input", "output"] as const).map((direction) => (

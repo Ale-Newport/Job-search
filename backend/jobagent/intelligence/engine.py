@@ -42,6 +42,37 @@ NARRATIVE_INTENTS = {
 }
 
 
+def confirmed_visa_route_options(route, options):
+    """Match route enums without adding conditions to confirmed work rights.
+
+    Slash/or alternatives are disjunctions: a confirmed Student route supports
+    Student/Graduate, but not Student and Graduate. Extra eligibility assertions
+    must be resolved separately and therefore do not match this grammar.
+    """
+    route_name = normalize(re.sub(r"\s+visa$", "", str(route or ""), flags=re.I))
+    if not route_name:
+        return []
+    supported = []
+    for option in options:
+        label = str(option.get("label") or "").strip()
+        match = re.fullmatch(
+            r"(.+?)\s+visa(?:\s*(?:\(\s*(?:with\s+)?(?:work rights|right to work|work authori[sz]ation)\s*\)"
+            r"|with\s+(?:work rights|right to work|work authori[sz]ation)))?",
+            label, re.I,
+        )
+        if not match:
+            continue
+        alternatives = [normalize(part) for part in re.split(r"\s*/\s*|\s+or\s+", match[1], flags=re.I)]
+        if route_name in alternatives:
+            supported.append((len(alternatives), label))
+    # Prefer the exact route over a broader union, but never arbitrarily choose
+    # between equally specific options.
+    if not supported:
+        return []
+    specificity = min(count for count, _ in supported)
+    return [label for count, label in supported if count == specificity]
+
+
 def country_name(value):
     value = normalize(value or "")
     aliases = {
@@ -676,6 +707,7 @@ class CandidateEngine:
             if record is None and intent == "VISA" and len(records) == 1 and country is None:
                 record = records[0]
             if record:
+                read(record, "country")  # Preserve the jurisdiction evidence in the answer audit.
                 if intent == "VISA":
                     answer = read(record, "route")
                     if re.search(r"expir|valid until", text):
@@ -754,13 +786,14 @@ class CandidateEngine:
                             confidence = "POLICY"
                     facets_values.append(facet_value if isinstance(facet_value, bool) else None)
                 answer = False if False in facets_values else True if all(v is True for v in facets_values) else None
-                if answer is True and facets == ['current'] and record and country == 'United Kingdom':
+                if answer is True and facets == ['current'] and record:
                     # This classifies an already confirmed present permission.
                     # Student-route evidence alone cannot establish any work
                     # permission, expiry, hours, future or full-time eligibility.
                     route = read(record, 'route')
+                    route_options = confirmed_visa_route_options(route, field.get('options', []))
                     temporary_options = []
-                    if normalize(route or '') == 'student':
+                    if not route_options and country == 'United Kingdom' and normalize(route or '') == 'student':
                         for option in field.get('options', []):
                             label = option.get('label', '')
                             option_text = normalize(label)
@@ -770,7 +803,14 @@ class CandidateEngine:
                                     and not re.search(r'\d|permanent|unrestricted|full time|future|without|until|through|during|need|require', option_text)
                                     and not set(option_semantic.get('authorization_requirements') or ['current']) - {'current'}):
                                 temporary_options.append(label)
-                    if len(temporary_options) == 1:
+                    if len(route_options) == 1:
+                        answer = route_options[0]
+                        confidence = 'DERIVED_HIGH'
+                        rules.append('confirmed_visa_route_and_current_work_permission')
+                        explanations.append('The selected option contains the confirmed visa route and only '
+                                            'the independently confirmed current work permission. It does not '
+                                            'establish any additional route, expiry, hours or future eligibility.')
+                    elif len(temporary_options) == 1:
                         answer = temporary_options[0]
                         confidence = 'DERIVED_HIGH'
                         rules.append('uk_student_time_limited_route_with_confirmed_current_work_permission')

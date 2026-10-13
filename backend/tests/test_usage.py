@@ -54,3 +54,41 @@ def test_request_rechecks_live_budget_inside_atomic_reservation(tmp_path):
     db.execute("INSERT INTO settings VALUES('monthly_budget','0')")
     with pytest.raises(ValueError, match='exceeded'):
         Reservation(db, .001, 20, 'openai-compatible')
+
+
+def test_unlimited_requires_live_authorization_and_still_records_usage(tmp_path):
+    db = Database(tmp_path / 'unlimited.db')
+    db.execute("INSERT INTO settings VALUES('monthly_budget','0')")
+    with pytest.raises(ValueError, match='exceeded'):
+        Reservation(db, 30, 20, 'text', unlimited=True)
+    db.execute("INSERT INTO settings VALUES('ai_budget_unlimited','true')")
+    paid = Reservation(db, 30, 20, 'text', unlimited=True)
+    paid.settle(25, 100, 50)
+    usage = json.loads(db.one('SELECT value FROM settings WHERE key=?', (paid.key,))['value'])
+    assert usage['cost'] == 25 and usage['calls'] == 1
+    assert usage['input_tokens'] == 100
+    with pytest.raises(ValueError, match='exceeded'):
+        Reservation(db, .01, 20, 'other')
+    db.execute("UPDATE settings SET value='false' WHERE key='ai_budget_unlimited'")
+    with pytest.raises(ValueError, match='exceeded'):
+        Reservation(db, .01, 20, 'text', unlimited=True)
+
+
+def test_timed_validation_restores_controls_on_failure_and_expires_on_crash(tmp_path):
+    from jobagent.calibration.budget import uncapped_validation
+    db = Database(tmp_path / 'lease.db')
+    db.execute("INSERT INTO settings VALUES('monthly_budget','20')")
+    with pytest.raises(RuntimeError):
+        with uncapped_validation(db.path):
+            paid = Reservation(db, 25, 20, 'test', unlimited=True)
+            paid.settle(21)
+            with pytest.raises(ValueError, match='Another timed validation'):
+                with uncapped_validation(db.path):
+                    pass
+            raise RuntimeError('Simulated provider failure')
+    assert db.one("SELECT value FROM settings WHERE key='monthly_budget'")['value'] == '20'
+    assert db.one("SELECT value FROM settings WHERE key='ai_budget_unlimited'") is None
+    db.execute("INSERT INTO settings VALUES('ai_budget_unlimited','true')")
+    db.execute('INSERT INTO settings VALUES(?,?)', ('ai_budget_unlimited_until', json.dumps('2000-01-01T00:00:00+00:00')))
+    with pytest.raises(ValueError, match='exceeded'):
+        Reservation(db, .01, 20, 'test', unlimited=True)

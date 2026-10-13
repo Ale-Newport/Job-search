@@ -667,9 +667,9 @@ export function ApplicationDetail({
     ctx.busy === "approve" ||
     ctx.busy === "approve-section" ||
     ctx.busy === "resume" ||
-    ["running", "submitting"].includes(runStatus);
+    ["queued", "running", "submitting"].includes(runStatus);
   const watching = !closed && [
-    "running", "submitting", "browser_question", "section_review", "needs_review", "ready_for_review", "human_required",
+    "queued", "running", "submitting", "browser_question", "section_review", "needs_review", "ready_for_review", "human_required",
   ].includes(runStatus);
   useEffect(() => {
     if ((!active && !watching) || r.loading) return;

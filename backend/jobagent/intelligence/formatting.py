@@ -195,18 +195,21 @@ validate_format = AnswerFormatResolver.validate
 
 
 def choice(value, options, *, question="", disclosure_concept=None):
-    result = option_for(str(value), options, question=question)
+    from ..automation.disclosures import disclosure_profile_key
+
+    concept = disclosure_concept or disclosure_profile_key(question)
+    # A hidden machine code cannot establish an option's meaning.
+    # Match the displayed label; preserve the original DOM value for execution.
+    labelled = [{**o, 'value': o.get('label', ''), '_original': o} for o in options]
+    result = option_for(str(value), labelled, question=question)
     if result:
-        return result
+        return result.get('_original', result)
     norm = normalize(value)
     labels = [
         o
         for o in options
         if not o.get("disabled") and (o.get("role") == "option" or o.get("value", o.get("label")) not in ("", None))
     ]
-    from ..automation.disclosures import disclosure_profile_key
-
-    concept = disclosure_concept or disclosure_profile_key(question)
     aliases = {
         "pronouns": [
             {"he", "he him", "he him his"},
@@ -216,6 +219,11 @@ def choice(value, options, *, question="", disclosure_concept=None):
         "gender": [{"man", "male", "hombre"}, {"woman", "female", "mujer"}, {"non binary", "nonbinary"}],
         "sex": [{"male", "masculino"}, {"female", "femenino"}],
         "sexual_orientation": [{"heterosexual", "straight", "heterosexual straight", "straight heterosexual"}],
+        "disability": [
+            {'yes', 'disabled', 'i am disabled', 'i have a disability', 'yes i have a disability'},
+            {'no', 'not disabled', 'i am not disabled', 'i do not have a disability',
+             'no i do not have a disability', 'i don t have a disability', 'no i don t have a disability'},
+        ],
         "ethnicity": [
             {
                 "white other",
@@ -223,7 +231,10 @@ def choice(value, options, *, question="", disclosure_concept=None):
                 "white any other white background",
                 "white any other white ethnic background",
                 "any other white background",
+                "any other white ethnic background",
                 "other white background",
+                "white any other",
+                "any other white",
             }
         ],
     }
@@ -237,18 +248,27 @@ def choice(value, options, *, question="", disclosure_concept=None):
     if concept == "religion" and norm in {"atheist", "atheism", "ateo"}:
         for group in (
             {"atheist", "atheism", "ateo"},
-            {"no religion", "no religion or belief", "no religion or atheist", "no religious beliefs", "none"},
+            {"no religion", "no religion or belief", "no religion or atheist", "no religious beliefs",
+             "no religious affiliation", "no affiliation", "none"},
         ):
             matches = [o for o in labels if normalize(o["label"]) in group]
             if len(matches) == 1:
                 return matches[0]
+    if concept == 'religion' and norm in {'no religion', 'no religion or belief', 'no religious affiliation', 'no affiliation'}:
+        matches = [o for o in labels if normalize(o['label']) in
+                   {'no religion', 'no religion or belief', 'no religious affiliation', 'no affiliation', 'none'}]
+        if len(matches) == 1:
+            return matches[0]
     # Phone country menus decorate country names with international dial codes.
     if concept == 'ethnicity':
         # A confirmed subgroup can map to its broader displayed category. The
         # reverse direction would invent a subgroup and remains unsupported.
         for broad in ('white','black','asian','mixed'):
             if norm.startswith(broad+' '):
-                matches = [option for option in labels if normalize(option['label']) == broad]
+                broad_labels = {broad}
+                if broad == 'white':
+                    broad_labels.update({'white caucasian', 'white caucasian european or middle eastern'})
+                matches = [option for option in labels if normalize(option['label']) in broad_labels]
                 if len(matches) == 1:
                     return matches[0]
     if re.search(r'\b(?:what|which)\b.*\bnationality\b', normalize(question)) and norm not in {'unknown','none','prefer not to say','unspecified','undisclosed','undeclared','undetermined','na'}:

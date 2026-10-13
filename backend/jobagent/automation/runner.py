@@ -17,6 +17,7 @@ from .disclosures import disclosure_resolution, disclosure_clear_operation, disc
 from .browser import BrowserSession, confirmation_evidence
 from .browser import PROGRESS, is_submit, application_entry_target, application_input_elements, lost_posting_target
 from .engines import make_engine
+from .option_selection import OptionSelector
 from .job_context import enrich_job_context
 from .consent import action_key, dropdown_open_target, radio_group, resolution_element, section_plan, selected_resolution_matches
 from .types import AutomationError, Decision, HumanRequired, Operation, Paused, StaleState, UserEdit
@@ -176,7 +177,9 @@ class BrowserManager(BrowserSession):
         if answer_llm is not None and hasattr(answer_llm, 'on_progress'):
             answer_llm.on_progress = answer_progress
 
-        async def resolve(element):
+        option_selector = OptionSelector(settings, settings.get('_local_option_engine'))
+
+        async def resolve_raw(element):
             element = resolution_element(element, snapshot['elements'])
             field = adapter.question(element)
             question_id = question_identity(application.get('id'), element, field)
@@ -184,6 +187,27 @@ class BrowserManager(BrowserSession):
             # result but every distinct question has its own immutable identity.
             element = {**element, 'question_id': question_id,
                        '_related_answers': [dict(a) for a in answers if a.get('question_id') != question_id]}
+            intelligence = settings.get('_candidate_engine')
+            if intelligence and re.search(r'\bphone country code\b|\btelephone country code\b', normalize(field)):
+                phone = intelligence.answer_question('Phone', {'type': 'tel'}, application)
+                country = intelligence.answer_question('Country of residence', {'type': 'text'}, application)
+                digits = re.sub(r'\D', '', str(phone.get('answer') or ''))
+                options = []
+                if str(phone.get('answer') or '').startswith('+'):
+                    for option in element.get('options', []):
+                        code = re.search(r'\(\+(\d{1,4})\)', option.get('label', ''))
+                        if code and digits.startswith(code[1]):
+                            options.append(option)
+                selected = options[0] if len(options) == 1 else None
+                if not selected and country.get('answer'):
+                    undecorated = [{**o, 'label': re.sub(r'\s*\(\+\d+\)', '', o['label']), 'original': o} for o in options]
+                    match = option_for(str(country['answer']), undecorated, question='Country of residence')
+                    selected = match.get('original') if match else None
+                if selected:
+                    return {**phone, 'answer': selected['label'], 'form_value': selected['label'],
+                            'question': field, 'question_id': question_id,
+                            'fact_ids': list(dict.fromkeys(phone.get('fact_ids', []) + country.get('fact_ids', []))),
+                            'inference_rules': ['verified_phone_prefix_and_observed_country_option']}
             corrections = [f for f in facts if f.get('manual_correction')]
             if corrections:
                 corrected = profile_resolution(field, corrections, element=element, policies={})
@@ -192,11 +216,24 @@ class BrowserManager(BrowserSession):
             disclosure = disclosure_resolution(field, element, policies)
             if disclosure:
                 return disclosure
-            if re.search(r'\babove (?:university|institution|school)\b', field, re.I):
+            if (re.search(r'\babove (?:university|institution|school)\b', field, re.I)
+                    or (re.search(r'\b(?:grade|gpa|average|classification|discipline)\b', field, re.I)
+                        and not re.search(r'\b(?:highest|bachelor|undergraduate|master|postgraduate|school|secondary)\b', field, re.I))):
                 preceding = [e for e in snapshot['elements'] if e['index'] < element['index'] and e.get('form_id') == element.get('form_id') and e.get('document_id') == element.get('document_id') and re.search(r'university|institution|school', adapter.question(e), re.I)]
+                preceding = [e for e in preceding if e.get('section_label') == element.get('section_label') and
+                             any(op in e.get('operations', []) for op in ('TYPE_TEXT','SELECT')) and
+                             (e.get('selected_text') or e.get('value'))]
+                from ..intelligence.semantics import interpret
+                preceding = [e for e in preceding if interpret(adapter.question(e), e).get('intent') == 'EDUCATION']
                 if preceding:
                     parent = preceding[-1]
-                    element['_education_reference'] = parent.get('selected_text') or parent.get('value')
+                    explicit_reference = re.search(r'\babove (?:university|institution|school)\b', field, re.I)
+                    completed_context = any(parent['index'] < peer['index'] < element['index'] and
+                        peer.get('form_id') == element.get('form_id') and peer.get('document_id') == element.get('document_id') and
+                        re.search(r'\bhighest completed (?:degree|qualification)\b', adapter.question(peer), re.I) and
+                        (peer.get('value') or peer.get('selected_text')) for peer in snapshot['elements'])
+                    if explicit_reference or not completed_context:
+                        element['_education_reference'] = parent.get('selected_text') or parent.get('value')
             intelligence = settings.get('_candidate_engine')
             if intelligence:
                 job = settings.get('_job_context', application)
@@ -236,6 +273,57 @@ class BrowserManager(BrowserSession):
                     reasoning_cache[key] = await callback(field, element)
                 result = reasoning_cache[key] or result
             return self._location_resolution(result, facts, element)
+
+        async def resolve(element):
+            result = await resolve_raw(element)
+            field = resolution_element(element, snapshot['elements'])
+            if not result.get('question_id'):
+                # Legacy/profile-only resolution still needs the same scoped
+                # identity and observed acceptance contract as intelligence.
+                result = {**result, 'question_id': question_identity(application.get('id'), field, adapter.question(field)),
+                          'status': 'ANSWER_VALIDATED' if result.get('answer') is not None or result.get('leave_blank')
+                          else 'ANSWER_FAILED'}
+                previous = self._answer_diagnostics.get(result['question_id'], {})
+                if previous.get('status') == 'ANSWER_ACCEPTED_BY_FORM' and previous.get('answer') == result.get('answer'):
+                    result['status'] = previous['status']
+                self._answer_diagnostics[result['question_id']] = dict(result)
+            options = field.get('options') or []
+            if not options or result.get('leave_blank'):
+                return result
+            intelligence = settings.get('_candidate_engine')
+            bare = {**field, 'options': []}
+            if field.get('role') in {'radio', 'checkbox'} or field.get('multiple'):
+                # Retrieve the confirmed concept before imposing this widget's
+                # Boolean/list contract. Pronouns in a checkbox group are an
+                # identity value, not a Yes/No answer to each option label.
+                bare.update(type='text', role='textbox', tag='input', multiple=False)
+            raw = intelligence.answer_question(adapter.question(field), bare, settings.get('_job_context', application)) if intelligence else (
+                profile_resolution(adapter.question(field), facts, element=bare, policies=policies))
+            if intelligence:
+                raw = intelligence.confirmed_fallback(adapter.question(field), raw, facts, policies)
+            raw = self._location_resolution(raw, facts, field)
+            if raw.get('answer') is None or raw.get('leave_blank') or not raw.get('verified'):
+                return result
+            raw.update(question_id=result.get('question_id'))
+            # Closed custom widgets can expose only their current selection.
+            # Keep the supported raw answer so the menu can open and search for
+            # the correct choice instead of treating a stale selection as truth.
+            if field.get('role') == 'combobox' and field.get('tag') != 'select' and not field.get('expanded'):
+                return result if result.get('answer') is not None else raw
+            values = (raw.get('form_value') if isinstance(raw.get('form_value'), list) else
+                      [raw['answer']] if raw.get('disclosure_concept') else
+                      result.get('form_value') if field.get('multiple') and isinstance(result.get('form_value'), list) else [raw['answer']])
+            decisions = [await option_selector.select(raw, options, item) for item in values]
+            if not decisions or any(decision is None for decision in decisions):
+                return result
+            labels = list(dict.fromkeys(decision['option']['label'] for decision in decisions))
+            mapped = {**raw, 'answer': ', '.join(labels) if field.get('multiple') else labels[0],
+                      'form_value': labels if field.get('multiple') else labels[0],
+                      'option_selection': [{k: v for k, v in decision.items() if k != 'option'} for decision in decisions],
+                      'confirmed_answer': raw['answer'], 'status': 'ANSWER_VALIDATED'}
+            if mapped.get('question_id'):
+                self._answer_diagnostics[mapped['question_id']] = dict(mapped)
+            return mapped
 
         self.allowed_uploads = {Path(d["path"]).resolve() for d in documents if d.get("path") and Path(d["path"]).is_file()}
         try:
@@ -373,6 +461,10 @@ class BrowserManager(BrowserSession):
                             break
                         await asyncio.sleep(.2)
                         snapshot = await self.observe()
+                    decision = await option_selector.select(resolution, options)
+                    if decision:
+                        choices = [decision['option']]
+                        resolution['option_selection'] = {k: v for k, v in decision.items() if k != 'option'}
                     if len(choices) != 1:
                         failed_dropdowns[(pending_dropdown['frame_url'], pending_dropdown['manual_key'] or
                                           (pending_dropdown['document_id'], pending_dropdown['node_id']))] = {
@@ -405,6 +497,7 @@ class BrowserManager(BrowserSession):
                         pending_dropdown = None
                         continue
                     resolution['selection_verified'] = True
+                    resolution['selected_option_label'] = choices[0]['label']
                     diagnostic = self._answer_diagnostics.get(resolution.get('question_id'))
                     if diagnostic:
                         diagnostic['selection_verified'] = True
@@ -504,7 +597,19 @@ class BrowserManager(BrowserSession):
                             if element.get("required") or not skip_optional or element.get('selected_text') or element.get('value'):
                                 questions.append({"question": adapter.question(element), "kind": resolution["kind"], "required": element.get("required", False), "target": element["index"]})
                             continue
-                        if not element.get("expanded") and selected_resolution_matches(resolution, element.get("selected_text") or element.get("value", "")):
+                        previous = next((a for a in answers if a.get('question_id') == resolution.get('question_id')
+                                         and a.get('selection_verified')), None)
+                        selected = element.get('selected_text') or element.get('value', '')
+                        previous_commit = bool(previous and normalize(selected) == normalize(previous.get('selected_option_label', '')))
+                        if (not element.get("expanded") and (element.get('selected_text') or previous_commit)
+                                and selected_resolution_matches(resolution, selected)):
+                            if previous_commit:
+                                resolution.update(selection_verified=True, option_selection=previous.get('option_selection'),
+                                                  selected_option_label=previous['selected_option_label'])
+                                diagnostic = self._answer_diagnostics.get(resolution.get('question_id'))
+                                if diagnostic is not None:
+                                    diagnostic.update(selection_verified=True, option_selection=previous.get('option_selection'),
+                                                      selected_option_label=previous['selected_option_label'])
                             self._add_answer(answers, dict(resolution))
                             continue
                         pending_dropdown = {"resolution": resolution, "node_id": element["node_id"],
@@ -536,6 +641,15 @@ class BrowserManager(BrowserSession):
                             continue
                         document = candidates[0]
                         filename = Path((document.get("filename") or document["path"]).replace("\\", "/")).name
+                        from .uploads import validate_upload
+                        from .types import InvalidDecision
+                        try:
+                            validate_upload(document['path'], filename, document.get('mime_type'), element.get('accept') or '')
+                        except InvalidDecision as exc:
+                            questions.append({'question': field, 'kind': 'document_format', 'target': element['index'],
+                                              'reason': str(exc), 'accepted_formats': element.get('accept') or '',
+                                              'document_version_id': document.get('id')})
+                            continue
                         if filename in element.get("value", ""):
                             handled.add(signature)
                             continue
@@ -575,10 +689,15 @@ class BrowserManager(BrowserSession):
                     answer = resolution["answer"]
                     operation = None
                     if "TYPE_TEXT" in operations:
+                        from .answers import phone_matches
                         phone_equivalent = bool(re.search(r'\bphone|\bmobile|\btelephone', field, re.I)
-                                                and selected_resolution_matches(resolution, element['value']))
+                                                and phone_matches(answer, element))
                         if element["value"] != answer and not phone_equivalent:
                             operation, value = Operation.TYPE_TEXT, answer
+                            code = str(element.get('phone_country_code') or '')
+                            digits = re.sub(r'\D', '', str(answer))
+                            if element.get('phone_national_only') and str(answer).startswith('+') and code and digits.startswith(code):
+                                value = digits[len(code):]
                     elif "SELECT" in operations:
                         selected = resolution.get('form_value')
                         values = selected if element.get('multiple') and isinstance(selected, list) else [answer]
@@ -882,7 +1001,9 @@ class BrowserManager(BrowserSession):
         return result
 
     async def _decide_safe_progress(self, snapshot: dict, settings: dict) -> dict | None:
-        # L3 resolves ambiguous safe navigation only. It never chooses field values,
+        # General L3 resolves ambiguous safe navigation only. OptionSelector
+        # separately constrains local field decisions to supported real options.
+        # This navigation decision never chooses field values,
         # submits, accepts terms, leaves the application or clicks unknown controls.
         candidates = [e for e in snapshot["elements"] if e.get("role") == "button" and
                       "CLICK" in e["operations"] and PROGRESS.match(e["label"].strip()) and not is_submit(e)]
@@ -922,6 +1043,9 @@ class BrowserManager(BrowserSession):
                         [{'label': element.get('label', ''), 'value': element.get('value', '')}],
                         question=resolution.get('question', '')))) if element.get('role') == 'radio' else (
                 bool(element.get('checked')) == (normalize(str(resolution.get('answer'))) in {'yes','true','1'}))
+        elif element.get('type') == 'tel':
+            from .answers import phone_matches
+            accepted = phone_matches(resolution.get('answer'), element)
         else:
             accepted = selected_resolution_matches(resolution, element.get('selected_text') or element.get('value', ''))
             if element.get('role') == 'combobox' and element.get('tag') != 'select':
@@ -945,7 +1069,8 @@ class BrowserManager(BrowserSession):
         for diagnostic in self._answer_diagnostics.values():
             if diagnostic.get('answer') is None and not diagnostic.get('leave_blank'):
                 continue
-            fields = [e for e in snapshot.get('elements', []) if adapter.question(e) == diagnostic['question']]
+            fields = [e for e in snapshot.get('elements', []) if adapter.question(e) == diagnostic['question'] and
+                      question_identity(self._active_application_id, e, diagnostic['question']) == diagnostic.get('question_id')]
             if not fields:
                 continue  # Earlier wizard pages retain their observed acceptance.
             if any(e.get('multiple') for e in fields):

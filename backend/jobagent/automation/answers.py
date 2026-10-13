@@ -12,8 +12,10 @@ from .disclosures import disclosure_resolution
 
 def question_identity(application_id, element, question):
     """Keep identically named questions in separate forms/education sections apart."""
+    grouped = element.get('role') == 'radio' or (element.get('role') == 'checkbox' and element.get('multiple'))
+    control = (element.get('field_path') or element.get('group')) if grouped else None
     identity = [application_id, element.get('document_id'), element.get('form_id'),
-                element.get('section_label'), element.get('name') or element.get('field_path') or
+                element.get('section_label'), control or element.get('name') or element.get('field_path') or
                 element.get('group') or element.get('node_id'), question]
     return hashlib.sha256(json.dumps(identity, ensure_ascii=False).encode()).hexdigest()
 
@@ -180,6 +182,20 @@ def resolve_answer(question: str, facts: list[dict], *, hints: list[str] | None 
     return result
 
 
+def phone_matches(expected, element):
+    wanted = re.sub(r'\D', '', str(expected or ''))
+    actual = re.sub(r'\D', '', str(element.get('value') or ''))
+    if not 7 <= len(wanted) <= 15 or not actual:
+        return False
+    code = str(element.get('phone_country_code') or '')
+    if wanted == actual:
+        return not code or not str(expected).startswith('+') or wanted.startswith(code)
+    # A national number is equivalent only with an observed selected dial code
+    # belonging to this specific telephone widget. A suffix alone is insufficient.
+    return bool(str(expected).startswith('+') and re.fullmatch(r'\d{1,4}', code)
+                and (wanted == code + actual or (actual.startswith('0') and wanted == code + actual[1:])))
+
+
 def option_for(answer: str, options: list[dict], *, question: str = "") -> dict | None:
     norm = normalize(answer)
     # An enum's machine value does not establish the meaning of its label.
@@ -227,6 +243,10 @@ def option_for(answer: str, options: list[dict], *, question: str = "") -> dict 
         if city and country:
             matching = [o for o in options if not o.get('disabled') and
                         re.match(r'^' + re.escape(city) + r'(?:\b|$)', normalize(o.get('label', '')))]
+            # A geocoder may offer the enclosing metropolitan region rather
+            # than repeat the city. Country evidence remains mandatory.
+            matching += [o for o in options if not o.get('disabled') and o not in matching and
+                         re.match(r'^greater ' + re.escape(city) + r'(?:\b|$)', normalize(o.get('label', '')))]
             uk = [o for o in matching if re.search(r'\b(?:united kingdom|uk|great britain|england|scotland|wales)\b',
                                                   normalize(o.get('label', '')))]
             if uk:

@@ -1,5 +1,7 @@
 # Universal application and discovery reliability — 12 October 2026
 
+Historical report. The newer [13 October validation](UNIVERSAL_COVERAGE_20261013.md) records the current option-selection, Chrome-entry, source-storage and budget-test changes and their remaining limitations.
+
 This is the current verification report. The signed update is installed in `/Applications/Meridian.app` using the existing stable Apple Development identity. It is not notarized. No test application was submitted. This report does **not** claim universal coverage or that every configured source is working.
 
 ## Installed changes

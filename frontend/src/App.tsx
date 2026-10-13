@@ -38,6 +38,7 @@ import {
   Profile,
 } from "./pages";
 import { Networking } from "./networking";
+import { BrowserApply } from "./browser-apply";
 import { Daily, Tracker } from "./tracking";
 import { Automation, Settings } from "./settings";
 import { Detail } from "./details";
@@ -76,6 +77,7 @@ export default function App() {
       null,
     ),
     [search, setSearch] = useState(false),
+    [browserApply, setBrowserApply] = useState(false),
     [theme, setThemeState] = useState(
       () => localStorage.getItem("meridian-theme") || "system",
     ),
@@ -287,6 +289,7 @@ export default function App() {
             <strong>{navigation.find((n) => n.id === page)?.label}</strong>
           </div>
           <div className="topbar-actions">
+            <Button secondary onClick={() => setBrowserApply(true)}>Auto Apply from Chrome</Button>
             <button className="global-search" onClick={() => setSearch(true)}>
               <Search size={16} />
               <span>Search anything</span>
@@ -319,6 +322,7 @@ export default function App() {
             </IconButton>
           </div>
         </header>
+        {browserApply && <BrowserApply ctx={ctx} onClose={() => setBrowserApply(false)} />}
         <div className="page-content" key={`${page}:${target || ""}`}>
           {health.error && (
             <div className="offline-banner">

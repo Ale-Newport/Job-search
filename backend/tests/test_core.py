@@ -106,6 +106,49 @@ def test_same_title_different_posting_not_merged_without_description(db):
     assert one["id"] != two["id"]
 
 
+def test_duplicate_metadata_refresh_preserves_fts_without_reindexing_unchanged_description(db):
+    first = job(db)
+    db.execute('CREATE TABLE description_writes(n INTEGER)')
+    db.execute('CREATE TRIGGER audit_description AFTER UPDATE OF description ON jobs BEGIN INSERT INTO description_writes VALUES(1); END')
+    updated = job(db, salary_min=50000, salary_max=60000, currency='GBP')
+    assert updated['id'] == first['id'] and updated['salary_min'] == 50000
+    assert db.one('SELECT COUNT(*) n FROM description_writes')['n'] == 0
+    job(db, description='Build Python services with SQL and AWS plus robotics platforms')
+    assert db.one('SELECT COUNT(*) n FROM description_writes')['n'] == 1
+    assert db.one("SELECT count(*) n FROM jobs_fts WHERE jobs_fts MATCH 'robotics'")['n'] == 1
+
+
+def test_background_writer_contention_does_not_fail_ui_write_after_two_seconds(db):
+    from threading import Event, Timer
+    entered, release = Event(), Event()
+    def hold():
+        with db.transaction() as conn:
+            conn.execute("INSERT INTO settings VALUES('held_writer','true')")
+            entered.set()
+            assert release.wait(6)
+    with ThreadPoolExecutor(max_workers=1) as pool:
+        writer = pool.submit(hold)
+        assert entered.wait(3)
+        timer = Timer(2.3, release.set)
+        timer.start()
+        try:
+            assert db.one('SELECT count(*) n FROM jobs')['n'] == 0
+            db.execute("INSERT INTO settings VALUES('second_writer','true')")
+        finally:
+            release.set()
+            timer.cancel()
+        writer.result()
+    assert db.one("SELECT count(*) n FROM settings WHERE key IN ('held_writer','second_writer')")['n'] == 2
+
+
+def test_oracle_vacancy_identity_survives_application_step_paths():
+    root = 'https://jpmc.fa.oraclecloud.com/hcmUI/CandidateExperience/en/sites/CX_1001/job/210792897'
+    expected = ats_identity(root)
+    for suffix in ('/apply/email', '/apply/personal-info', '/apply/review'):
+        assert ats_identity(root + suffix) == expected
+    assert ats_identity(root.replace('210792897', '210792898') + '/apply/email') != expected
+
+
 def test_identical_cross_post_merged_and_snapshot_preserved(db):
     description = "We are seeking a graduate engineer to build backend services with Python and SQL. " * 8
     first = job(db, description=description)
@@ -362,6 +405,40 @@ def test_settings_reject_budget_above_authorized_maximum_atomically(client, inva
     assert client.patch('/api/settings', json={'monthly_budget': 20}).status_code == 200
     assert client.patch('/api/settings', json={'monthly_budget': invalid}).status_code == 422
     assert client.get('/api/settings').json()['monthly_budget'] == 20
+
+
+def test_unlimited_spending_setting_requires_explicit_boolean(client):
+    assert client.get('/api/settings').json()['ai_budget_unlimited'] is False
+    assert client.patch('/api/settings', json={'ai_budget_unlimited': True}).status_code == 200
+    assert client.patch('/api/settings', json={'ai_budget_unlimited': 'true'}).status_code == 422
+
+
+def test_apply_arbitrary_browser_page_creates_review_application_without_a_source(client, db, monkeypatch):
+    from types import SimpleNamespace
+    async def public(_url):
+        return None
+    monkeypatch.setattr('jobagent.discovery.validate_public_url', public)
+    launches = []
+    def launch(identifier, resume):
+        app = db.one('SELECT * FROM applications WHERE id=?', (identifier,))
+        assert app['mode'] == 'review' and app['assisted_autofill'] == 1
+        assert resume is True  # Reopening the same Chrome URL restores a parked draft.
+        launches.append(identifier)
+        return {'run_id': 'test-run', 'status': 'running'}
+    client.app.state.automation = SimpleNamespace(launch=launch)
+    response = client.post('/api/applications/from-browser', json={
+        'url': 'https://new-employer.example.test/apply/42', 'title': 'Graduate Engineer', 'company': 'Unregistered Company'})
+    assert response.status_code == 200
+    assert response.json()['application_id'] == launches[0]
+    assert db.one('SELECT COUNT(*) n FROM sources')['n'] == 0
+    repeated = client.post('/api/applications/from-browser', json={
+        'url': 'https://new-employer.example.test/apply/42', 'title': 'Graduate Engineer', 'company': 'Unregistered Company'})
+    assert repeated.json()['application_id'] == launches[0]
+    assert db.one('SELECT COUNT(*) n FROM applications')['n'] == 1
+    invalid = client.post('/api/applications/from-browser', json={
+        'url': 'https://user:password@example.test/apply', 'title': 'Engineer', 'company': 'Company'})
+    assert invalid.status_code == 422
+    assert db.one('SELECT COUNT(*) n FROM applications')['n'] == 1
 
 
 def test_selected_cv_replacement_preserves_history_and_blocks_after_submit(client, db, tmp_path):

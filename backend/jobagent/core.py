@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 import math
 import re
 import sqlite3
@@ -86,6 +87,7 @@ DEFAULT_SETTINGS = {
     "text_full_professional_context": False,
     "text_fallback_model": "",
     "monthly_budget": 0,
+    "ai_budget_unlimited": False,
     "notifications_enabled": True,
     "email_poll_minutes": 10,
     "email_interval_minutes": 10,
@@ -125,10 +127,19 @@ def validate_config_tree(value, depth=0):
 def get_settings(db):
     result = dict(DEFAULT_SETTINGS)
     for row in db.query("SELECT key,value FROM settings"):
+        if row['key'].startswith('validated_answer_cache:'):
+            continue  # Private answer storage is not application configuration.
         try:
             result[row["key"]] = json.loads(row["value"])
         except ValueError:
             result[row["key"]] = row["value"]
+    if result.get('ai_budget_unlimited') is True and result.get('ai_budget_unlimited_until'):
+        from .usage import unlimited_authorized
+        connection = db._connect()
+        try:
+            result['ai_budget_unlimited'] = unlimited_authorized(connection)
+        finally:
+            connection.close()
     return result
 
 
@@ -617,6 +628,47 @@ def job_create(payload: JobPayload, request: Request):
 
 class URLPayload(Payload):
     url: str = Field(min_length=1, max_length=4000)
+
+
+class BrowserApplicationPayload(Payload):
+    url: str = Field(min_length=1, max_length=4000)
+    title: str = Field(min_length=1, max_length=400)
+    company: str = Field(min_length=1, max_length=300)
+    document_version_id: str | None = None
+
+
+@router.post("/applications/from-browser")
+async def application_from_browser(payload: BrowserApplicationPayload, request: Request):
+    """Explicit user-selected URL; no watchlist/source registration required."""
+    from .automation.browser import safe_url
+    from .automation.types import InvalidDecision
+    from .discovery import ats_identity, validate_public_url
+    try:
+        url = safe_url(payload.url.strip())
+        await validate_public_url(url)
+        title, company = payload.title.strip(), payload.company.strip()
+        if not title or not company:
+            raise ValueError('Enter the job title and company shown on the selected page')
+        db = get_db(request)
+        if payload.document_version_id:
+            document = required(db, 'document_versions', payload.document_version_id)
+            if not document['approved']:
+                raise ValueError('Choose an approved CV before filling')
+            document_path(db, request.app.state.data_dir, document['id'])
+        kind, _ = ats_identity(url)
+        job, _ = ingest_job(db, {'url': url, 'application_url': url, 'title': title,
+                                'company': company, 'source': 'browser', 'ats': kind or 'generic'})
+        application = prepare_application(db, job['id'], 'review', payload.document_version_id,
+                                          request.app.state.data_dir, section_consent=True,
+                                          assisted_autofill=True)
+        # Review is fixed for this entry point; importing a page never authorizes submission.
+        if not os.environ.get('MERIDIAN_TEST'):
+            from .automation.local_runtime import prepare_local_choices
+            await prepare_local_choices(getattr(request.app.state, 'laya_runtime', None), get_settings(db))
+        run = request.app.state.automation.launch(application['id'], resume=True)
+        return {'application_id': application['id'], 'job_id': job['id'], **run}
+    except (ValueError, InvalidDecision, OSError) as exc:
+        raise HTTPException(422, str(exc)) from exc
 
 
 @router.post("/jobs/ingest")
@@ -1475,6 +1527,8 @@ async def settings_patch(payload: dict, request: Request):
             except (ValueError, TypeError) as exc:
                 raise HTTPException(422, f"Invalid automation rule: {exc}") from exc
     with get_db(request).transaction() as conn:
+        if 'ai_budget_unlimited' in payload:
+            conn.execute("DELETE FROM settings WHERE key IN ('ai_budget_unlimited_until','ai_budget_validation_lease')")
         for key, value in payload.items():
             conn.execute(
                 "INSERT INTO settings(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",

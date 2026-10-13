@@ -1221,7 +1221,7 @@ function AIUsage({ settings }: { settings: Data }) {
                 tokens
               </p>
             </div>
-            <Tag>Monthly budget ${settings.monthly_budget ?? 0}</Tag>
+            <Tag>{settings.ai_budget_unlimited ? "Uncapped AI spending" : `Monthly budget $${settings.monthly_budget ?? 0}`}</Tag>
           </div>
           <div className="simple-list">
             {Object.entries(providers).map(([provider, value]) => {
@@ -1250,8 +1250,7 @@ function AIUsage({ settings }: { settings: Data }) {
         </>
       ) : (
         <p className="panel-copy">
-          No remote AI usage has been recorded. Current monthly budget: $
-          {settings.monthly_budget ?? 0}. Configure provider token prices before
+          No remote AI usage has been recorded. {settings.ai_budget_unlimited ? "AI spending is uncapped." : `Current monthly budget: $${settings.monthly_budget ?? 0}.`} Configure provider token prices before
           using a remote engine.
         </p>
       )}

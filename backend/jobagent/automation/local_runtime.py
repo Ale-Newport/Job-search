@@ -17,6 +17,19 @@ import httpx
 LAYA_REVISION = "9060f073e7836d6f10a6b0596f362e362f32107e"
 
 
+async def prepare_local_choices(runtime, settings: dict) -> None:
+    """Explicit preparation starts an installed selected engine on demand.
+
+    Startup preferences still control idle app launch. No installation, cloud
+    fallback or engine preference change is authorized by preparing a form.
+    """
+    if runtime is None or settings.get('browser_engine', 'laya') not in {'laya', 'hybrid'}:
+        return
+    state = await runtime.status()
+    if state.get('installed') and not state.get('running'):
+        await runtime.start()
+
+
 class LayaRuntime:
     def __init__(self, data_dir: str | Path):
         self.data_dir = Path(data_dir)

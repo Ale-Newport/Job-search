@@ -412,6 +412,10 @@ def create_app(data_dir: Path | None = None, token: str | None = None, secret_st
 
     @app.post("/api/applications/{application_id}/apply")
     async def application_apply(application_id: str):
+        if not os.environ.get('MERIDIAN_TEST'):
+            from .automation.local_runtime import prepare_local_choices
+            from .core import get_settings
+            await prepare_local_choices(app.state.laya_runtime, get_settings(app.state.db))
         return app.state.automation.launch(application_id)
 
     @app.post("/api/jobs/{job_id}/assisted-apply")
@@ -423,6 +427,10 @@ def create_app(data_dir: Path | None = None, token: str | None = None, secret_st
         application = prepare_application(app.state.db, job_id, "review", payload.get("document_version_id"),
                                           app.state.data_dir, section_consent=True,
                                           assisted_autofill=payload.get("autofill_approved") is True)
+        if not os.environ.get('MERIDIAN_TEST'):
+            from .automation.local_runtime import prepare_local_choices
+            from .core import get_settings
+            await prepare_local_choices(app.state.laya_runtime, get_settings(app.state.db))
         run = app.state.automation.launch(application["id"], resume=False)
         return {"application_id": application["id"], **run}
 
@@ -459,6 +467,10 @@ def create_app(data_dir: Path | None = None, token: str | None = None, secret_st
 
     @app.post("/api/applications/{application_id}/resume")
     async def application_resume(application_id: str):
+        if not os.environ.get('MERIDIAN_TEST'):
+            from .automation.local_runtime import prepare_local_choices
+            from .core import get_settings
+            await prepare_local_choices(app.state.laya_runtime, get_settings(app.state.db))
         return app.state.automation.launch(application_id, resume=True)
 
     @app.post("/api/applications/{application_id}/reconcile")

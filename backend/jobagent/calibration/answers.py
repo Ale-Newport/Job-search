@@ -31,7 +31,7 @@ def configure_from_live(db, live_db):
     """Copy provider settings and numeric prices, never credentials or profile data."""
     settings = get_settings(live_db)
     for key, value in settings.items():
-        if key.startswith('text_') or key == 'monthly_budget':
+        if key.startswith('text_') or key in {'monthly_budget', 'ai_budget_unlimited', 'ai_budget_unlimited_until'}:
             db.execute('INSERT OR REPLACE INTO settings(key,value) VALUES(?,?)', (key, json.dumps(value)))
     provider = settings.get('text_provider')
     row = live_db.one('SELECT config FROM integrations WHERE provider=?', (provider,))

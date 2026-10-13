@@ -106,8 +106,9 @@ def ats_identity(url: str) -> tuple[str, str | None]:
         return 'workday', f'workday:{host}:{requisition.group(1)}' if requisition else None
     if 'sites' in segments and 'job' in segments and ('oraclecloud.com' in host or re.search(r'career|jobs', host)):
         site_index = segments.index('sites')
-        if len(segments) > site_index+1:
-            return 'oraclehcm', f'oraclehcm:{host}:{segments[site_index+1]}:{segments[-1]}'
+        job_index = segments.index('job')
+        if len(segments) > max(site_index, job_index)+1:
+            return 'oraclehcm', f'oraclehcm:{host}:{segments[site_index+1]}:{segments[job_index+1]}'
     for domain, name in (
         ("myworkdayjobs.com", "workday"),
         ("linkedin.com", "linkedin"),
@@ -331,10 +332,10 @@ def ingest_job(db, raw: dict, source_id: str | None = None, *, match_context=Non
                 if salary_refresh:
                     # Amount, currency and period must come from the same advertisement snapshot.
                     merged_metadata["salary_unit"] = job["metadata"].get("salary_unit")
+                description_changed = job['description'] != existing['description']
                 conn.execute(
-                    "UPDATE jobs SET description=?,skills=?,salary_min=?,salary_max=?,currency=?,metadata=?,remote=COALESCE(?,remote),posted_at=COALESCE(?,posted_at),experience_level=COALESCE(?,experience_level),updated_at=? WHERE id=?",
-                    (
-                        job["description"],
+                    "UPDATE jobs SET " + ("description=?," if description_changed else "") + "skills=?,salary_min=?,salary_max=?,currency=?,metadata=?,remote=COALESCE(?,remote),posted_at=COALESCE(?,posted_at),experience_level=COALESCE(?,experience_level),updated_at=? WHERE id=?",
+                    (*([job['description']] if description_changed else []),
                         dumps(job["skills"]),
                         job["salary_min"] if salary_refresh else existing["salary_min"],
                         job["salary_max"] if salary_refresh else existing["salary_max"],
@@ -703,10 +704,20 @@ async def discover_career_page(text, final, config):
     return DiscoveryResult(list(found.values()), complete=authoritative, authoritative=authoritative, method='Published career data and ATS references', endpoints=endpoints, limitations=list(dict.fromkeys(limitations)))
 
 
+class PublisherPermissionRequired(ValueError):
+    """The configured source has a documented authorization boundary."""
+
+
 async def discover(source: dict) -> list[dict]:
     config = source.get("config", {})
     if isinstance(config, str):
         config = json.loads(config)
+    policy = config.get('access_policy') or {}
+    if isinstance(policy, dict) and policy.get('automation_requires_written_permission') is True:
+        evidence = policy.get('written_permission_evidence')
+        if not isinstance(evidence, str) or not evidence.strip():
+            raise PublisherPermissionRequired('Automated collection requires the publisher\'s written permission; '
+                                              'use an authorized alert or manually imported listing instead.')
     kind, url = source["kind"], source.get("url", "")
     parts = [x for x in urlsplit(url).path.split("/") if x]
     board = str(config.get("board") or config.get("company") or (parts[0] if parts else ""))
@@ -932,7 +943,8 @@ async def discover(source: dict) -> list[dict]:
                 evidence['complete'] = evidence['total'] is None or offset >= evidence['total']
                 break
         if not evidence['complete']:
-            evidence['limitations'].append('Posting limit reached before the final page')
+            evidence['limitations'].append('Posting limit reached before the final page' if offset >= maximum else
+                'Public search ended before its published total was reached; listings may have changed during pagination')
     elif kind == 'workable' and (urlsplit(url).hostname or '') == 'apply.workable.com':
         if not re.fullmatch(r'[A-Za-z0-9_.-]{1,120}', board):
             raise ValueError('Configure a valid public Workable account identifier')
@@ -1386,7 +1398,8 @@ async def _run_sources(db, data_dir=None, source_id=None, due_only=False):
                          'TimeoutError: source scan exceeded 300s' if isinstance(exc, TimeoutError) else
                          f'SQLite persistence error: {str(exc)[:160]}' if isinstance(exc, sqlite3.OperationalError) else
                          f'{type(exc).__name__}: public career extraction failed; verify the configured source')
-            health = ('ACCESS_DENIED' if error and any(f'HTTP {code}' in error for code in (401,403)) else
+            health = ('ACCESS_DENIED' if error and (any(f'HTTP {code}' in error for code in (401,403)) or
+                                                   error.startswith('PublisherPermissionRequired:')) else
                       'RATE_LIMITED' if error and 'HTTP 429' in error else
                       'TIMEOUT' if error and 'Timeout' in error else 'FAILED' if error else
                       'EMPTY' if not count and proof.get('complete') else 'PARTIAL' if not proof.get('complete') else 'HEALTHY')

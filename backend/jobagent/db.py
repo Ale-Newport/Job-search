@@ -156,7 +156,8 @@ class Database:
         conn.row_factory = sqlite3.Row
         conn.execute("PRAGMA foreign_keys=ON")
         conn.execute("PRAGMA busy_timeout=2000")
-        conn.execute("PRAGMA journal_mode=WAL")
+        if conn.execute("PRAGMA journal_mode").fetchone()[0].lower() != 'wal':
+            conn.execute("PRAGMA journal_mode=WAL")
         return conn
 
     def _migrate(self):
@@ -176,6 +177,11 @@ class Database:
     def transaction(self):
         conn = self._connect()
         try:
+            # Background discovery, inbox imports and UI workers share a writer.
+            # Waiting for acquisition is safe: no statement has run yet, so a
+            # transient competing writer cannot leave half-applied mutations.
+            if conn.execute('PRAGMA busy_timeout').fetchone()[0] == 2000:
+                conn.execute("PRAGMA busy_timeout=15000")
             conn.execute("BEGIN IMMEDIATE")
             yield conn
             conn.commit()

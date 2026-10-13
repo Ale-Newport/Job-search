@@ -106,6 +106,25 @@ def model_prices(input_rate=1, output_rate=2, model='discovered-model'):
                                             'cache_write_cost_per_million': input_rate * 1.25}}}
 
 
+async def test_validated_answer_reused_across_dom_ids_but_invalidated_by_constraints(db, evidence):
+    calls = []
+    def handler(request):
+        payload = request_payload(request)
+        calls.append(payload)
+        generated = ({'question_id': payload['question_id'], 'passed': True,
+                      'scores': {name: .95 for name in SCORE_NAMES}, 'unsupported_claims': [], 'issues': [], 'reason': 'Grounded.'}
+                     if 'generated_answer' in payload else complete(payload, fid=evidence))
+        return response_for(request, generated)
+    llm = ApplicationAnswerLLM(db, Keys(), transport=httpx.MockTransport(handler))
+    first = await llm.generate(settings(), 'Describe a project you built.', {'id': 'job-one', 'application_id': 'run-one'}, question_id='dom-one')
+    reused = await llm.generate(settings(), 'Describe a project you built.', {'id': 'job-one', 'application_id': 'run-two'}, question_id='dom-two')
+    assert len(calls) == 2
+    assert reused['reused_validated_answer'] and reused['answer'] == first['answer']
+    assert reused['question_id'] == 'dom-two' and reused['quality']['review']['question_id'] == 'dom-two'
+    await llm.generate(settings(), 'Describe a project you built.', {'id': 'job-one'}, question_id='dom-three', field={'max_length': 200})
+    assert len(calls) == 4
+
+
 @pytest.mark.parametrize('provider', ['openai', 'anthropic', 'gemini', 'ollama', 'openai-compatible'])
 async def test_native_provider_contracts_exact_question_and_independent_review(db, evidence, provider):
     calls = []

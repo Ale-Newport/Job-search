@@ -110,6 +110,11 @@ def application_entry_target(snapshot: dict) -> dict | None:
     entries = manual or entries
     if len(entries) == 1:
         return entries[0]
+    if entries and all(e.get('tag') == 'button' and e.get('label', '').strip().casefold() ==
+                       entries[0].get('label', '').strip().casefold() for e in entries):
+        # Responsive job pages repeat the same entry button in header/footer.
+        # Each already passed the no-form/no-input/no-explicit-submit checks.
+        return entries[0]
     if entries and all(e.get('tag') == 'a' and e.get('href') == entries[0].get('href') for e in entries):
         return entries[0]  # Repeated header/footer links to the same entry page.
     repeated = [e for e in entries if e.get('tag') == 'a'
@@ -511,6 +516,16 @@ class BrowserSession:
                         visible_node = proxy_handle.as_element()
                         if visible_node is None:
                             raise StaleState('The observed toggle label changed.')
+                    if element.get('visual_toggle_proxy_id'):
+                        proxy_handle = await node.evaluate_handle("""(node, id) => {
+                            const proxy = window.__meridianObservedControlsV1.nodes.get(id);
+                            return node.isConnected && proxy?.isConnected && node.matches('.checkbox') &&
+                                proxy.matches('.label-text') && proxy.parentElement === node.parentElement &&
+                                node.querySelector('.checkmark') ? proxy : null;
+                        }""", element['visual_toggle_proxy_id'])
+                        visible_node = proxy_handle.as_element()
+                        if visible_node is None:
+                            raise StaleState('The observed visual toggle changed.')
                     if op == Operation.CLEAR and element.get("clear_proxy_id"):
                         if proxy_handle:
                             await proxy_handle.dispose()
@@ -530,13 +545,15 @@ class BrowserSession:
                             const field = node.closest('[data-field-path],.ashby-application-form-field-entry');
                             const inline = node.closest('a,button,label');
                             const attachment = node.matches('.visually-hidden') && node.parentElement?.querySelector(':scope > button[type="button"]');
-                            const associated = field?.contains(proxy) || inline === proxy || attachment === proxy;
+                            const associated = field?.contains(proxy) || inline === proxy || attachment === proxy ||
+                                (proxy instanceof HTMLLabelElement && proxy.control === node && [...(node.labels || [])].includes(proxy));
                             return node.isConnected && proxy?.isConnected && !node.disabled && associated ? proxy : null;
                         }""", element["upload_proxy_id"])
                         visible_node = proxy_handle.as_element()
                         if visible_node is None:
                             raise StaleState("The observed upload control changed.")
                     await visible_node.scroll_into_view_if_needed()
+                    await visible_node.evaluate("n => n.scrollIntoView({block:'center',inline:'center',behavior:'instant'})")
                     valid = await visible_node.evaluate("""(node, nativeToggleId) => {
                         if (!node.isConnected || node.ownerDocument !== document) return 'document';
                         if (node.matches(':disabled') || node.closest('[aria-disabled="true"],[inert]')) return 'disabled';
@@ -551,7 +568,7 @@ class BrowserSession:
                         // be the hit target; other overlays still block action.
                         if (nativeToggleId && top === window.__meridianObservedControlsV1.nodes.get(nativeToggleId)) return 'native';
                         return top === node || node.contains(top) ? 'ok' : 'covered';
-                    }""", node_id if element.get('toggle_proxy_id') else None)
+                    }""", node_id if element.get('toggle_proxy_id') or element.get('upload_proxy_id') else None)
                     if valid not in {"ok", "native"}:
                         raise StaleState(f"The observed control is {valid}; no action was performed.")
                     toggle_click_node = node if valid == "native" else visible_node
@@ -645,7 +662,7 @@ class BrowserSession:
                         elif element["type"] in {"checkbox", "radio"}:
                             await node.set_checked(desired)
                         elif bool(element["checked"]) != desired:
-                            await node.click()
+                            await visible_node.click()
                     elif op == Operation.UPLOAD:
                         path = Path(file_path or "").resolve()
                         if path not in self.allowed_uploads or not path.is_file():

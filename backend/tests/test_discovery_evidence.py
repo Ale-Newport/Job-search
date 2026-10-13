@@ -7,6 +7,25 @@ from jobagent.db import Database, dumps, now
 from jobagent.discovery import DiscoveryResult, discover, ingest_job, parse_jsonld, run_sources, source_health
 
 
+@pytest.mark.parametrize('failure,retry', [('net::ERR_HTTP2_PROTOCOL_ERROR', True),
+    ('Public browser navigation returned HTTP 403', False), ('net::ERR_CERT_DATE_INVALID', False)])
+async def test_public_render_protocol_retry_preserves_access_and_certificate_boundaries(monkeypatch, failure, retry):
+    from jobagent import public_renderer
+    calls = []
+    async def render(url, *, http1=False):
+        calls.append((url, http1))
+        if not http1:
+            raise ValueError(failure)
+        return '<a href="/jobs/1">Job</a>', url
+    monkeypatch.setattr(public_renderer, '_render_public_page', render)
+    if retry:
+        assert await public_renderer.render_public_page('https://example.test/careers') == ('<a href="/jobs/1">Job</a>', 'https://example.test/careers')
+        assert calls == [('https://example.test/careers', False), ('https://example.test/careers', True)]
+    else:
+        with pytest.raises(ValueError, match=failure):
+            await public_renderer.render_public_page('https://example.test/careers')
+        assert len(calls) == 1
+
 @pytest.fixture
 def db(tmp_path):
     return Database(tmp_path / 'discovery.sqlite3')
@@ -15,6 +34,34 @@ def db(tmp_path):
 def add_source(db, identifier='board', kind='greenhouse'):
     db.execute('INSERT INTO sources(id,name,kind,url,config,created_at,updated_at) VALUES(?,?,?,?,?,?,?)',
                (identifier, 'Synthetic public board', kind, 'https://boards.greenhouse.io/fixture', dumps({'board': 'fixture'}), now(), now()))
+
+
+async def test_documented_publisher_boundary_is_not_an_empty_success_or_a_network_retry(db, monkeypatch):
+    from jobagent.discovery import PublisherPermissionRequired
+    async def forbidden_fetch(*args, **kwargs):
+        pytest.fail('A restricted source must not issue network requests without recorded authorization')
+    monkeypatch.setattr('jobagent.discovery.fetch', forbidden_fetch)
+    add_source(db)
+    config = {'board': 'fixture', 'access_policy': {'automation_requires_written_permission': True,
+                                                  'evidence_url': 'https://example.test/robots.txt'}}
+    db.execute('UPDATE sources SET config=?', (dumps(config),))
+    with pytest.raises(PublisherPermissionRequired):
+        await discover({'kind': 'greenhouse', 'url': 'https://boards.greenhouse.io/fixture', 'config': config})
+    result = await run_sources(db)
+    assert result['items'][0]['state'] == 'ACCESS_DENIED'
+    assert result['items'][0]['evidence'].get('complete') is not True
+    assert db.one('SELECT state FROM source_scans')['state'] == 'FAILED'
+    assert 'written permission' in source_health(db, db.one('SELECT * FROM sources'))['last_error']
+
+
+async def test_recorded_publisher_permission_allows_only_the_existing_public_reader(monkeypatch):
+    async def public_feed(url, **kwargs):
+        return b'{"jobs":[]}', 'application/json', url
+    monkeypatch.setattr('jobagent.discovery.fetch', public_feed)
+    result = await discover({'kind':'json','url':'https://example.test/jobs.json','config':{
+        'access_policy': {'automation_requires_written_permission': True,
+                          'written_permission_evidence': 'Recorded synthetic permission for this public feed'}}})
+    assert result == [] and result.evidence['complete'] is True
 
 
 def test_published_workday_locale_and_board_references_are_generic():
@@ -367,6 +414,19 @@ async def test_eightfold_ignores_oversized_pages_after_its_configured_limit(monk
     monkeypatch.setattr('jobagent.discovery.fetch', fetch)
     jobs = await discover({'kind': 'eightfold', 'url': 'https://example.test/api/pcsx/search?domain=fixture.test', 'config': {'max_jobs': 3}})
     assert len(jobs) == 3 and not jobs.evidence['complete']
+
+
+async def test_eightfold_changed_total_is_partial_without_claiming_a_posting_cap(monkeypatch):
+    from urllib.parse import parse_qs, urlsplit
+    async def fetch(url, **kwargs):
+        offset = int(parse_qs(urlsplit(url).query)['start'][0])
+        posts = [{'id': str(i), 'name': 'Engineer'} for i in range(offset, 2)]
+        return json.dumps({'data': {'positions': posts, 'count': 3}}).encode(), 'application/json', url
+    monkeypatch.setattr('jobagent.discovery.fetch', fetch)
+    jobs = await discover({'kind': 'eightfold', 'url': 'https://example.test/api/pcsx/search?domain=fixture.test', 'config': {}})
+    assert len(jobs) == 2 and not jobs.evidence['complete']
+    assert 'published total' in jobs.evidence['limitations'][0]
+    assert not any('Posting limit' in limitation for limitation in jobs.evidence['limitations'])
 
 
 @pytest.mark.asyncio

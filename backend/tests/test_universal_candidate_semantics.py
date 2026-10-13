@@ -641,3 +641,44 @@ def test_temporary_visa_option_needs_confirmed_current_work_permission_and_scope
         assert len(result['facts_used']) >= 2
     full_time = CandidateEngine(db).answer_question('Are you authorized to work full-time?', {}, {'country': country})
     assert full_time['answer'] is None or full_time['answer'] == 'No'
+
+
+@pytest.mark.parametrize('route,current,record_country,label,expected', [
+    ('Student', True, 'United Kingdom', 'Student/Graduate Visa (with work rights)', True),
+    ('Student', True, 'United Kingdom', 'Student or Graduate Visa (with right to work)', True),
+    ('Skilled Worker', True, 'United Kingdom', 'Skilled Worker Visa', True),
+    ('Student', None, 'United Kingdom', 'Student/Graduate Visa (with work rights)', False),
+    ('Student', False, 'United Kingdom', 'Student/Graduate Visa (with work rights)', False),
+    (None, True, 'United Kingdom', 'Student/Graduate Visa (with work rights)', False),
+    ('Student', True, 'Canada', 'Student/Graduate Visa (with work rights)', False),
+    ('Student', True, 'United Kingdom', 'Graduate Visa (with work rights)', False),
+    ('Student', True, 'United Kingdom', 'Student and Graduate Visa (with work rights)', False),
+    ('Student', True, 'United Kingdom', 'Student/Graduate Visa (with unlimited work rights)', False),
+    ('Student', True, 'United Kingdom', 'Student/Graduate Visa (with full-time work rights)', False),
+    ('Student', True, 'United Kingdom', 'Student/Graduate Visa (with work rights until 2028)', False),
+    ('Student', True, 'United Kingdom', 'Student/Graduate Visa (with current and future work rights)', False),
+])
+def test_route_enum_requires_both_jurisdiction_and_independent_current_permission(
+        tmp_path, route, current, record_country, label, expected):
+    db = Database(tmp_path / 'route-enum.sqlite3')
+    eid = entity(db, 'immigration', 'Confirmed synthetic permission')
+    for key, value in {'country': record_country, 'route': route, 'current_right_to_work': current}.items():
+        if value is not None:
+            ingest_fact(db, eid, key, value, value_type='boolean' if isinstance(value, bool) else 'text',
+                        source='Independent confirmed synthetic evidence', evidence={}, verified=True)
+    result = CandidateEngine(db).answer_question('Please select your current UK work authorization status',
+        {'type': 'select', 'options': [{'label': 'UK /Irish Citizen', 'value': 'citizen'},
+                                     {'label': label, 'value': 'route'},
+                                     {'label': 'No work authorization', 'value': 'none'}]},
+        {'country': 'United Kingdom'})
+    assert (result['answer'] == label) is expected
+    if expected:
+        assert result['confidence_level'] == 'DERIVED_HIGH'
+        assert len(result['facts_used']) >= 3
+
+
+def test_visa_route_enums_prefer_specific_and_refuse_equal_ambiguity():
+    from jobagent.intelligence.engine import confirmed_visa_route_options
+    options = [{'label': label} for label in ['Student/Graduate Visa (with work rights)', 'Student Visa']]
+    assert confirmed_visa_route_options('Student', options) == ['Student Visa']
+    assert len(confirmed_visa_route_options('Student', options + [{'label': 'Student Visa (with work rights)'}])) == 2

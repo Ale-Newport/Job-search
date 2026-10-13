@@ -56,6 +56,39 @@ async def test_cloud_requires_key_and_local_requires_loopback():
         await SystemOneEngine("jev").decide(benchmark_snapshot(), "Fill email")
 
 
+async def test_laya_option_contract_is_local_and_has_no_browser_operations():
+    options = [{'label': 'Greater London, England, UK', 'value': 'place-1'},
+               {'label': 'London (UK)', 'value': 'place-2'}]
+    def handle(request):
+        body = json.loads(request.content)
+        assert body['state']['question'] == 'Current location'
+        assert body['state']['confirmed_answer'] == 'London, United Kingdom'
+        assert body['state']['supporting_fact_ids'] == ['city-fact', 'country-fact']
+        assert body['state']['evidence_status'].startswith('Explicitly confirmed')
+        assert set(body['questions']) == {'option'}
+        assert body['questions']['option']['criteria']['o0'] == options[0]['label']
+        choices = body['questions']['option']['criteria']
+        return httpx.Response(200, json={'answers': {'option': {'choice': 'o0', 'confidence': .99,
+            'probabilities': {key: int(key == 'o0') for key in choices}}}, 'backend': 'laya-mlx'})
+    decision = await SystemOneEngine(transport=httpx.MockTransport(handle)).choose_option(
+        'Current location', 'London, United Kingdom', options, ['city-fact', 'country-fact'])
+    assert decision['option'] == options[0]
+    assert decision['runtime'] == 'laya-mlx'
+    with pytest.raises(HumanRequired, match='local'):
+        await SystemOneEngine('jev', api_key='fixture-key').choose_option('Religion', 'Atheist', options, ['faith'])
+
+
+@pytest.mark.parametrize('selected,confidence', [('HUMAN_REQUIRED', .99), ('o0', .4), ('#new-option', .99)])
+async def test_laya_rejects_unsupported_or_uncertain_option_decisions(selected, confidence):
+    criteria = {'o0': 1, 'HUMAN_REQUIRED': 0}
+    if selected == 'HUMAN_REQUIRED':
+        criteria = {'o0': 0, 'HUMAN_REQUIRED': 1}
+    engine = SystemOneEngine(transport=httpx.MockTransport(lambda request: httpx.Response(200, json={
+        'answers': {'option': {'choice': selected, 'confidence': confidence, 'probabilities': criteria}}})))
+    with pytest.raises((HumanRequired, InvalidDecision)):
+        await engine.choose_option('Religion', 'Atheist', [{'label': 'No religion', 'value': 'none'}], ['faith'])
+
+
 def test_adapters_do_not_allow_spoofed_domain_or_override_manual_source():
     assert get_adapter("https://boards.greenhouse.io/example").name == "greenhouse"
     assert get_adapter("https://greenhouse.io.evil.test/example").name == "generic"

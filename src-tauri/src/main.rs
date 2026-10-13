@@ -27,6 +27,108 @@ struct ConnectionInfo {
     base_url: String,
     token: String,
 }
+
+#[derive(Serialize)]
+struct ChromeTab {
+    url: String,
+    title: String,
+}
+
+fn chrome_read_error(stderr: &[u8]) -> String {
+    let diagnostic = String::from_utf8_lossy(stderr);
+    if diagnostic.contains("(-1743)") {
+        "macOS denied permission to read Chrome. Allow Meridian in System Settings > Privacy & Security > Automation, or paste the application URL.".into()
+    } else if diagnostic.contains("(-2741)")
+        || diagnostic.contains("(-2740)")
+        || diagnostic.contains("SyntaxError")
+    {
+        "Chrome metadata reader could not parse its script. Paste the application URL and report this reader error.".into()
+    } else if diagnostic.contains("(-600)") || diagnostic.contains("Open a job application") {
+        "Open a job application in Google Chrome first, or paste its URL.".into()
+    } else if diagnostic.contains("No visible Chrome window") {
+        "Bring your job application window in Chrome to the front, or paste its URL. Hidden background browser windows are not used.".into()
+    } else {
+        "Chrome could not return its active tab. Paste the application URL to continue.".into()
+    }
+}
+
+#[tauri::command]
+async fn current_chrome_tab() -> Result<ChromeTab, String> {
+    #[cfg(not(target_os = "macos"))]
+    return Err("Paste the application URL to start from this browser.".into());
+    #[cfg(target_os = "macos")]
+    tauri::async_runtime::spawn_blocking(|| {
+        // Target the process owning an actual on-screen Chrome window. Headless
+        // Chrome can report AppleScript's `visible` as true, and bundle-name
+        // addressing can otherwise select a background discovery/test process.
+        // Read only native window ownership and the active tab's URL/title;
+        // never page JavaScript, pixels, cookies or browser profile files.
+        let script = r#"ObjC.import('AppKit');
+ObjC.import('CoreGraphics');
+var nativeWindows = ObjC.deepUnwrap($.CGWindowListCopyWindowInfo(
+    $.kCGWindowListOptionOnScreenOnly | $.kCGWindowListExcludeDesktopElements, $.kCGNullWindowID)) || [];
+var selectedPID = null;
+for (var i = 0; i < nativeWindows.length && i < 500; i++) {
+    var info = nativeWindows[i];
+    if (info.kCGWindowLayer !== 0) continue;
+    var running = $.NSRunningApplication.runningApplicationWithProcessIdentifier(info.kCGWindowOwnerPID);
+    if (running && ObjC.unwrap(running.bundleIdentifier) === 'com.google.Chrome') {
+        selectedPID = info.kCGWindowOwnerPID; break;
+    }
+}
+// On another macOS Space, the last Chrome window may not be in the on-screen
+// list. Prefer the primary regular Chrome process over newer automation
+// instances. Normal Chrome profiles share that primary browser process.
+if (selectedPID === null) {
+    var runningApps = $.NSWorkspace.sharedWorkspace.runningApplications;
+    var primaryChrome = null;
+    var oldestLaunch = Infinity;
+    for (var k = 0; k < runningApps.count; k++) {
+        var candidate = runningApps.objectAtIndex(k);
+        if (ObjC.unwrap(candidate.bundleIdentifier) !== 'com.google.Chrome' ||
+            Number(candidate.activationPolicy) !== 0 || candidate.terminated) continue;
+        var launched = Number(candidate.launchDate.timeIntervalSince1970);
+        if (launched < oldestLaunch) { primaryChrome = Number(candidate.processIdentifier); oldestLaunch = launched; }
+    }
+    selectedPID = primaryChrome;
+}
+if (selectedPID === null) throw new Error('No visible Chrome window');
+var chrome = Application(selectedPID);
+var windows = chrome.windows();
+var selectedWindow = null;
+for (var j = 0; j < windows.length; j++) {
+    if (!windows[j].minimized()) { selectedWindow = windows[j]; break; }
+}
+if (selectedWindow === null) throw new Error('No visible Chrome window');
+var tab = selectedWindow.activeTab();
+tab.url() + '\n' + tab.title();"#;
+        let mut child = Command::new("/usr/bin/osascript")
+            .args(["-l", "JavaScript", "-e", script])
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn().map_err(|error| error.to_string())?;
+        let deadline = std::time::Instant::now() + Duration::from_secs(30);
+        loop {
+            if child.try_wait().map_err(|error| error.to_string())?.is_some() { break; }
+            if std::time::Instant::now() >= deadline {
+                let _ = child.kill();
+                let _ = child.wait();
+                return Err("Chrome did not respond. Allow Meridian in System Settings > Privacy & Security > Automation, or paste the application URL.".into());
+            }
+            std::thread::sleep(Duration::from_millis(100));
+        }
+        let output = child.wait_with_output().map_err(|error| error.to_string())?;
+        if !output.status.success() {
+            return Err(chrome_read_error(&output.stderr));
+        }
+        let text = String::from_utf8(output.stdout).map_err(|_| "Chrome returned invalid text")?;
+        let (url, title) = text.trim_end().split_once('\n').unwrap_or((text.trim(), ""));
+        if !(url.starts_with("https://") || url.starts_with("http://")) {
+            return Err("Select a public job or application page in Chrome.".into());
+        }
+        Ok(ChromeTab { url: url.into(), title: title.into() })
+    }).await.map_err(|error| error.to_string())?
+}
 struct Backend {
     process: Mutex<BackendProcess>,
     connection: ConnectionInfo,
@@ -288,7 +390,8 @@ fn main() {
         .invoke_handler(tauri::generate_handler![
             connection_info,
             export_file,
-            show_review_window
+            show_review_window,
+            current_chrome_tab
         ])
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::CloseRequested { api, .. } = event {
@@ -318,6 +421,18 @@ fn main() {
 mod export_tests {
     use super::*;
     use std::os::unix::fs::symlink;
+
+    #[test]
+    fn chrome_errors_distinguish_permission_and_reader_failures_without_echoing_page_data() {
+        assert!(chrome_read_error(b"Not authorized (-1743)").contains("macOS denied permission"));
+        assert!(chrome_read_error(b"Expected end of line (-2741)").contains("parse its script"));
+        assert!(chrome_read_error(b"Application isn't running (-600)")
+            .contains("Open a job application"));
+        assert!(
+            chrome_read_error(b"No visible Chrome window (-2700)").contains("Hidden background")
+        );
+        assert!(!chrome_read_error(b"secret fixture page title").contains("secret"));
+    }
 
     struct Fixture(PathBuf);
 

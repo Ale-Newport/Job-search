@@ -8,7 +8,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from jobagent.core import prepare_application
-from jobagent.db import Database, now, uid
+from jobagent.db import Database, dumps, now, uid
 from jobagent.discovery import ingest_job
 from jobagent.job_validity import deadline_evidence, eligible
 from jobagent.mail import classify_message, ingest_message
@@ -38,6 +38,42 @@ def test_deadlines_never_come_from_posting_age():
     assert eligible({'availability': 'UNKNOWN'})
     assert not eligible({'availability': 'CLOSED'})
     assert not eligible({'metadata': {'application_deadline': '2020-01-01'}})
+
+
+@pytest.mark.parametrize('uncertain', [False, True])
+async def test_explicit_review_switch_parks_idle_account_without_losing_checkpoint(workspace, monkeypatch, uncertain):
+    from types import SimpleNamespace
+    db, path = workspace
+    supervisor = WorkerSupervisor(db, path)
+    old, target = application(db, path, 'old'), application(db, path, 'new')
+    db.execute('UPDATE applications SET section_consent=1 WHERE id=?', (target,))
+    first, second = supervisor.launch(old), supervisor.launch(target)
+    db.execute("UPDATE automation_tasks SET state='WAITING_FOR_USER',worker_id='old-worker',account_scope='same-account' WHERE id=?", (first['task_id'],))
+    db.execute("UPDATE automation_tasks SET account_scope='same-account' WHERE id=?", (second['task_id'],))
+    checkpoint = {'snapshot_id': 'old-observation', 'answers': [{'question': 'Saved question', 'answer': 'Saved answer'}]}
+    db.execute('UPDATE automation_runs SET status=?,checkpoint=? WHERE id=?', ('unconfirmed' if uncertain else 'needs_review', json.dumps(checkpoint), first['run_id']))
+    task = db.one('SELECT * FROM automation_tasks WHERE id=?', (first['task_id'],))
+    worker = SimpleNamespace(id='old-worker', task=task, state='WAITING_FOR_USER', stopping=False)
+    supervisor.workers[worker.id] = worker
+    calls = []
+    async def rpc(_worker, command, **_kwargs):
+        calls.append(command)
+    async def stop(_worker):
+        calls.append('stop')
+        supervisor.workers.pop(_worker.id)
+    monkeypatch.setattr(supervisor, '_rpc', rpc)
+    monkeypatch.setattr(supervisor, '_stop', stop)
+    await supervisor._release_idle_scopes()
+    if uncertain:
+        assert not calls
+        assert db.one('SELECT state FROM automation_tasks WHERE id=?', (second['task_id'],))['state'] == 'WAITING_FOR_USER'
+        assert 'uncertain submission' in db.one('SELECT error FROM automation_runs WHERE id=?', (second['run_id'],))['error']
+    else:
+        assert calls == ['park', 'stop']
+        saved = json.loads(db.one('SELECT checkpoint FROM automation_runs WHERE id=?', (first['run_id'],))['checkpoint'])
+        assert saved['answers'] == checkpoint['answers'] and saved['snapshot_id'] is None
+        assert db.one('SELECT worker_id FROM automation_tasks WHERE id=?', (first['task_id'],))['worker_id'] is None
+        assert supervisor._claim(1)['id'] == second['task_id']
 
 
 def test_queue_deduplicates_and_survives_restart(workspace):
@@ -83,6 +119,20 @@ def test_submission_receipt_blocks_recovery_replay(workspace):
         supervisor.launch(app_id)
 
 
+def test_parked_review_resume_restores_its_checkpoint_instead_of_starting_over(workspace):
+    db, path = workspace
+    app_id = application(db, path)
+    supervisor = WorkerSupervisor(db, path)
+    run = supervisor.launch(app_id)
+    db.execute("UPDATE automation_tasks SET state='WAITING_FOR_USER' WHERE id=?", (run['task_id'],))
+    db.execute('UPDATE automation_runs SET checkpoint=? WHERE id=?', (dumps({'answers': [{'question': 'Email', 'answer': 'synthetic@example.test'}]}), run['run_id']))
+    resumed = supervisor.launch(app_id, resume=True)
+    assert resumed['run_id'] == run['run_id']
+    task = supervisor._claim(2)
+    assert json.loads(task['payload'])['resume'] is True
+    assert json.loads(db.one('SELECT checkpoint FROM automation_runs WHERE id=?', (run['run_id'],))['checkpoint'])['answers']
+
+
 def test_database_contention_is_bounded_and_data_preserved(workspace):
     db, _ = workspace
     writer = sqlite3.connect(db.path, isolation_level=None)
@@ -90,7 +140,9 @@ def test_database_contention_is_bounded_and_data_preserved(workspace):
     start = time.monotonic()
     with pytest.raises(sqlite3.OperationalError, match='locked'):
         db.execute("INSERT INTO settings VALUES('test_lock','true')")
-    assert time.monotonic()-start < 3
+    # Production writers wait up to 15 seconds for concurrent discovery/inbox
+    # imports. A persistent lock must still fail within that bounded window.
+    assert time.monotonic()-start < 17
     writer.rollback()
     writer.close()
     assert db.one("SELECT value FROM settings WHERE key='automation_paused'")['value']=='false'
@@ -297,6 +349,22 @@ def test_official_source_seeding_preserves_custom_portals_and_settings(workspace
     sync_company_source(db,company)
     original=db.one("SELECT * FROM sources WHERE id='custom'")
     assert original['kind']=='greenhouse' and json.loads(original['config'])['region']=='eu'
+    morgan = db.one("SELECT * FROM sources WHERE name='Morgan Stanley careers'")
+    config = json.loads(morgan['config'])
+    assert config['published_board']['kind'] == 'eightfold'
+    assert config['published_board']['url'] == 'https://morganstanley.eightfold.ai/api/pcsx/search?domain=morganstanley.com'
+    # A configured provider/feed belongs to the user; seeding does not replace it.
+    config['published_board'] = {'kind': 'json', 'url': 'https://example.test/confirmed-feed'}
+    db.execute('UPDATE sources SET config=? WHERE id=?', (json.dumps(config), morgan['id']))
+    seed_official_sources(db)
+    assert json.loads(db.one('SELECT config FROM sources WHERE id=?', (morgan['id'],))['config'])['published_board'] == config['published_board']
+    meta = db.one("SELECT * FROM sources WHERE name='Meta careers'")
+    config = json.loads(meta['config'])
+    assert config['access_policy']['automation_requires_written_permission'] is True
+    config['access_policy']['written_permission_evidence'] = 'Recorded synthetic publisher permission'
+    db.execute('UPDATE sources SET config=? WHERE id=?', (json.dumps(config), meta['id']))
+    seed_official_sources(db)
+    assert json.loads(db.one('SELECT config FROM sources WHERE id=?', (meta['id'],))['config']) == config
 
 
 @pytest.mark.parametrize('output_format',['pdf','docx','txt'])

@@ -2,6 +2,7 @@ from jobagent.automation.runner import BrowserManager
 from jobagent.automation.consent import action_key, section_plan
 from jobagent.automation.adapters.base import ATSAdapter
 from jobagent.automation.browser import application_input_elements, application_entry_target
+from jobagent.automation.answers import question_identity
 
 
 def test_wrong_checked_radio_is_not_accepted(tmp_path):
@@ -39,15 +40,17 @@ def test_website_reset_revokes_previously_observed_acceptance(tmp_path):
 
 def test_reselection_revokes_group_acceptance(tmp_path):
     manager = BrowserManager(tmp_path)
-    answer = {'question_id': 'q4', 'question': 'Languages', 'answer': 'English, Spanish',
+    manager._active_application_id = 'language-review'
+    field = {'label': 'Languages', 'document_id': 'doc', 'form_id': 'application', 'name': 'languages',
+             'tag': 'select', 'role': 'combobox', 'multiple': True, 'selected_values': ['en'],
+             'options': [{'label': 'English', 'value': 'en'}, {'label': 'Spanish', 'value': 'es'}]}
+    question_id = question_identity('language-review', field, 'Languages')
+    answer = {'question_id': question_id, 'question': 'Languages', 'answer': 'English, Spanish',
               'form_value': ['English', 'Spanish'], 'status': 'ANSWER_ACCEPTED_BY_FORM'}
-    manager._answer_diagnostics = {'q4': dict(answer)}
-    snapshot = {'url': 'https://example.test/application', 'elements': [
-        {'label': 'Languages', 'tag': 'select', 'multiple': True, 'selected_values': ['en'],
-         'options': [{'label': 'English', 'value': 'en'}, {'label': 'Spanish', 'value': 'es'}]}
-    ]}
+    manager._answer_diagnostics = {question_id: dict(answer)}
+    snapshot = {'url': 'https://example.test/application', 'elements': [field]}
     manager._reconcile_diagnostics(snapshot)
-    assert manager._answer_diagnostics['q4']['status'] == 'ANSWER_INSERTED'
+    assert manager._answer_diagnostics[question_id]['status'] == 'ANSWER_INSERTED'
 
 
 def test_role_question_mentioning_job_search_is_an_applicant_field():

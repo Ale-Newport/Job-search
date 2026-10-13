@@ -95,6 +95,15 @@ def test_blank_mode_still_overrides_confirmed_values(explicit_profile):
     assert result['leave_blank'] and result['answer'] is None
 
 
+def test_current_disability_answer_does_not_invent_lifetime_history(explicit_profile):
+    db, _ = explicit_profile
+    result = CandidateEngine(db).answer_question('Do you have, or have you ever had, a disability?', {
+        'tag': 'select', 'options': [{'label': 'Yes', 'value': 'yes'}, {'label': 'No', 'value': 'no'}]})
+    assert result['answer'] is None
+    assert result['root_cause'] == 'MISSING_CONFIRMED_DISCLOSURE'
+    assert result['requires_confirmation']
+
+
 @pytest.mark.parametrize('question,value,label', [
     ('Preferred pronouns','He','he/him/his'), ('Preferred pronouns','he/him','he/him/his'),
     ('Preferred pronouns','She','she/her/hers'), ('Preferred pronouns','they/them','they/them/theirs'),

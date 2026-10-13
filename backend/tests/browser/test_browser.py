@@ -276,29 +276,37 @@ async def test_unmatched_dropdown_does_not_stop_later_verified_fields(browser, f
     assert await browser.page.evaluate('window.submissions')==0
 
 
-async def test_editable_dropdown_reads_equivalent_visible_label_before_filtering(browser, fixture_server, candidate):
+@pytest.mark.parametrize('initial_search', ['', 'Great Britain'])
+async def test_editable_dropdown_reads_equivalent_visible_label_before_filtering(browser, fixture_server, candidate, initial_search):
     await browser.open(fixture_server + '/generic.html')
-    await browser.page.evaluate("""() => {
+    await browser.page.evaluate("""initial => {
       const widget=document.createElement('input');widget.setAttribute('role','combobox');
       widget.setAttribute('aria-label','Country');widget.setAttribute('aria-expanded','false');
+      widget.value=initial;window.selections=0;
       document.querySelector('form').prepend(widget);
       function open(){widget.setAttribute('aria-expanded','true');
         document.querySelector('#equivalent-country')?.remove();
         if(widget.value && !'Great Britain'.includes(widget.value)) return;
         const option=document.createElement('div');option.id='equivalent-country';
         option.setAttribute('role','option');option.textContent='Great Britain';widget.after(option);
-        option.onclick=()=>{widget.value='Great Britain';widget.setAttribute('aria-expanded','false');option.remove()};
+        option.onclick=()=>{window.selections++;widget.value='Great Britain';widget.setAttribute('aria-expanded','false');option.remove()};
       }
       widget.onclick=open;widget.oninput=open;
-    }""")
+    }""", initial_search)
     browser._active_application_id='editable-options'
     result=await browser.fill_application({'id':'editable-options','url':fixture_server+'/generic.html'},candidate,[])
     assert any(a['question']=='Country' and a['answer']=='United Kingdom' for a in result['answers']), result
     assert await browser.page.locator('[role=combobox]').input_value()=='Great Britain'
+    assert await browser.page.evaluate('window.selections') == 1
+    assert next(d for d in result['answer_diagnostics'] if d['question'] == 'Country')['status'] == 'ANSWER_ACCEPTED_BY_FORM'
     assert await browser.page.evaluate('window.submissions')==0
 
 
-async def test_dynamic_work_status_re_evaluates_facts_after_observing_menu(browser, fixture_server, tmp_path):
+@pytest.mark.parametrize('supported_label', [
+    'I have a visa which gives me temporary right to work',
+    'Student/Graduate Visa (with work rights)',
+])
+async def test_dynamic_work_status_re_evaluates_facts_after_observing_menu(browser, fixture_server, tmp_path, supported_label):
     from jobagent.db import Database
     from jobagent.intelligence.engine import CandidateEngine
     from jobagent.intelligence.store import entity, ingest_fact
@@ -310,14 +318,13 @@ async def test_dynamic_work_status_re_evaluates_facts_after_observing_menu(brows
     ingest_fact(db, entity(db, 'person', 'Synthetic candidate'), 'email', 'alex@example.test',
                 verified=True, source='Independent evidence', evidence={})
     await browser.open(fixture_server + '/generic.html')
-    await browser.page.evaluate("""() => {
+    await browser.page.evaluate("""supported => {
       const form=document.querySelector('form');form.innerHTML='';window.searches=0;window.selections=0;
       const control=document.createElement('div');control.className='select__control';form.append(control);
       const widget=document.createElement('input');widget.name='work-status';
       widget.setAttribute('role','combobox');widget.setAttribute('aria-label','Right to Work status');
       widget.setAttribute('aria-expanded','false');widget.setAttribute('aria-required','true');control.append(widget);
-      const labels=['I have a visa which gives me the permanent right to work',
-                    'I have a visa which gives me temporary right to work'];
+      const labels=['I have a visa which gives me the permanent right to work', supported];
       function open(){widget.setAttribute('aria-expanded','true');
         document.querySelectorAll('[role=option]').forEach(o=>o.remove());
         for(const label of labels){if(widget.value && !label.includes(widget.value))continue;
@@ -331,11 +338,11 @@ async def test_dynamic_work_status_re_evaluates_facts_after_observing_menu(brows
       const email=document.createElement('input');email.name='email';email.type='email';
       email.setAttribute('aria-label','Email');email.required=true;form.append(email);
       const submit=document.createElement('button');submit.type='submit';submit.textContent='Submit';form.append(submit);
-    }""")
+    }""", supported_label)
     browser._active_application_id = 'work-status'
     result = await browser.fill_application({'id': 'work-status', 'url': fixture_server + '/generic.html'},
         [], [], 'REVIEW', {'_candidate_engine': CandidateEngine(db), '_job_context': {'country': 'United Kingdom'}})
-    assert any(a['answer'] == 'I have a visa which gives me temporary right to work' for a in result['answers']), result
+    assert any(a['answer'] == supported_label for a in result['answers']), result
     assert result['consistency_review']['passed'], result
     assert await browser.page.evaluate('window.searches') == 0
     assert await browser.page.evaluate('window.selections') == 1
@@ -978,6 +985,73 @@ async def test_location_search_uses_current_employer_options(browser, fixture_se
     assert await browser.page.evaluate('window.queries') == ['London']
     assert await browser.page.evaluate('window.submissions') == 0
     assert browser.edits.records == {}  # No engine events become candidate memory.
+
+
+async def test_laya_selects_geocoder_region_after_city_search_and_verifies_committed_value(browser, fixture_server, candidate):
+    from jobagent.automation.engines import SystemOneEngine
+    import httpx
+    import json
+    requests = []
+    def handle(request):
+        body = json.loads(request.content)
+        requests.append(body)
+        assert body['state']['confirmed_answer'] == 'London, United Kingdom'
+        assert list(body['questions']['option']['criteria'].values()) == [
+            'Greater London, England, UK', 'The confirmed answer does not support any offered option.']
+        return httpx.Response(200, json={'answers': {'option': {'choice': 'o0', 'confidence': .99,
+            'probabilities': {'o0': 1, 'HUMAN_REQUIRED': 0}}}, 'backend': 'laya-mlx'})
+    result = await browser.fill_application({'id': 'laya-location', 'url': fixture_server +
+        '/search_location.html?greater_only'}, candidate + [fact('location', 'London')], [], settings={
+        'assisted_autofill': True, 'skip_optional_unknown': True,
+        '_local_option_engine': SystemOneEngine(transport=httpx.MockTransport(handle))})
+    assert result['status'] == 'needs_review', result
+    assert await browser.page.evaluate('window.queries') == ['London']
+    assert await browser.page.locator('#location').input_value() == 'Greater London, England, UK'
+    assert await browser.page.evaluate('window.submissions') == 0
+    assert len(requests) == 1
+    answer = next(a for a in result['answers'] if a['question'] == 'Current location')
+    assert answer['selection_verified'] and answer['option_selection']['engine'] == 'laya'
+
+
+async def test_checkbox_choices_with_different_names_share_one_verified_question(browser, fixture_server, tmp_path):
+    from jobagent.db import Database
+    from jobagent.intelligence.engine import CandidateEngine
+    from jobagent.intelligence.store import entity, ingest_fact, policy
+    db = Database(tmp_path / 'checkbox-choice.sqlite3')
+    person = entity(db, 'person', 'Synthetic confirmed candidate')
+    ingest_fact(db, person, 'pronouns', 'he/him/his', verified=True, source='User confirmed', evidence={})
+    ingest_fact(db, person, 'ethnicity', 'White - Other', verified=True, source='User confirmed', evidence={})
+    policy(db, 'personal_disclosures', 'use_confirmed')
+    local_calls = []
+    class LocalOptionEngine:
+        async def choose_option(self, question, answer, options, fact_ids):
+            local_calls.append((question, answer, options, fact_ids))
+            return {'option': options[0], 'engine': 'laya', 'confidence': .99}
+    await browser.open(fixture_server + '/generic.html')
+    await browser.page.evaluate('''() => {document.body.innerHTML = `<form onsubmit="event.preventDefault();window.submissions++">
+      <div data-field-path="pronouns"><label class="ashby-application-form-question-title">What are your pronouns?</label>
+        <label><input type="checkbox" name="she-option">She/her</label>
+        <label><input type="checkbox" name="he-option">He/him</label></div>
+      <div data-field-path="ethnicity"><label class="ashby-application-form-question-title">Your ethnic background</label>
+        <label><input type="checkbox" name="asian-option">Asian</label>
+        <label><input type="checkbox" name="white-option">White (Caucasian, European, or Middle Eastern)</label></div>
+      <button type="submit">Submit application</button></form>`;window.submissions=0;}''')
+    browser._active_application_id = 'grouped-choice'
+    result = await browser.fill_application({'id': 'grouped-choice', 'url': fixture_server + '/generic.html'}, [], [],
+        settings={'_candidate_engine': CandidateEngine(db), 'browser_engine': 'deterministic',
+                  '_local_option_engine': LocalOptionEngine()})
+    assert result['status'] == 'needs_review', result.get('questions')
+    assert await browser.page.locator('[name=he-option]').is_checked()
+    assert await browser.page.locator('[name=white-option]').is_checked()
+    assert not await browser.page.locator('[name=she-option]').is_checked()
+    assert not await browser.page.locator('[name=asian-option]').is_checked()
+    assert await browser.page.evaluate('window.submissions') == 0
+    assert {a['question'] for a in result['answers']} == {'What are your pronouns?', 'Your ethnic background'}
+    assert len(result['answers']) == 2
+    assert all(a['status'] == 'ANSWER_ACCEPTED_BY_FORM' for a in result['answers'])
+    assert len(local_calls) == 2
+    assert {call[1] for call in local_calls} == {'he/him/his', 'White - Other'}
+    assert all(a['option_selection'][0]['engine'] == 'laya' for a in result['answers'])
 
 
 async def test_user_edits_win_during_fill_and_survive_rerender(browser, fixture_server, candidate, monkeypatch):

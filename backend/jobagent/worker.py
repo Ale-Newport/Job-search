@@ -58,6 +58,13 @@ async def serve(root: Path, task_id: str):
                 background.cancel()
             db.execute("UPDATE automation_tasks SET state='WAITING_FOR_USER',updated_at=? WHERE id=?", (now(), task_id))
             return {'paused': True}
+        if command == 'park':
+            if background and not background.done():
+                raise ValueError('A running preparation cannot be parked')
+            if orchestrator.browser.edits:
+                await orchestrator.browser.edits.flush()
+            await orchestrator.browser.close()
+            return {'parked': True}
         raise ValueError('Unknown internal worker command')
 
     async def heartbeat():

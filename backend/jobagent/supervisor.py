@@ -162,7 +162,8 @@ class WorkerSupervisor(Orchestrator):
                 self._loop.call_soon_threadsafe(lambda: asyncio.create_task(self._resume_worker(worker, resume=True)))
                 return {'task_id': existing['id'], 'run_id': existing['run_id'], 'status': 'running'}
             if resume and not worker and existing['state'] == 'WAITING_FOR_USER':
-                self.db.execute("UPDATE automation_tasks SET state='QUEUED',worker_id=NULL,lease_until=NULL,next_run=0,error=NULL,updated_at=? WHERE id=?", (now(), existing['id']))
+                payload = {**json.loads(existing['payload']), 'resume': True}
+                self.db.execute("UPDATE automation_tasks SET state='QUEUED',worker_id=NULL,lease_until=NULL,next_run=0,error=NULL,payload=?,updated_at=? WHERE id=?", (dumps(payload),now(), existing['id']))
                 return {'task_id': existing['id'], 'run_id': existing['run_id'], 'status': 'queued'}
             return {'task_id': existing['id'], 'run_id': existing['run_id'], 'status': existing['state'].lower()}
         run_id = uid()
@@ -277,6 +278,34 @@ class WorkerSupervisor(Orchestrator):
         finally:
             worker.pending.pop(request_id, None)
 
+    async def _release_idle_scopes(self):
+        queued = self.db.query("SELECT t.* FROM automation_tasks t JOIN applications a ON a.id=t.application_id "
+            "WHERE t.kind='application' AND t.state='QUEUED' AND a.section_consent=1 AND a.mode='review' ORDER BY t.created_at")
+        for target in queued:
+            for worker in list(self.workers.values()):
+                if (worker.state != 'WAITING_FOR_USER' or worker.stopping or worker.task['kind'] != 'application'
+                        or worker.task.get('account_scope') != target['account_scope']
+                        or worker.task['application_id'] == target['application_id']):
+                    continue
+                if self._uncertain(worker.task):
+                    reason = 'An earlier application in this account has uncertain submission state. Reconcile it before starting another form.'
+                    self.db.execute("UPDATE automation_tasks SET state='WAITING_FOR_USER',error=?,updated_at=? WHERE id=?", (reason,now(),target['id']))
+                    self._fail_run(target['run_id'], reason)
+                    self.human_task(target['application_id'], 'ACCOUNT_IN_USE', reason)
+                    continue
+                # The user explicitly started another review form. Flush manual
+                # corrections and close only the idle owned browser; all saved
+                # answers and checkpoint history remain available for resumption.
+                await self._rpc(worker, 'park', timeout=20)
+                await self._stop(worker)
+                saved = self.db.one('SELECT checkpoint FROM automation_runs WHERE id=?', (worker.task['run_id'],))
+                checkpoint = json.loads(saved['checkpoint']) if saved else {}
+                checkpoint['snapshot_id'] = None
+                reason = 'This browser session was parked to prepare another application in the same account. Resume to reopen the saved draft.'
+                self.db.execute('UPDATE automation_runs SET status=\'human_required\',checkpoint=?,error=?,updated_at=? WHERE id=?',
+                                (dumps(checkpoint),reason,now(),worker.task['run_id']))
+                self.db.execute("UPDATE automation_tasks SET worker_id=NULL,lease_until=NULL,error=?,updated_at=? WHERE id=?", (reason,now(),worker.task['id']))
+
     async def _watch(self):
         while not self._closing:
             try:
@@ -299,6 +328,7 @@ class WorkerSupervisor(Orchestrator):
                     elif worker.state == 'WAITING_FOR_USER' and time.monotonic()-worker.progress > 900:
                         await self._stop(worker)
                         await asyncio.to_thread(self.db.execute, "UPDATE automation_tasks SET worker_id=NULL,lease_until=NULL,error='Review session expired; resume to restore the form',updated_at=? WHERE id=?", (now(), worker.task['id']))
+                await self._release_idle_scopes()
                 count = sum(w.task['kind']=='application' for w in self.workers.values())
                 task = await asyncio.to_thread(self._claim, max(0, int(config.get('application_concurrency', 2))-count))
                 if task:

@@ -9,6 +9,20 @@ from datetime import datetime, timezone
 MAX_MONTHLY_BUDGET = 20.0
 
 
+def unlimited_authorized(connection):
+    row = connection.execute("SELECT value FROM settings WHERE key='ai_budget_unlimited'").fetchone()
+    if not row or json.loads(row['value']) is not True:
+        return False
+    expiry = connection.execute("SELECT value FROM settings WHERE key='ai_budget_unlimited_until'").fetchone()
+    if not expiry or not json.loads(expiry['value']):
+        return True  # Explicit permanent selection in the settings UI.
+    try:
+        deadline = datetime.fromisoformat(json.loads(expiry['value']))
+        return deadline.tzinfo is not None and datetime.now(timezone.utc) < deadline
+    except (ValueError, TypeError):
+        return False
+
+
 def validate_budget(value):
     if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value) or not 0 <= value <= MAX_MONTHLY_BUDGET:
         raise ValueError('Monthly AI budget must be a finite amount between $0 and $20')
@@ -25,7 +39,7 @@ def price_config(db, provider):
 
 
 class Reservation:
-    def __init__(self, db, maximum_cost: float, budget: float, provider: str):
+    def __init__(self, db, maximum_cost: float, budget: float, provider: str, *, unlimited: bool = False):
         budget = validate_budget(budget)
         if isinstance(maximum_cost, bool) or not isinstance(maximum_cost, (int, float)) or not math.isfinite(maximum_cost) or maximum_cost < 0:
             raise ValueError('Invalid maximum AI request cost')
@@ -33,11 +47,14 @@ class Reservation:
         self.key = "ai_usage:" + datetime.now(timezone.utc).strftime("%Y-%m")
         self.settled = False
         with db.transaction() as connection:
+            # Both the caller and the current authoritative ledger must opt in.
+            # A cached QA configuration cannot override a revoked authorization.
+            unlimited = unlimited is True and unlimited_authorized(connection)
             configured = connection.execute("SELECT value FROM settings WHERE key='monthly_budget'").fetchone()
             if configured:
                 budget = min(budget, validate_budget(json.loads(configured['value'])))
             usage = self._read(connection)
-            if maximum_cost > 0 and usage["cost"] + maximum_cost > budget:
+            if not unlimited and maximum_cost > 0 and usage["cost"] + maximum_cost > budget:
                 raise ValueError("Monthly AI budget would be exceeded")
             usage["cost"] += maximum_cost
             usage["calls"] += 1
@@ -86,6 +103,7 @@ def decision_settings(db, settings: dict, secret_store):
             (64000 * prices["input_cost_per_million"] + 2000 * prices["output_cost_per_million"]) / 1_000_000,
             float(settings.get("monthly_budget", 0)),
             "jev",
+            unlimited=settings.get("ai_budget_unlimited") is True,
         )
         return True
 

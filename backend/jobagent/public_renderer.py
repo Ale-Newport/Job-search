@@ -71,13 +71,25 @@ def public_search_request(method: str, url: str, body: str | None) -> bool:
 
 
 async def render_public_page(url: str) -> tuple[str, str]:
+    try:
+        return await _render_public_page(url)
+    except ValueError as error:
+        if 'net::ERR_HTTP2_PROTOCOL_ERROR' not in str(error):
+            raise
+        # Retry a broken protocol negotiation once using ordinary HTTP/1.1.
+        # The same anonymous context and public-request restrictions apply.
+        return await _render_public_page(url, http1=True)
+
+
+async def _render_public_page(url: str, *, http1: bool = False) -> tuple[str, str]:
     from playwright.async_api import async_playwright
 
     await validate_public_url(url)
     if os.environ.get('MERIDIAN_TEST'):
         raise ValueError('No readable public job collection found; public browser fallback requires an explicit browser integration test')
     async with async_playwright() as runtime:
-        browser = await runtime.chromium.launch(channel='chrome', headless=True)
+        browser = await runtime.chromium.launch(channel='chrome', headless=True,
+                                                **({'args': ['--disable-http2']} if http1 else {}))
         try:
             context = await browser.new_context(service_workers='block', accept_downloads=False)
             allowed_hosts = set()

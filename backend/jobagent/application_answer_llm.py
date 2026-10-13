@@ -364,7 +364,15 @@ class ApplicationAnswerLLM:
             validate_budget(budget)
         except ValueError as exc:
             raise ConfigurationError(str(exc)) from exc
-        if isinstance(budget, bool) or not isinstance(budget, (int, float)) or not math.isfinite(budget) or budget <= 0:
+        unlimited = settings.get('ai_budget_unlimited') is True
+        if unlimited:
+            from .usage import unlimited_authorized
+            connection = self.usage_db._connect()
+            try:
+                unlimited = unlimited_authorized(connection)
+            finally:
+                connection.close()
+        if not unlimited and budget <= 0:
             raise ConfigurationError('Set a positive monthly AI spending cap before using a cloud answer model. A zero cap disables remote calls, including connection tests.')
         if self.usage_db is not self.db:
             row = self.usage_db.one("SELECT value FROM settings WHERE key='monthly_budget'")
@@ -373,7 +381,7 @@ class ApplicationAnswerLLM:
                 validate_budget(live_budget)
             except (ValueError, TypeError) as exc:
                 raise ConfigurationError('The shared live monthly AI spending cap is invalid. Set a positive authorized cap in live settings.') from exc
-            if isinstance(live_budget, bool) or not isinstance(live_budget, (int, float)) or not math.isfinite(live_budget) or live_budget <= 0:
+            if not unlimited and live_budget <= 0:
                 raise ConfigurationError('The shared live monthly AI spending cap is zero. Set a positive authorized cap in live settings before running cloud calibration.')
             budget = min(budget, live_budget)
         row = self.db.one('SELECT config FROM integrations WHERE provider=?', (provider,))
@@ -538,7 +546,8 @@ class ApplicationAnswerLLM:
         for attempt in range(retries + 1):
             if attempt and payload.get('question_id'):
                 await self._progress(payload['question_id'], payload.get('intent'), 'RETRYING', attempt)
-            reservation = Reservation(self.usage_db, upper, budget, provider)
+            reservation = Reservation(self.usage_db, upper, budget, provider,
+                                      unlimited=settings.get('ai_budget_unlimited') is True)
             try:
                 async with httpx.AsyncClient(timeout=timeout, trust_env=False, follow_redirects=False, **({'transport': self.transport} if self.transport else {})) as client:
                     response = await client.post(url, headers=headers, json=body)
@@ -743,6 +752,34 @@ class ApplicationAnswerLLM:
         review_schema = json.loads(json.dumps(REVIEW_SCHEMA))
         review_schema['properties']['question_id']['enum'] = [qid]
         context = QuestionContext(qid, question, intent, job.get('application_id', job.get('id')), job.get('job_id'), job.get('company_id'), digest(payload), json.dumps(payload, ensure_ascii=False))
+        # Reuse only a previously validated answer to the identical question,
+        # evidence, job, constraints and review policy. Ephemeral DOM/run IDs
+        # are rebound; changed evidence or company context forces a new draft.
+        cache_payload = {**payload, 'answer_request': {**payload['answer_request']}}
+        for key in ('question_id', 'application_id'):
+            cache_payload.pop(key, None)
+        cache_payload['answer_request'].pop('question_id', None)
+        cache_payload['previous_answers'] = [{key: value for key, value in item.items() if key != 'question_id'}
+                                            for item in cache_payload.get('previous_answers', [])]
+        cache_key = 'validated_answer_cache:' + digest([cache_payload,
+            settings.get('text_provider'), settings.get('text_model'),
+            settings.get('text_fallback_model'), settings.get('text_quality_review', True)])
+        cached = self.db.one('SELECT value FROM settings WHERE key=?', (cache_key,))
+        if cached:
+            try:
+                result = json.loads(cached['value'])
+                if (result.get('state') == 'ANSWER_VALIDATED' and result.get('quality', {}).get('passed') is True
+                        and isinstance(result.get('answer'), str)
+                        and hashlib.sha256(result['answer'].encode()).hexdigest() == result.get('answer_hash')
+                        and set(result.get('facts_used', [])).issubset({f['id'] for f in facts})):
+                    result.update(id=str(uuid4()), question_id=qid, context_hash=context.context_hash,
+                                  cost=0, latency_ms=0, reused_validated_answer=True)
+                    if isinstance(result.get('quality', {}).get('review'), dict):
+                        result['quality']['review']['question_id'] = qid
+                    await self._progress(qid, intent, 'ANSWER_VALIDATED', 0)
+                    return result
+            except (ValueError, TypeError, AttributeError):
+                pass
         started = time.monotonic()
         concurrency = int(settings.get('text_concurrency', 2))
         if concurrency != self._concurrency and not self._active:
@@ -908,7 +945,7 @@ class ApplicationAnswerLLM:
                     await self._progress(qid, intent, 'ANSWER_VALIDATED', attempt)
                     answer_hash = hashlib.sha256(answer.encode()).hexdigest()
                     logger.info('answer_validated question_id=%s context_hash=%s answer_hash=%s provider=%s model=%s', qid, context.context_hash, answer_hash, usage['provider'], usage['model'])
-                    return {'id': str(uuid4()), **generated, 'question_id': qid, 'exact_question': question,
+                    result = {'id': str(uuid4()), **generated, 'question_id': qid, 'exact_question': question,
                             'intent': intent, 'answer': answer, 'facts_used': list(dict.fromkeys(generated['facts_used'])),
                             'form_value': generated['selected_options'] if output_requirements.get('options') else answer,
                             'word_count': len(answer.split()), 'confidence': min((review or {}).get('scores', {}).get('factual_support', .85), .95),
@@ -919,6 +956,9 @@ class ApplicationAnswerLLM:
                             'quality': {'passed': True, 'issues': [], 'scores': (review or {}).get('scores', {}), 'review': review,
                                         'restored_same_entity_citations': restored_citations,
                                         'deterministic_checks': 'passed', 'independent_review': 'passed' if review else 'disabled'}}
+                    self.db.execute('INSERT OR REPLACE INTO settings(key,value) VALUES(?,?)',
+                                    (cache_key, json.dumps(result, ensure_ascii=False)))
+                    return result
             finally:
                 self._active -= 1
 

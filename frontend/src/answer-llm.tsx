@@ -117,6 +117,7 @@ export function ApplicationAnswerLLMSetup({
               settings.text_full_professional_context,
               settings.text_fallback_model,
               settings.monthly_budget,
+              settings.ai_budget_unlimited,
               integrations.map((i) => [i.provider, i.config]),
             ])}
             ctx={ctx}
@@ -158,6 +159,7 @@ function AnswerLLMForm({
     text_full_professional_context: settings.text_full_professional_context ?? false,
     text_fallback_model: settings.text_fallback_model || "",
     monthly_budget: settings.monthly_budget ?? 0,
+    ai_budget_unlimited: settings.ai_budget_unlimited ?? false,
   });
   const [secret, setSecret] = useState("");
   const initialConfig =
@@ -593,6 +595,15 @@ function AnswerLLMForm({
                 </label>
                 {remote && (
                   <>
+                    <label className="field check-field">
+                      <span>Uncapped AI spending</span>
+                      <input
+                        type="checkbox"
+                        checked={values.ai_budget_unlimited}
+                        onChange={(e) => change("ai_budget_unlimited", e.target.checked)}
+                      />
+                      <small>Explicitly authorize paid calls without a spending ceiling. Usage is still tracked across providers. Turn off to restore the configured monthly limit.</small>
+                    </label>
                     <label className="field">
                       <span>Monthly AI usage limit (USD)</span>
                       <input
@@ -603,12 +614,13 @@ function AnswerLLMForm({
                         step={0.01}
                         value={values.monthly_budget}
                         required
+                        disabled={values.ai_budget_unlimited}
                         onChange={(e) =>
                           change("monthly_budget", Number(e.target.value))
                         }
                       />
                       <small>
-                        A positive cap is required for cloud calls. Connection
+                        A positive cap is required when uncapped spending is off. Connection
                         tests and all AI providers count toward this shared cap.
                         The maximum is $20/month; zero disables paid calls.
                       </small>

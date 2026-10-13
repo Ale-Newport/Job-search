@@ -14,6 +14,13 @@ VERIFIED_PUBLIC_FEEDS = {
         'published_board': {'kind': 'eightfold', 'url': 'https://apply.careers.microsoft.com/api/pcsx/search?domain=microsoft.com', 'config': {}},
         'board_evidence_url': 'https://apply.careers.microsoft.com/careers?domain=microsoft.com',
     },
+    'https://www.morganstanley.com/people-opportunities': {
+        'published_board': {'kind': 'eightfold',
+                            'url': 'https://morganstanley.eightfold.ai/api/pcsx/search?domain=morganstanley.com',
+                            'config': {}},
+        'board_evidence_url': 'https://www.morganstanley.com/careers/career-opportunities-search',
+        'feed_evidence_url': 'https://morganstanley.eightfold.ai/careers?domain=morganstanley.com',
+    },
     'https://www.lifeatspotify.com/jobs': {
         'public_job_feed': {'url': 'https://api.lifeatspotify.com/wp-json/animal/v1/job/search',
                             'collection_key': 'result', 'title_key': 'text', 'location_key': 'locations',
@@ -129,6 +136,20 @@ OFFICIAL_CAREERS = {
 }
 
 
+OFFICIAL_ACCESS_POLICIES = {
+    'https://www.metacareers.com/jobs/': {
+        'automation_requires_written_permission': True,
+        'evidence_url': 'https://www.metacareers.com/robots.txt',
+        'reason': 'The publisher requires express written permission for automated collection.',
+    },
+    'https://www.metacareers.com/jobsearch/': {
+        'automation_requires_written_permission': True,
+        'evidence_url': 'https://www.metacareers.com/robots.txt',
+        'reason': 'The publisher requires express written permission for automated collection.',
+    },
+}
+
+
 def seed_official_sources(db):
     """Add missing employer entry points, preserving all saved choices and portals."""
     for name, url in OFFICIAL_CAREERS.items():
@@ -148,6 +169,10 @@ def seed_official_sources(db):
     for source in db.query("SELECT id,url,config FROM sources WHERE kind='careers'"):
         verified = VERIFIED_PUBLIC_FEEDS.get(source['url'])
         config = json.loads(source['config'])
+        policy = OFFICIAL_ACCESS_POLICIES.get(source['url'])
+        if policy and 'access_policy' not in config:
+            config['access_policy'] = dict(policy)
+            db.execute('UPDATE sources SET config=?,updated_at=? WHERE id=?', (dumps(config), now(), source['id']))
         if verified and 'public_job_feed' not in config and 'published_board' not in config and 'public_sitemap' not in config:
             config.update(verified)
             db.execute('UPDATE sources SET config=?,updated_at=? WHERE id=?', (dumps(config), now(), source['id']))

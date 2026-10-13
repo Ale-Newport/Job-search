@@ -1,11 +1,10 @@
 """Fill-only browser boundary and independent DOM evidence for calibration."""
 
-import re
-
 from ..automation.runner import BrowserManager
 from ..automation.reasoning import conditional_state
 from ..automation.answers import selected_choice_matches, normalize, question_identity
 from ..intelligence.formatting import choice
+from ..automation.consent import resolution_element
 
 
 class DryRunBrowser(BrowserManager):
@@ -44,7 +43,7 @@ def audit_fields(snapshot, adapter, intelligence, result, job):
         seen.add(key)
         question = adapter.question(field)
         condition = conditional_state(field, snapshot["elements"], adapter)
-        context = {**field, "_condition": condition or {}}
+        context = {**resolution_element(field, snapshot['elements']), "_condition": condition or {}}
         reasoning = intelligence.answer_question(question, context, job)
         question_id = question_identity(job.get('id'), field, question)
         candidates = by_question.get(normalize(question), [])
@@ -68,9 +67,8 @@ def audit_fields(snapshot, adapter, intelligence, result, job):
         if field.get('type') == 'tel' and expected is not None and value:
             # ATS phone widgets can insert spacing without changing the number.
             # Compare the complete digit sequence, including the country code.
-            expected_digits = re.sub(r'\D', '', str(expected))
-            observed_digits = re.sub(r'\D', '', str(value))
-            match = bool(7 <= len(expected_digits) <= 15 and expected_digits == observed_digits)
+            from ..automation.answers import phone_matches
+            match = phone_matches(expected, field)
         if field.get('multiple'):
             if field.get('tag') == 'select':
                 selected = [o['label'] for o in field['options'] if o['value'] in field.get('selected_values', [])]

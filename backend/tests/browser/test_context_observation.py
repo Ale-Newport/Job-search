@@ -48,6 +48,122 @@ async def test_generic_and_shadow_field_descriptions_are_kept(context_browser):
     assert shadow["description"] == "Include the route and current study status."
 
 
+async def test_loading_announcements_and_repeated_entry_buttons(context_browser):
+    from jobagent.automation.browser import application_entry_target
+    await context_browser.page.set_content('''<h1>Software Engineer</h1>
+      <div role="alert">Loading screen</div><button>APPLY NOW</button><button>APPLY NOW</button>''')
+    snapshot = await context_browser.observe()
+    assert not snapshot['errors']
+    assert application_entry_target(snapshot)['label'] == 'APPLY NOW'
+    await context_browser.page.set_content('''<form><label>Email<input type="email"></label>
+      <button>APPLY NOW</button><button>APPLY NOW</button></form>
+      <div role="alert">Loading failed. Please retry.</div>''')
+    snapshot = await context_browser.observe()
+    assert application_entry_target(snapshot) is None
+    assert snapshot['errors'] == ['Loading failed. Please retry.']
+
+
+async def test_email_authentication_boundary_is_not_a_candidate_form(context_browser):
+    await context_browser.page.set_content('<h1>Job application</h1><p>Authentication screen.</p><label>Email Address<input type="email"></label><button>Next</button>')
+    snapshot = await context_browser.observe()
+    assert snapshot['login'] and snapshot['blocked']
+    await context_browser.page.set_content('<h1>Personal information</h1><label>Email Address<input type="email"></label><button>Next</button>')
+    snapshot = await context_browser.observe()
+    assert not snapshot['login'] and not snapshot['blocked']
+
+
+async def test_split_phone_verification_requires_the_observed_country(context_browser):
+    from jobagent.automation.answers import phone_matches
+    await context_browser.page.set_content('''<div><button aria-label="Change country for phone number, currently selected United Kingdom (+44)"></button>
+      <label>Phone<input type="tel" value="7700900123"></label></div>''')
+    field = next(e for e in (await context_browser.observe())['elements'] if e.get('type') == 'tel')
+    assert field['phone_country_code'] == '44'
+    assert phone_matches('+447700900123', field)
+    assert not phone_matches('+347700900123', field)
+    assert not phone_matches('+447700900123', {**field, 'phone_country_code': None})
+
+
+async def test_clipped_file_control_uses_its_exact_associated_visible_label(context_browser, tmp_path):
+    from jobagent.automation.types import Decision, Operation
+    approved = tmp_path / 'approved.txt'
+    approved.write_text('Synthetic approved CV')
+    context_browser.allowed_uploads = {approved.resolve()}
+    await context_browser.page.set_content('''<label for="cv">Resume</label>
+      <input id="cv" type="file" style="position:absolute;width:1px;height:1px;clip-path:inset(50%)">
+      <label for="cv" style="display:block;width:160px;height:40px">Choose file</label>''')
+    snapshot = await context_browser.observe()
+    field = next(e for e in snapshot['elements'] if e.get('type') == 'file')
+    assert field['upload_proxy_id'] is not None
+    await context_browser.execute(Decision(Operation.UPLOAD, field['index']), snapshot, file_path=str(approved))
+    assert await context_browser.page.locator('#cv').evaluate('n => n.files[0].name') == 'approved.txt'
+
+
+async def test_accessible_wrappers_keep_group_question_and_deduplicate_native_toggles(context_browser):
+    from jobagent.automation.adapters import get_adapter
+    await context_browser.page.set_content('''<p id="question">Are you currently studying?</p>
+      <fieldset role="radiogroup" aria-labelledby="question">
+        <div role="radio" aria-checked="false" aria-labelledby="question yes"><label>
+          <input aria-hidden="true" type="radio" name="study" value="true"><span id="yes">Yes</span></label></div>
+        <div role="radio" aria-checked="false" aria-labelledby="question no"><label>
+          <input aria-hidden="true" type="radio" name="study" value="false"><span id="no">No</span></label></div>
+      </fieldset>''')
+    fields = [e for e in (await context_browser.observe())['elements'] if e['role'] == 'radio']
+    assert len(fields) == 2
+    assert [e['label'] for e in fields] == ['Yes', 'No']
+    assert {e['group'] for e in fields} == {'study'}
+    assert {get_adapter('https://apply.workable.com').question(e) for e in fields} == {'Are you currently studying?'}
+
+
+async def test_readonly_combobox_value_is_a_committed_choice_only_when_closed(context_browser):
+    await context_browser.page.set_content('''<input id="closed" readonly role="combobox" value="Other" aria-expanded="false">
+      <input id="open" readonly role="combobox" value="Other" aria-expanded="true">
+      <input id="search" role="combobox" value="Other" aria-expanded="false">''')
+    fields = {e['id']: e for e in (await context_browser.observe())['elements']}
+    assert fields['closed']['selected_text'] == 'Other'
+    assert not fields['open']['selected_text'] and not fields['search']['selected_text']
+
+
+async def test_legacy_visual_checkbox_uses_its_label_and_observed_indicator(context_browser):
+    from jobagent.automation.types import Decision, Operation
+    await context_browser.page.set_content('''<style>.checkbox {width:20px;height:20px;pointer-events:none}.checkmark{display:none}
+      .checked .checkmark {display:block;width:8px;height:8px}.label-text{display:block;width:200px;height:25px}</style>
+      <div class="form-field"><label for="backing">Preferences (select one or more)</label>
+      <div><div class="checkbox"><div class="checkmark"></div></div><span class="label-text" onclick="this.previousElementSibling.classList.toggle('checked');document.querySelector('#backing').value='Option A'">Option A</span></div>
+      <input id="backing" tabindex="-1" type="text"></div>''')
+    snapshot = await context_browser.observe()
+    toggles = [e for e in snapshot['elements'] if e['role'] == 'checkbox']
+    assert len(toggles) == 1 and not toggles[0]['checked']
+    assert not any(e['id'] == 'backing' for e in snapshot['elements'])
+    await context_browser.execute(Decision(Operation.CHECK, toggles[0]['index']), snapshot)
+    assert next(e for e in (await context_browser.observe())['elements'] if e['role'] == 'checkbox')['checked']
+
+
+async def test_scripted_cookie_rejection_anchor_is_a_button_not_navigation(context_browser):
+    await context_browser.page.set_content('<p>We use cookies</p><a onclick="this.remove()">REJECT ALL</a><a>Decorative anchor</a>')
+    fields = (await context_browser.observe())['elements']
+    assert len(fields) == 1 and fields[0]['role'] == 'button'
+    assert fields[0]['operations'] == ['CLICK']
+
+
+async def test_backed_legacy_dropdown_exposes_selection_options_and_phone_code(context_browser):
+    await context_browser.page.set_content('''<div class="phone-inputs"><div class="standard-dropdown">
+      <div class="preview-box" role="button" aria-expanded="false" aria-controls="countries">
+        <p>+44</p><input type="hidden" name="phone_country_code" value="United Kingdom (+44)"></div>
+      <div class="dropdown-container" id="countries" style="display:none"><li data-dropdown-selection="United Kingdom (+44)">United Kingdom (+44)</li></div>
+      </div><label>Phone<input type="tel" value="7700900123"></label></div>''')
+    fields = (await context_browser.observe())['elements']
+    combo = next(e for e in fields if e['role'] == 'combobox')
+    phone = next(e for e in fields if e['type'] == 'tel')
+    assert combo['label'] == 'phone country code'
+    assert combo['selected_text'] == 'United Kingdom (+44)'
+    assert combo['options'] == [{'label': 'United Kingdom (+44)', 'value': 'United Kingdom (+44)'}]
+    assert phone['phone_country_code'] == '44' and phone['phone_national_only']
+    await context_browser.page.locator('.preview-box').evaluate("n => {n.setAttribute('role','combobox');n.setAttribute('aria-expanded','true');document.querySelector('#countries').style.display='block';}")
+    fields = (await context_browser.observe())['elements']
+    assert next(e for e in fields if e['role'] == 'combobox')['name'] == 'phone_country_code'
+    assert next(e for e in fields if e['role'] == 'option')['label'] == 'United Kingdom (+44)'
+
+
 async def test_employer_context_excludes_all_candidate_widgets_and_errors(context_browser):
     await context_browser.page.set_content("""
       <h1>Machine Learning Engineer</h1><div id="content">

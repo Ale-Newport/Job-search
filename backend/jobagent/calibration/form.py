@@ -96,6 +96,9 @@ async def run(args):
                              "skip_optional_unknown": True, "browser_max_steps": 250,
                              "default_mode": "review", "auto_apply": False,
                              "browser_engine": "deterministic"})
+            if args.local_options:
+                from jobagent.automation.engines import SystemOneEngine
+                settings['_local_option_engine'] = SystemOneEngine('laya', endpoint=settings.get('laya_endpoint'))
             result = await browser.fill_application(job, facts, documents, "REVIEW", settings)
             snapshot = await browser.observe()
         else:
@@ -130,5 +133,15 @@ def main(argv=None):
     parser.add_argument("--fill", action="store_true")
     parser.add_argument("--headless", action="store_true")
     parser.add_argument("--allow-remote", action="store_true")
+    parser.add_argument('--local-options', action='store_true', help='Use local Laya for supported observed option matching; never cloud demographics')
+    parser.add_argument('--uncapped-validation', action='store_true', help='Explicitly authorize a ten-minute uncapped lease; restore previous controls on exit')
     parser.add_argument("--usage-database", type=Path, help="Existing live database supplying current nonsecret model settings and the shared monthly usage ledger")
-    asyncio.run(run(parser.parse_args(argv)))
+    args = parser.parse_args(argv)
+    if args.uncapped_validation:
+        if not args.allow_remote or not args.usage_database:
+            parser.error('--uncapped-validation requires --allow-remote and --usage-database')
+        from .budget import uncapped_validation
+        with uncapped_validation(args.usage_database):
+            asyncio.run(run(args))
+    else:
+        asyncio.run(run(args))

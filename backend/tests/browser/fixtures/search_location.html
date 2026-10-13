@@ -9,6 +9,7 @@ window.submissions=0;window.queries=[];
 const input=document.querySelector('#location'), portal=document.querySelector('#portal');
 const alternate=new URLSearchParams(location.search).has('alternate');
 let choices=alternate ? ['London, Ontario, Canada','London (UK)','London, Greater London, England'] : ['London, Ontario, Canada','London, Greater London, England, United Kingdom','London (UK)'];
+if(new URLSearchParams(location.search).has('greater_only'))choices=['London, Ontario, Canada','Greater London, England, UK'];
 if(new URLSearchParams(location.search).has('single_uk_label'))choices=choices.slice(0,2);
 const render=search=>{window.queries.push(search);input.setAttribute('aria-expanded','true');portal.innerHTML='<div id="places" role="listbox"></div>';
  if(search.toLowerCase()!=='london') return;

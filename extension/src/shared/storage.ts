@@ -239,6 +239,10 @@ async function decidePlacement(): Promise<CredentialPlacement> {
   } catch {
     // refused: treated exactly like an engine without the API
   }
+  // Safari: IndexedDB opens inside the worker but its transactions never run (measured with a WKWebExtension of this build: the
+  // first `get` never answers), so a vault there is a pairing that hangs. The credential stays in storage.session, which content
+  // scripts cannot read: it is lost when Safari quits and the user connects again (the documented fail-closed tier).
+  if (typeof __SAFARI__ !== "undefined" && __SAFARI__) return "session";
   return vaultSupported() ? "sealed" : "session";
 }
 
@@ -312,6 +316,11 @@ export async function getConnection(slot: CredentialSlot = "current"): Promise<S
     if (where === "local") return normalizeConnection(raw);
     const sealed = normalizeSealedConnection(raw);
     if (sealed) return openSealed(sealed, slot);
+  }
+  if (where !== "session") {
+    // where the credential lives when the vault could not hold it (a worker restarted with the vault still unavailable)
+    const fromSession = normalizeConnection(await sessionGet(keys.session));
+    if (fromSession) return fromSession;
   }
   // A plaintext credential written where content scripts can read it (before protection existed, or by an older
   // build): hand it to the protected store and scrub the plaintext copy.

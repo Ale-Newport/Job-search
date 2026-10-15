@@ -451,6 +451,9 @@ export async function bridgeFetch<T>(port: number, path: string, creds: BridgeCr
   const init: RequestInit = {
     method: options.method ?? "GET", headers, cache: "no-store", credentials: "omit", redirect: "error", referrerPolicy: "no-referrer",
   };
+  // Safari sends `Origin: null` on a POST whose referrer policy is no-referrer (fetch spec, no-cors mode), and the bridge binds
+  // every credential to the extension's real origin: a POST says who it is with the origin-only policy (no path ever leaves).
+  if (init.method !== "GET" && init.method !== "HEAD") init.referrerPolicy = "origin";
   if (options.version && VERSION_PATTERN.test(options.version)) headers[VERSION_HEADER] = options.version;
   if (options.body !== undefined) {
     const json = JSON.stringify(options.body);

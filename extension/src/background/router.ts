@@ -7,6 +7,7 @@ import type {
 } from "../shared/protocol";
 import type { BgRequest, BgResponse, ConnectionState, CtxInfo, Diagnostics, HintConfig, StoredPrefs } from "../shared/messages";
 import { PROTOCOL } from "../shared/protocol";
+import { trace } from "../shared/trace";
 import { applyBadge } from "../shared/badge";
 import type { BadgeKind } from "../shared/badge";
 import { candidatePorts } from "../shared/bridge-client";
@@ -202,13 +203,28 @@ async function openMeridianApp(): Promise<void> {
   }
 }
 
+/** The extension's own address without scheme or slashes (an id, not a secret): lets the console show what the bridge is looking at. */
+function ownHost(): string {
+  try {
+    return chrome.runtime.getURL("").replace(/^[a-z-]+:\/\//i, "").replace(/\/+$/, "");
+  } catch {
+    return "";
+  }
+}
+
 export async function handleMessage(message: unknown, sender: Sender): Promise<BgResponse> {
   let response: BgResponse;
   try {
     response = await dispatch(message, sender);
   } catch (error) {
-    if (error instanceof BridgeCallError) response = { ok: false, error: error.detail };
-    else return fail("internal", "Unexpected error in the extension.");
+    const request = (message as { t?: unknown } | null)?.t;
+    if (error instanceof BridgeCallError) {
+      trace("request failed", { t: typeof request === "string" ? request : "?", code: String((error.detail as { code?: unknown }).code ?? ""), why: String((error.detail as { detail?: unknown }).detail ?? ""), ext: ownHost() });
+      response = { ok: false, error: error.detail };
+    } else {
+      trace("request crashed", { t: typeof request === "string" ? request : "?", kind: error instanceof Error ? error.name : "unknown" });
+      return fail("internal", "Unexpected error in the extension.");
+    }
   }
   return isExtensionPage(sender) ? response : pageResponse(response);
 }

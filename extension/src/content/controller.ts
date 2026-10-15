@@ -326,8 +326,11 @@ export class Controller {
   private async toggle(): Promise<void> {
     if (this.orphaned) return;
     if (this.activating) {
-      await this.activating; // a second click while the first is still starting is the same wish, not the opposite
-      return;
+      // A second click while the first is still starting is the same wish, not the opposite: wait for it, but never for ever.
+      // A start that hangs (a worker that does not answer) must not make every later click a no-op: give up on it and start afresh.
+      const settled = await Promise.race([this.activating.then(() => true), sleep(3000).then(() => false)]);
+      if (settled) return;
+      this.activating = null;
     }
     if (window !== window.top) {
       // frames follow the top frame (it relays "deactivate"): they only need to be running
@@ -364,10 +367,10 @@ export class Controller {
   private async start(auto: boolean): Promise<void> {
     if (isOrphaned()) return;
     // the worker may be waking up: a failed first answer is retried before giving up
-    let res = await sendBg<"ctx">({ t: "ctx" });
+    let res = await sendBg<"ctx">({ t: "ctx" }, 6000);
     for (let attempt = 0; !res.ok && res.error.code !== "orphaned" && attempt < 3; attempt++) {
       await sleep(400 * (attempt + 1));
-      res = await sendBg<"ctx">({ t: "ctx" });
+      res = await sendBg<"ctx">({ t: "ctx" }, 6000);
     }
     if (!res.ok) {
       if (res.error.code === "orphaned") this.handleOrphaned();
@@ -1869,6 +1872,8 @@ export class Controller {
         this.setConnection(r.data.connection);
       } else if (r.error.connection) {
         this.setConnection(r.error.connection);
+      } else if (Date.now() < res.data.expiresAt + 3000) {
+        this.pairingTimer = after(() => spawn(poll()), 2000); // a hiccup (the worker was asleep, a slow answer) must not strand the code on screen
       }
     };
     this.pairingTimer = after(() => spawn(poll()), 1500);

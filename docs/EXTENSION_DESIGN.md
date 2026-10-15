@@ -101,7 +101,7 @@ The Chrome extension id is pinned by `extension/manifest-key.txt` (public key on
 
 The worker proves the listener **before every credentialed request**, not once: `proveConnection` is the only producer of credentials, requests that start together share one fresh hello, a proof is never reused for a later request, and `bridgeFetch` refuses credentials it was not handed by a verified proof (a unit test pins that only `connection.ts` marks them). Hello probes carry the client id only, never the token. A well-formed hello is required to count as Meridian (`isRecognisedHello`). **Residual limits:** the proof and the request are separate connections, so a local process that takes over the port between them could receive that one request; and before the first pairing no secret exists, so the first pairing relies on exactly one program answering and on the user typing the code into the window Meridian itself opens.
 
-The credential is stored in `storage.local` with access restricted to trusted contexts where the engine supports it (Chrome); otherwise it is AES-GCM-encrypted under a non-extractable key in the extension's own IndexedDB (`vault.ts`); failing that it lives in `storage.session` only.
+The credential is stored in `storage.local` with access restricted to trusted contexts where the engine supports it (Chrome); otherwise it is AES-GCM-encrypted under a non-extractable key in the extension's own IndexedDB (`vault.ts`); failing that it lives in `storage.session` only. Safari always takes the last tier: its worker opens IndexedDB but the transactions never answer (measured with a WKWebExtension harness), so the vault would hang the pairing; the credential lives in `storage.session` and the user connects again after Safari quits.
 
 ### 4.4 Errors
 

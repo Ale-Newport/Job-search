@@ -2,6 +2,7 @@
 // The worker is the only poller that ever claims the token, and polls are de-duplicated, so a token that the server
 // releases exactly once cannot be lost to a race between the options page, a panel and the worker's own watcher.
 
+import { trace } from "../shared/trace";
 import type { PairStartRequest, PairStartResponse, PairStatusResponse } from "../shared/protocol";
 import type { ConnectionState, PairStarted } from "../shared/messages";
 import { BridgeHttpError, BridgeNetworkError, bridgeFetch } from "../shared/bridge-client";
@@ -98,7 +99,10 @@ export function pollPairing(pairingId: string): Promise<PairPollResult> {
 async function settled(pairingId: string, state: PairState): Promise<PairPollResult> {
   // only OUR pairing is retired: if the user already started another one, its record and alarm stay
   if (await clearPairingIf(pairingId)) await clearPairingAlarm();
-  return { state, connection: (await resolveConnection({ force: true })).state };
+  trace("pair resolving", { state });
+  const connection = (await resolveConnection({ force: true })).state;
+  trace("pairing settled", { state, phase: connection.phase });
+  return { state, connection };
 }
 
 async function pollOnce(pairingId: string): Promise<PairPollResult> {
@@ -113,6 +117,7 @@ async function pollOnce(pairingId: string): Promise<PairPollResult> {
   try {
     status = await bridgeFetch<PairStatusResponse>(record.port, `/v1/pair/${encodeURIComponent(pairingId)}`, null, { timeoutMs: 8000, version: ownVersion() });
   } catch (error) {
+    trace("pair status failed", { kind: error instanceof Error ? error.name : "unknown", code: error instanceof BridgeHttpError ? error.code : "" });
     if (error instanceof BridgeHttpError) {
       if (error.status === 404 || error.code === "not_found" || error.code === "expired") return settled(pairingId, "expired");
       if (error.code === "restoring" || error.code === "disabled") throw failureFromState((await resolveConnection({ force: true })).state);
@@ -124,11 +129,13 @@ async function pollOnce(pairingId: string): Promise<PairPollResult> {
     }
     throw error;
   }
+  trace("pair status", { state: status.state });
   switch (status.state) {
     case "pending":
       return { state: "pending", connection: (await resolveConnection()).state };
     case "approved": {
       const parsed = parseToken(status.token);
+      trace("pair approved", { parsed: parsed !== null });
       if (!parsed || (status.client_id && status.client_id !== parsed.clientId)) return settled(pairingId, "expired");
       // A credential that is already stored is NOT thrown away: the newcomer may be a listener nobody could vouch for. The old one
       // stays as the fallback (connection.ts promotes it back when the app that issued it answers with its proof; the newer one
@@ -142,6 +149,7 @@ async function pollOnce(pairingId: string): Promise<PairPollResult> {
         port: record.port, clientId: parsed.clientId, token: status.token as string,
         clientName: describeBrowser(), pairedAt: new Date().toISOString(),
       });
+      trace("pair stored");
       await sessionRemove(KEYS.revoked);
       return settled(pairingId, "approved");
     }

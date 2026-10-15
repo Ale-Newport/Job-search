@@ -173,3 +173,21 @@ test("a proof that is too old and cannot be renewed means nothing is sent, and t
   assert.equal(gateStats(w.bridge.port).active, 0, "no slot is leaked");
   await assert.rejects(bridgeFetch(w.bridge.port, "/v1/status", creds, { reprove: async () => ({ ...fresh, port: fresh.port + 1 }) }), (error) => /out of date/.test(error.message));
 });
+
+test("a POST names its origin (Safari sends `Origin: null` when the referrer policy is no-referrer) while a GET sends no referrer at all", async () => {
+  const w = await setup({ paired: {} });
+  const seen = [];
+  const real = globalThis.fetch;
+  globalThis.fetch = (url, init) => { seen.push({ method: init?.method, policy: init?.referrerPolicy }); return real(url, init); };
+  try {
+    await bridgeCall("/v1/status").catch(() => undefined);
+    await bridgeCall("/v1/feedback", { method: "POST", body: { x: 1 } }).catch(() => undefined);
+  } finally {
+    globalThis.fetch = real;
+  }
+  const get = seen.find((entry) => entry.method === "GET");
+  const post = seen.find((entry) => entry.method === "POST");
+  assert.equal(get?.policy, "no-referrer");
+  assert.equal(post?.policy, "origin");
+  assert.ok(w);
+});

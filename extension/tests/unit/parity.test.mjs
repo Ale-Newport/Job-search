@@ -85,5 +85,6 @@ test("the worker never calls an optional API without testing for it first", () =
 });
 
 test("nothing in the worker, the shared code or the pages logs: a credential can never reach a console by accident", () => {
-  for (const { path, text } of sources) assert.doesNotMatch(text, /\bconsole\.(log|info|warn|error|debug|trace|dir)\b/, path);
+  // shared/trace.ts is the one sanctioned console writer: it prints only booleans, numbers and short plain words (see its header)
+  for (const { path, text } of sources) if (!/shared[\\/]trace\.ts$/.test(path)) assert.doesNotMatch(text, /\bconsole\.(log|info|warn|error|debug|trace|dir)\b/, path);
 });

@@ -174,3 +174,19 @@ test("setConnection refuses anything that is not a whole credential", async () =
   await clearConnection(); // clearing nothing is fine
   assert.equal(await getConnection(), null);
 });
+
+test("on Safari the credential never goes through the IndexedDB vault (its transactions never answer in the worker)", async () => {
+  const w = await setup();
+  delete w.chrome.storage.local.setAccessLevel;
+  installFakeIndexedDB(); // present, as in Safari, but not to be used
+  globalThis.__SAFARI__ = true;
+  resetCredentialPlacement();
+  try {
+    assert.equal(await credentialPlacement(), "session");
+    const issued = await pairFreshly(w);
+    assert.equal(containsSecret(w.chrome.storage.local, issued), false, "nothing secret in storage.local");
+    assert.equal((await getConnection()).token, issued.token, "the credential is read back from storage.session");
+  } finally {
+    delete globalThis.__SAFARI__;
+  }
+});

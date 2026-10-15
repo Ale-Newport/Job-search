@@ -34,15 +34,28 @@ function request<T>(req: IDBRequest<T>): Promise<T> {
   });
 }
 
+/** The longest the vault waits for the browser's IndexedDB: some engines never answer from a worker (Safari), and a credential that waits for ever is a pairing that never finishes. */
+export const VAULT_TIMEOUT_MS = 2500;
+
 function openDatabase(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error("indexeddb timeout")), VAULT_TIMEOUT_MS);
     const opening = indexedDB.open(DB_NAME, 1);
+    const done = <T>(fn: (value: T) => void) => (value: T): void => { clearTimeout(timer); fn(value); };
+    opening.onsuccess = done(() => resolve(opening.result));
+    opening.onerror = done(() => reject(opening.error ?? new Error("indexeddb")));
+    opening.onblocked = done(() => reject(new Error("indexeddb blocked")));
     opening.onupgradeneeded = () => {
       if (!opening.result.objectStoreNames.contains(STORE)) opening.result.createObjectStore(STORE);
     };
-    opening.onsuccess = () => resolve(opening.result);
-    opening.onerror = () => reject(opening.error ?? new Error("indexeddb"));
-    opening.onblocked = () => reject(new Error("indexeddb blocked"));
+  });
+}
+
+/** `work`, or a rejection once `ms` have passed: the caller moves on (the vault answers "unavailable") and the next call starts clean. */
+function within<T>(ms: number, work: Promise<T>): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error("vault timeout")), ms);
+    work.then((value) => { clearTimeout(timer); resolve(value); }, (error) => { clearTimeout(timer); reject(error); });
   });
 }
 
@@ -50,7 +63,7 @@ let keyLock: Promise<unknown> = Promise.resolve();
 
 /** The vault key; created on first use when `create` is set. Creation is serialised so two callers never end with two keys. */
 async function vaultKey(create: boolean): Promise<CryptoKey | null> {
-  const run = keyLock.then(async () => {
+  const run = within(VAULT_TIMEOUT_MS * 2, keyLock.then(async () => {
     const db = await openDatabase();
     try {
       const read = (): Promise<CryptoKey | undefined> => request(db.transaction(STORE, "readonly").objectStore(STORE).get(KEY_ID));
@@ -67,7 +80,7 @@ async function vaultKey(create: boolean): Promise<CryptoKey | null> {
     } finally {
       db.close();
     }
-  });
+  }));
   keyLock = run.catch(() => undefined);
   return run;
 }

@@ -240,7 +240,7 @@ The page address that is stored or sent to a model first has parameters that loo
 
 ## 10. Administration and privacy notes
 
-- The extension holds no secrets. Its credential (`mrd1.<id>.<secret>`) is created by an approved pairing, stored hashed (SHA-256) in Meridian, and revocable in Settings > Browser assistant. In Chrome it is kept in extension storage that content scripts cannot read; where a browser cannot restrict that (Safari), it is encrypted with a non-extractable key that lives in the extension's own IndexedDB, and failing that kept for the browser session only.
+- The extension holds no secrets. Its credential (`mrd1.<id>.<secret>`) is created by an approved pairing, stored hashed (SHA-256) in Meridian, and revocable in Settings > Browser assistant. In Chrome it is kept in extension storage that content scripts cannot read; in Safari it is kept in `storage.session` (unreadable by content scripts) for the browser session only, so after quitting Safari you connect once more.
 - Backups never contain paired browsers, pairing records, assisted-page history or audit lines; every browser pairs again after a restore. Saved answers and the profile are part of the normal backup.
 - Field-level audit events (never values) are pruned after 90 days; pages that never led to a job or application after a year.
 - The bridge's logs omit request bodies and access logs; tokens are redacted (`mrd1.[redacted]`).

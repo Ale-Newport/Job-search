@@ -79,6 +79,7 @@ let ownDigestPromise: Promise<string> | null = null;
  */
 export function ownDigest(): Promise<string> {
   ownDigestPromise ??= (async () => {
+    if (typeof __SAFARI__ !== "undefined" && __SAFARI__) return ""; // the Safari build carries no stamp: nothing to fetch
     try {
       const response = await fetch(chrome.runtime.getURL("build.json"), { cache: "no-store" });
       if (!response.ok) return "";

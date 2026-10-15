@@ -8,6 +8,7 @@ import type { BadgeKind } from "../shared/badge";
 import { bridgeCall, cachedConnection, resolveConnection } from "../shared/connection";
 import { hostMatchesRules, hostOf, isRestrictedUrl, matchesAnyPattern, originOf } from "../shared/hosts";
 import { hasHost } from "../shared/permissions";
+import { trace } from "../shared/trace";
 import { alwaysOnRules, getConnection, getPrefs, markSettingsHeard, rememberSettings, settingsHeardAt } from "../shared/storage";
 import {
   clearPending, clearTabState, getPending, getTabState, injectContent, listTabStates, openOptions, sendToTab, setTabState,
@@ -115,6 +116,7 @@ export async function activateTab(tabId: number, options: { auto?: boolean; url?
     }
   }
   const outcome = await injectContent(tabId, url);
+  trace("inject", outcome.ok ? { ok: true, frames: outcome.frames, fresh: outcome.fresh.length } : { ok: false, reason: outcome.reason });
   if (!outcome.ok) {
     await clearTabState(tabId);
     await clearPending(tabId); // nothing can pick the record up where the assistant cannot run
@@ -198,6 +200,8 @@ async function topFrameHasContent(tabId: number): Promise<boolean> {
 export async function onActionClicked(tab: chrome.tabs.Tab): Promise<void> {
   if (typeof tab.id !== "number") return;
   const state = await getTabState(tab.id);
+  // Breadcrumbs for the worker's console (Safari: Develop > Web Extension Background Content): the host only, never page text.
+  trace("toolbar click", { tab: tab.id, host: hostOf(tab.url ?? ""), stored: state?.active === true });
   if (state?.active && (await topFrameHasContent(tab.id))) {
     // the panel lives in the top frame: only it is asked (child frames follow the top frame's decision)
     if (await sendToTab(tab.id, { t: "activate", auto: false, toggle: true }, 0)) return;

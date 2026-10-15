@@ -412,7 +412,15 @@ class ApplicationAnswerLLM:
                 role = 'fallback' if selected == fallback and selected != model else 'selected'
                 raise ConfigurationError(f'Configure current cached input and cache write token prices for the exact {role} OpenAI answer model. Automatic cache writes may cost more than ordinary input; the spending cap requires model-bound cache rates.')
         selected_keys = rate_keys + OPENAI_CACHE_RATE_KEYS if provider == 'openai' else rate_keys
-        return {key: model_prices[model][key] for key in selected_keys}, float(budget)
+        rates = {key: model_prices[model][key] for key in selected_keys}
+        if provider != 'openai':
+            # What a request costs also depends on the cache hits the provider reports and on its off-peak hours: the rates the
+            # provider publishes for this exact model (or the ones the user configured for it) travel with the base rates
+            from .usage import SCHEDULE_KEYS, effective_rates
+            host = urlparse(provider_config(settings)[1]).hostname
+            full = effective_rates(host, model, model_prices[model])
+            rates.update({key: full[key] for key in SCHEDULE_KEYS if key in full})
+        return rates, float(budget)
 
     async def status(self, settings):
         provider = settings.get('text_provider', 'none')
@@ -574,6 +582,17 @@ class ApplicationAnswerLLM:
                 if any(isinstance(n, bool) or not isinstance(n, int) or n < 0 for n in (input_tokens, output_tokens)):
                     raise ProviderError('LLM returned invalid token accounting')
                 cost = (input_tokens * prices['input_cost_per_million'] + output_tokens * prices['output_cost_per_million']) / 1_000_000 if usage or local else upper
+                cache_hits = 0
+                if provider != 'openai' and not local and usage:
+                    # DeepSeek names the prompt tokens served from its context cache; other compatible endpoints put them in
+                    # prompt_tokens_details. Absent or inconsistent figures mean no discount: never a guess in the user's favour.
+                    reported = usage.get('prompt_cache_hit_tokens')
+                    if reported is None and isinstance(usage.get('prompt_tokens_details'), dict):
+                        reported = usage['prompt_tokens_details'].get('cached_tokens')
+                    if isinstance(reported, int) and not isinstance(reported, bool) and 0 <= reported <= input_tokens:
+                        cache_hits = reported
+                    from .usage import request_cost
+                    cost = request_cost(prices, input_tokens, cache_hits, output_tokens)
                 if provider == 'openai' and not local:
                     # Cache reads and writes are subsets of input_tokens, not
                     # additive charges. Without a complete valid breakdown,
@@ -590,6 +609,7 @@ class ApplicationAnswerLLM:
                         raise ProviderError('LLM returned invalid cache token accounting')
                     if all(key in usage for key in ('input_tokens', 'output_tokens')) and all(key in details for key in cache_keys):
                         cached, written = (details[key] for key in cache_keys)
+                        cache_hits = cached
                         ordinary = input_tokens - cached - written
                         cost = (ordinary * prices['input_cost_per_million']
                                 + cached * prices['cached_input_cost_per_million']
@@ -597,7 +617,7 @@ class ApplicationAnswerLLM:
                                 + output_tokens * prices['output_cost_per_million']) / 1_000_000
                     else:
                         cost = upper
-                reservation.settle(cost, input_tokens, output_tokens)
+                reservation.settle(cost, input_tokens, output_tokens, cache_hits)
                 total_cost += cost
                 if provider == 'openai':
                     if raw.get('status') not in (None, 'completed'):
@@ -731,20 +751,34 @@ class ApplicationAnswerLLM:
             group['fact_ids'].append(fact['id'])
             if fact['key'] in {'public_architecture_tradeoffs', 'public_implementation_details', 'contribution', 'challenge', 'approach', 'outcome'}:
                 group['verified_detail_fields'].append(fact['key'])
-        payload = {'question_id': qid, 'intent': intent, 'exact_question': question, 'question': question,
-                   'application_id': job.get('application_id', job.get('id')), 'job_id': job.get('job_id', job.get('id')),
-                   'company_id': job.get('company_id'),
-                   'verified_facts': facts, 'candidate_interests': [f for f in facts if 'interest' in f['key'] or 'preference' in f['key']],
+        # What stays the same from one question of an application to the next (the evidence, the job, the company) comes FIRST and
+        # what belongs to this question comes last: a provider's prompt cache serves the identical start of consecutive requests
+        # at a few percent of the price, and only a start that is identical can be served (key order is not a meaning: hashes sort).
+        shown, closest = facts, None
+        if complete_profile:
+            # The whole pool is sent whatever the question is, so its order says nothing: a fixed order keeps the beginning of
+            # every request of an application identical (what a provider's prompt cache can serve), and the facts closest to
+            # THIS question are named at the end instead of being put first.
+            closest = [fact['id'] for fact in facts[:16]]
+            shown = sorted(facts, key=lambda fact: (str(fact.get('category') or ''), str(fact.get('entity') or ''),
+                                                    str(fact.get('key') or ''), str(fact['id'])))
+        payload = {'verified_facts': shown, 'candidate_interests': [f for f in facts if 'interest' in f['key'] or 'preference' in f['key']],
                    'evidence_groups': list(evidence_groups.values()),
-                   'job': public_job, 'company_context': company_context, 'output_requirements': output_requirements,
-                   'field_context': {key:str(field.get(key) or '')[:2000] for key in
-                                     ('label','description','placeholder','section_label','type','tag')},
-                   'uploaded_resume': resume, 'previous_answers': previous, 'prompt_version': PROMPT_VERSION,
+                   'uploaded_resume': resume, 'job': public_job, 'company_context': company_context,
+                   'application_id': job.get('application_id', job.get('id')), 'job_id': job.get('job_id', job.get('id')),
+                   'company_id': job.get('company_id'), 'prompt_version': PROMPT_VERSION,
                    'context_mode': 'complete_professional' if complete_profile else 'question_retrieval',
                    'knowledge_version': retriever.knowledge.version,
+                   'question_id': qid, 'intent': intent, 'exact_question': question, 'question': question,
+                   'output_requirements': output_requirements,
+                   'field_context': {key:str(field.get(key) or '')[:2000] for key in
+                                     ('label','description','placeholder','section_label','type','tag')},
+                   'previous_answers': previous,
                    'answer_request': {'question_id': qid, 'intent': intent, 'exact_question': question,
                                       'output_requirements': output_requirements,
                                       'technical_evidence_index': technical_evidence_index(facts, intent)}}
+        if closest is not None:
+            payload['facts_closest_to_this_question'] = closest
         answer_schema = json.loads(json.dumps(ANSWER_SCHEMA))
         answer_schema['properties']['question_id']['enum'] = [qid]
         answer_schema['properties']['intent']['enum'] = [intent]

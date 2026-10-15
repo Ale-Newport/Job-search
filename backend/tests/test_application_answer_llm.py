@@ -540,6 +540,64 @@ async def test_openai_cold_and_mixed_cache_costs_settle_once_on_shared_ledger(tm
     assert not clone.one("SELECT value FROM settings WHERE key LIKE 'ai_usage:%'")
 
 
+DEEPSEEK = {'text_provider': 'openai-compatible', 'text_model': 'deepseek-v4-pro', 'text_retry_attempts': 0,
+            'text_base_url': 'https://api.deepseek.com/v1', 'monthly_budget': 10}
+
+
+@pytest.mark.parametrize('usage,expected', [
+    # 39,000 prompt tokens, 36,000 of them served from DeepSeek's context cache, 540 generated, off-peak (the clock is pinned below)
+    ({'prompt_tokens': 39000, 'completion_tokens': 540, 'prompt_cache_hit_tokens': 36000, 'prompt_cache_miss_tokens': 3000},
+     (3000 * 1.32 + 36000 * 0.044 + 540 * 3.96) / 1e6 / 2),
+    # the same through the OpenAI-compatible field name
+    ({'prompt_tokens': 39000, 'completion_tokens': 540, 'prompt_tokens_details': {'cached_tokens': 36000}},
+     (3000 * 1.32 + 36000 * 0.044 + 540 * 3.96) / 1e6 / 2),
+    # no cache figure at all: every token is a miss (never a guess in the user's favour), still off-peak
+    ({'prompt_tokens': 39000, 'completion_tokens': 540}, (39000 * 1.32 + 540 * 3.96) / 1e6 / 2),
+    # an impossible figure (more hits than tokens) is ignored
+    ({'prompt_tokens': 39000, 'completion_tokens': 540, 'prompt_cache_hit_tokens': 90000}, (39000 * 1.32 + 540 * 3.96) / 1e6 / 2),
+])
+async def test_deepseek_cache_hits_and_off_peak_hours_are_what_the_ledger_records(db, monkeypatch, usage, expected):
+    import jobagent.usage as usage_module
+    from datetime import datetime, timezone
+
+    class Clock(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return datetime(2026, 10, 14, 14, 0, tzinfo=timezone.utc)  # a Wednesday afternoon in UTC: off-peak
+
+    monkeypatch.setattr(usage_module, 'datetime', Clock)
+    db.execute('INSERT INTO integrations(id,provider,config,status) VALUES(?,?,?,?)',
+               (uid(), 'openai-compatible', json.dumps({'answer_model_prices': {
+                   'deepseek-v4-pro': {'input_cost_per_million': 1.32, 'output_cost_per_million': 3.96}}}), 'configured'))
+    def handler(request):
+        body = json.loads(response_for(request, complete(request_payload(request), fid='fact')).content)
+        body['usage'] = usage
+        return httpx.Response(200, json=body)
+    payload = {'question_id': 'q', 'intent': 'PROJECT', 'verified_facts': [{'id': 'fact'}]}
+    _, accounting = await ApplicationAnswerLLM(db, Keys(), transport=httpx.MockTransport(handler))._request(
+        DEEPSEEK, 'system', payload, ANSWER_SCHEMA)
+    ledger = usage_ledger(db)
+    assert accounting['cost'] == pytest.approx(expected)
+    assert ledger['cost'] == pytest.approx(expected)
+    assert ledger['input_tokens'] == 39000 and ledger['output_tokens'] == 540
+    hits = usage.get('prompt_cache_hit_tokens', (usage.get('prompt_tokens_details') or {}).get('cached_tokens', 0))
+    assert ledger.get('cache_hit_tokens', 0) == (hits if hits <= 39000 else 0)
+
+
+async def test_rates_that_are_not_the_published_ones_are_charged_as_configured(db):
+    db.execute('INSERT INTO integrations(id,provider,config,status) VALUES(?,?,?,?)',
+               (uid(), 'openai-compatible', json.dumps({'answer_model_prices': {
+                   'deepseek-v4-pro': {'input_cost_per_million': 5, 'output_cost_per_million': 9}}}), 'configured'))
+    def handler(request):
+        body = json.loads(response_for(request, complete(request_payload(request), fid='fact')).content)
+        body['usage'] = {'prompt_tokens': 1000000, 'completion_tokens': 0, 'prompt_cache_hit_tokens': 900000}
+        return httpx.Response(200, json=body)
+    payload = {'question_id': 'q', 'intent': 'PROJECT', 'verified_facts': [{'id': 'fact'}]}
+    _, accounting = await ApplicationAnswerLLM(db, Keys(), transport=httpx.MockTransport(handler))._request(
+        DEEPSEEK, 'system', payload, ANSWER_SCHEMA)
+    assert accounting['cost'] == pytest.approx(5.0)
+
+
 @pytest.mark.parametrize('usage', [
     {}, {'input_tokens': 12000, 'output_tokens': 100},
     {'input_tokens': 12000, 'input_tokens_details': {'cached_tokens': 0}, 'output_tokens': 100},

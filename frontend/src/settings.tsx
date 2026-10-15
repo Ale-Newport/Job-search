@@ -579,7 +579,7 @@ export function Settings({
         {tab === "ai" && (
           <>
             <LocalLaya ctx={ctx} />
-            <AIUsage settings={s} />
+            <AIUsage ctx={ctx} settings={s} />
             <Panel
               title="Browser decision engine"
               description="DOM observations first. Explicit operations and confidence gates."
@@ -1198,13 +1198,33 @@ function Rules({ ctx, settings }: { ctx: AppContext; settings: Data }) {
     </>
   );
 }
-function AIUsage({ settings }: { settings: Data }) {
+function AIUsage({ ctx, settings }: { ctx: AppContext; settings: Data }) {
   const periods = Object.entries(settings)
     .filter(([key]) => key.startsWith("ai_usage:"))
     .sort(([a], [b]) => b.localeCompare(a));
   const latest = periods[0],
     usage = latest?.[1] || {},
     providers = usage.providers || {};
+  const [dashboard, setDashboard] = useState("");
+  const adjustments: Data[] = Array.isArray(usage.adjustments) ? usage.adjustments : [];
+  const lastAdjustment = adjustments[adjustments.length - 1];
+  const money = (value: unknown) =>
+    Number(value || 0).toLocaleString(undefined, {
+      style: "currency",
+      currency: "USD",
+      maximumFractionDigits: 4,
+    });
+  const reconcile = () =>
+    ctx.act(
+      "usage-reconcile",
+      () =>
+        api("/ai/usage/reconcile", "POST", {
+          amount_usd: Number(dashboard),
+          month: latest?.[0].slice(9),
+          note: "Matched to the provider's dashboard",
+        }),
+      "Recorded spend matched to your provider's figure.",
+    ).then(() => setDashboard(""));
   return (
     <Panel
       title="AI usage & budget"
@@ -1229,11 +1249,48 @@ function AIUsage({ settings }: { settings: Data }) {
               <p>
                 {usage.calls ?? 0} calls ·{" "}
                 {Number(usage.input_tokens || 0).toLocaleString()} input tokens
+                {usage.cache_hit_tokens
+                  ? ` (${Number(usage.cache_hit_tokens).toLocaleString()} served from the provider's cache)`
+                  : ""}
                 · {Number(usage.output_tokens || 0).toLocaleString()} output
                 tokens
               </p>
+              {lastAdjustment && (
+                <p>
+                  Matched to your provider's dashboard on{" "}
+                  {String(lastAdjustment.at).slice(0, 10)}: {money(lastAdjustment.from)} →{" "}
+                  {money(lastAdjustment.to)}.
+                </p>
+              )}
             </div>
             <Tag>{settings.ai_budget_unlimited ? "Uncapped AI spending" : `Monthly budget $${settings.monthly_budget ?? 0}`}</Tag>
+          </div>
+          <div className="settings-row">
+            <div>
+              <strong>Does your provider's dashboard say something else?</strong>
+              <p>
+                Meridian estimates spend from token counts and your configured rates (cache hits and off-peak
+                hours included where the provider publishes them); the dashboard is the invoice. Enter its figure
+                for this month to match the record, and the monthly cap follows it.
+              </p>
+            </div>
+            <label className="field">
+              Dashboard total (USD)
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                value={dashboard}
+                onChange={(e) => setDashboard(e.target.value)}
+              />
+            </label>
+            <Button
+              secondary
+              disabled={dashboard === "" || !Number.isFinite(Number(dashboard)) || Number(dashboard) < 0}
+              onClick={reconcile}
+            >
+              Match this month
+            </Button>
           </div>
           <div className="simple-list">
             {Object.entries(providers).map(([provider, value]) => {

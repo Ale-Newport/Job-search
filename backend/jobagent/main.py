@@ -640,6 +640,21 @@ def create_app(data_dir: Path | None = None, token: str | None = None, secret_st
 
         return await app.state.text_ai.answer_llm.status(get_settings(app.state.db))
 
+    @app.post("/api/ai/usage/reconcile")
+    async def ai_usage_reconcile(payload: dict = Body(...)):
+        """Set a month's recorded AI spend to what the provider's own dashboard says (the ledger is an estimate)."""
+        from .usage import reconcile
+
+        amount = payload.get("amount_usd")
+        try:
+            usage = await asyncio.to_thread(
+                reconcile, app.state.db, amount, month=payload.get("month") or None,
+                note=str(payload.get("note") or "Matched to the provider's dashboard"))
+        except ValueError as error:
+            raise HTTPException(422, str(error)) from error
+        app.state.extension_status_cache = None  # the browser assistant shows the spend: say the new figure at once
+        return usage
+
     @app.get("/api/ai/answers/models")
     async def answer_llm_models():
         from .core import get_settings

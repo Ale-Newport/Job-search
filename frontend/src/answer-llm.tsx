@@ -37,9 +37,30 @@ function requiredRateKeys(provider: string): string[] {
     : [...rateKeys];
 }
 
+// A provider that reports prompt tokens served from its cache (DeepSeek's "cache hit") charges them a fraction of the input
+// rate: an optional rate, blank meaning "the input rate", is kept beside the required ones. The off-peak schedule of a record
+// (not edited here) is carried through a save untouched.
+const optionalRateKeys = (provider: string): string[] =>
+  provider === "openai" ? [] : ["cached_input_cost_per_million"];
+const scheduleKeys = ["off_peak_multiplier", "peak_hours_utc", "peak_weekdays_only"];
+
 function modelPrices(config: Data, model: unknown, provider: string): Data {
   const saved = config.answer_model_prices?.[String(model || "").trim()];
-  return Object.fromEntries(requiredRateKeys(provider).map((key) => [key, saved?.[key] ?? ""]));
+  return Object.fromEntries(
+    [...requiredRateKeys(provider), ...optionalRateKeys(provider)].map((key) => [key, saved?.[key] ?? ""]),
+  );
+}
+
+function savedRecord(prices: Data, provider: string, previous?: Data): Data {
+  return {
+    ...Object.fromEntries(requiredRateKeys(provider).map((key) => [key, Number(prices[key])])),
+    ...Object.fromEntries(
+      optionalRateKeys(provider)
+        .filter((key) => prices[key] !== "" && prices[key] != null && Number.isFinite(Number(prices[key])) && Number(prices[key]) >= 0)
+        .map((key) => [key, Number(prices[key])]),
+    ),
+    ...Object.fromEntries(scheduleKeys.filter((key) => previous && key in previous).map((key) => [key, previous![key]])),
+  };
 }
 
 function validPrices(prices: Data, provider: string): boolean {
@@ -251,13 +272,9 @@ function AnswerLLMForm({
     if (provider !== "none" && (secret.trim() || remote)) {
       const exactPrices = { ...savedConfig.answer_model_prices };
       if (remote && model && validPrices(prices, provider))
-        exactPrices[model] = Object.fromEntries(
-          requiredRateKeys(provider).map((key) => [key, Number(prices[key])]),
-        );
+        exactPrices[model] = savedRecord(prices, provider, savedConfig.answer_model_prices?.[model]);
       if (remote && fallback && validPrices(fallbackPrices, provider))
-        exactPrices[fallback] = Object.fromEntries(
-          requiredRateKeys(provider).map((key) => [key, Number(fallbackPrices[key])]),
-        );
+        exactPrices[fallback] = savedRecord(fallbackPrices, provider, savedConfig.answer_model_prices?.[fallback]);
       const config = {
         ...savedConfig,
         ...(remote ? { answer_model_prices: exactPrices } : {}),
@@ -653,6 +670,29 @@ function AnswerLLMForm({
                         </small>
                       </label>
                     ))}
+                    {provider !== "openai" && (
+                      <label className="field">
+                        <span>Cached input price per million tokens (USD, optional)</span>
+                        <input
+                          aria-label="Cached input price per million tokens (USD, optional)"
+                          type="number"
+                          min={0}
+                          step="any"
+                          value={prices.cached_input_cost_per_million}
+                          onChange={(e) =>
+                            setPrices((p) => ({
+                              ...p,
+                              cached_input_cost_per_million: e.target.value === "" ? "" : Number(e.target.value),
+                            }))
+                          }
+                        />
+                        <small>
+                          What the provider charges for prompt tokens it serves from its cache (DeepSeek: &quot;cache hit&quot;).
+                          Blank charges them at the input rate. DeepSeek&apos;s published cache-hit and off-peak prices
+                          are applied by themselves when the rates above are its published ones.
+                        </small>
+                      </label>
+                    )}
                     {provider === "openai" && cacheRateFields.map((field) => (
                       <label className="field" key={field.key}>
                         <span>{field.name} price per million tokens (USD)</span>

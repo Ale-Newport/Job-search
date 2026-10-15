@@ -1,5 +1,7 @@
 import { CandidateIntelligence } from "./intelligence";
 import { ApplicationAnswerLLMSetup } from "./answer-llm";
+import { ExtensionPanel } from "./extension";
+import type { ExtensionFeed } from "./extension-state";
 import { useEffect, useRef, useState } from "react";
 import {
   ArrowDownToLine,
@@ -17,6 +19,7 @@ import {
   Pencil,
   Play,
   Plus,
+  Puzzle,
   RefreshCw,
   Settings2,
   ShieldCheck,
@@ -399,10 +402,12 @@ export function Settings({
   ctx,
   theme,
   setTheme,
+  extension,
 }: {
   ctx: AppContext;
   theme: string;
   setTheme: (theme: string) => void;
+  extension: ExtensionFeed;
 }) {
   const r = useResource("/settings", ctx.refresh),
     integrations = useResource("/integrations", ctx.refresh),
@@ -418,6 +423,7 @@ export function Settings({
     ["ai", "AI & providers", Cpu],
     ["backup", "Backup & restore", Database],
     ["intelligence", "Candidate Intelligence", Fingerprint],
+    ["extension", "Browser assistant", Puzzle],
   ] as const;
   return (
     <>
@@ -439,7 +445,13 @@ export function Settings({
         ))}
       </div>
       {tab === "intelligence" && <CandidateIntelligence ctx={ctx} coverageOnly />}
-      <Resource {...r} retry={r.reload}>
+      {tab === "extension" && <ExtensionPanel ctx={ctx} feed={extension} />}
+      <Resource
+        {...r}
+        loading={r.loading && tab !== "extension"}
+        error={tab === "extension" ? "" : r.error}
+        retry={r.reload}
+      >
         {tab === "general" && (
           <>
             <Panel
@@ -464,7 +476,7 @@ export function Settings({
               <div className="settings-row">
                 <div>
                   <strong>Getting started guide</strong>
-                  <p>Reopen the eight setup steps on your dashboard.</p>
+                  <p>Reopen the setup steps on your dashboard.</p>
                 </div>
                 <Button
                   secondary

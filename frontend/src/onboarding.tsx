@@ -65,6 +65,12 @@ const steps: { id: string; title: string; page: Page; target?: string }[] = [
     page: "discover",
     target: "sources",
   },
+  {
+    id: "extension",
+    title: "Install the browser assistant",
+    page: "settings",
+    target: "extension",
+  },
 ];
 const statusLabels = {
   pending: "Not started",

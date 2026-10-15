@@ -7,11 +7,13 @@ import {
   Mail,
   RefreshCw,
   Search,
+  Sparkles,
   X,
   WandSparkles,
 } from "lucide-react";
-import type { AppContext, Data } from "./types";
+import type { AppContext, Data, ExtensionOpenResult } from "./types";
 import { api, date, label, openExternal, useResource } from "./api";
+import { assistedLine, browserName, calloutSnoozed, snoozeCallout } from "./extension-state";
 import {
   Button,
   Empty,
@@ -144,6 +146,30 @@ export function OpportunityActions({
           <ArrowUpRight size={15} />
           {compact ? "Apply link" : "Open application"}
         </Button>
+        {!job.submitted &&
+          (ctx.assistant === "ready" || ctx.assistant === "outdated") && (
+            <Button
+              secondary
+              title="Opens the application in your connected browser and starts researching the company"
+              loading={ctx.busy === `assistant-open:${job.id}`}
+              onClick={async () => {
+                const opened = await ctx.act(`assistant-open:${job.id}`, () =>
+                  api<ExtensionOpenResult>(`/extension/jobs/${job.id}/open`, "POST", {}),
+                );
+                if (!opened) return;
+                if (opened.ok === false)
+                  ctx.toast(opened.message || "Could not open the application in your browser.", true);
+                else
+                  ctx.toast(
+                    opened.message ||
+                      `Opened in ${opened.browser ? browserName(opened.browser) : "your browser"}. Click the Meridian icon to start.`,
+                  );
+              }}
+            >
+              <Sparkles size={15} />
+              Open with assistant
+            </Button>
+          )}
         {!job.submitted && (
           <Button secondary onClick={() => setRecord(true)}>
             <Check size={15} />
@@ -291,7 +317,8 @@ function AssistedApply({
 
 export function Daily({ ctx }: { ctx: AppContext }) {
   const r = useResource("/daily", ctx.refresh),
-    [query, setQuery] = useState("");
+    [query, setQuery] = useState(""),
+    [assistantSnoozed, setAssistantSnoozed] = useState(() => calloutSnoozed());
   const reload = r.reload;
   useEffect(() => {
     if (r.loading) return;
@@ -381,10 +408,36 @@ export function Daily({ ctx }: { ctx: AppContext }) {
                     ? "Gmail is connected. The first inbox sync is still pending; open Email to finish the macOS Keychain prompt."
                     : "Connect your application inbox to detect confirmations, assessments, interviews and decisions."}
               </p>
-              <Button secondary onClick={() => ctx.navigate("email")}>
+              <Button secondary id="email-status-button" onClick={() => ctx.navigate("email")}>
                 Email status
               </Button>
             </div>
+            {/* A waiting pairing request is never hidden; the rest can be put off for 30 days with "Not now". */}
+            {["not_installed", "detected", "pairing"].includes(ctx.assistant) &&
+              (ctx.assistant === "pairing" || !assistantSnoozed) && (
+                <div className="tracking-callout" id="assistant-callout">
+                  <Sparkles size={17} />
+                  <p>
+                    Fill any application form in your own browser. Meridian suggests each answer; press Tab to accept it.
+                  </p>
+                  <Button secondary onClick={() => ctx.navigate("settings", "extension")}>
+                    Set up the browser assistant
+                  </Button>
+                  {ctx.assistant !== "pairing" && (
+                    <Button
+                      secondary
+                      onClick={() => {
+                        snoozeCallout();
+                        setAssistantSnoozed(true);
+                        // the button that had the focus is gone: keep the keyboard where the page continues
+                        document.getElementById("email-status-button")?.focus();
+                      }}
+                    >
+                      Not now
+                    </Button>
+                  )}
+                </div>
+              )}
             <div className="daily-columns">
               <section>
                 <div className="daily-list-heading">
@@ -714,6 +767,9 @@ export function Tracker({
                                 : "To apply"
                           }
                         />
+                      )}
+                      {j.assistant && (
+                        <small className="assist-note">{assistedLine(j.assistant)}</small>
                       )}
                     </td>
                     <td>{j.applied_at ? date(j.applied_at) : "—"}</td>

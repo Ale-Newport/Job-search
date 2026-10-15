@@ -70,6 +70,7 @@ import type { Field } from "./components";
 import { SetupGuide } from "./onboarding";
 import { CandidateIntelligence } from "./intelligence";
 import { ApplicationProfile } from "./application-profile";
+import { AssistantActivity } from "./extension";
 
 const STATUS = [
   "DISCOVERED",
@@ -278,7 +279,11 @@ export function Timeline({ events }: { events: Data[] }) {
               </strong>
               <time>{time(e.created_at || e.timestamp)}</time>
             </div>
-            <p>{[e.company, e.title, e.origin].filter(Boolean).join(" · ")}</p>
+            <p>
+              {[e.company, e.title, e.origin === "extension" ? "Browser assistant" : e.origin]
+                .filter(Boolean)
+                .join(" · ")}
+            </p>
             {e.status && <Status value={e.status} />}
           </div>
         </div>
@@ -2902,6 +2907,7 @@ export function Activity({ ctx }: { ctx: AppContext }) {
           )}
         </Resource>
       </Panel>
+      <AssistantActivity ctx={ctx} />
     </>
   );
 }

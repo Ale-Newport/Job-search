@@ -56,6 +56,7 @@ import {
   Tag,
 } from "./components";
 import { DocumentVersions, Timeline } from "./pages";
+import { browserName } from "./extension-state";
 
 export function Detail({
   selection,
@@ -697,6 +698,14 @@ export function ApplicationDetail({
                       : `${label(a.mode || "review")} mode`}
                 </Tag>
                 <Tag>Created {date(a.created_at)}</Tag>
+                {(a.assistant || a.events?.some((e: Data) => e.origin === "extension")) && (
+                  <Tag tone="green">
+                    <Sparkles size={11} aria-hidden="true" />
+                    {a.assistant
+                      ? `Assisted in ${browserName(a.assistant.browser)}`
+                      : "Assisted in your browser"}
+                  </Tag>
+                )}
               </div>
             </div>
             <Button secondary onClick={() => setEdit(true)}>
@@ -815,7 +824,13 @@ export function ApplicationDetail({
           )}
           <div className="tabs">
             {(a.mode === "manual"
-              ? ["overview", "documents", "email"]
+              ? [
+                  "overview",
+                  // Answers saved from the browser assistant belong to a manual application too.
+                  ...(a.answers?.length ? ["answers"] : []),
+                  "documents",
+                  "email",
+                ]
               : ["overview", "answers", "documents", "email", "automation"]
             ).map((t) => (
               <button
@@ -906,9 +921,12 @@ export function ApplicationDetail({
                     <div className="answer-card" key={v.id || i}>
                       <div className="row-between">
                         <h4>{v.question}</h4>
-                        <Status
-                          value={v.inferred ? "Inferred · review" : v.verified ? "verified" : "unverified"}
-                        />
+                        <div className="tags">
+                          {v.origin === "extension" && <Tag>Inserted by assistant</Tag>}
+                          <Status
+                            value={v.inferred ? "Inferred · review" : v.verified ? "verified" : "unverified"}
+                          />
+                        </div>
                       </div>
                       <p className="prose-text">{v.answer}</p>
                       {v.reason && <p className="muted">{v.reason}</p>}
@@ -927,9 +945,16 @@ export function ApplicationDetail({
                   <summary>Previous answers ({a.answer_history.length})</summary>
                   <p className="muted">Retained for your records. Current review uses the answers above.</p>
                   <div className="answer-list">
-                    {a.answer_history.map((v: Data) => (
+                    {a.answer_history.map((v) => (
                       <div className="answer-card" key={v.id}>
-                        <h4>{v.question}</h4>
+                        <div className="row-between">
+                          <h4>{v.question}</h4>
+                          {v.origin === "extension" && (
+                            <div className="tags">
+                              <Tag>Inserted by assistant</Tag>
+                            </div>
+                          )}
+                        </div>
                         <p className="prose-text">{v.answer}</p>
                         <small className="muted">Superseded {date(v.superseded_at)}</small>
                       </div>

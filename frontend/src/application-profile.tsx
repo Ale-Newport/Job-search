@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Pencil, CheckCircle2, CircleHelp } from "lucide-react";
 import { api, useResource } from "./api";
 import { Button, Editor, Panel, Resource, Tag } from "./components";
-import type { AppContext, Data } from "./types";
+import type { AppContext, ApplicationMemory, Data } from "./types";
 
 export function ApplicationProfile({ ctx }: { ctx: AppContext }) {
   const r = useResource("/application-profile", ctx.refresh);
@@ -114,10 +114,13 @@ export function ApplicationProfile({ ctx }: { ctx: AppContext }) {
                 Answers saved from applications ({r.data.answers.length})
               </summary>
               <div className="simple-list">
-                {r.data.answers.map((a: Data) => (
+                {r.data.answers.map((a: ApplicationMemory) => (
                   <div key={a.id}>
-                    <div>
-                      <strong>{a.question}</strong>
+                    <div className="grow">
+                      <div className="memory-title">
+                        <strong>{a.question}</strong>
+                        {a.origin === "extension" && <Tag>Inserted by assistant</Tag>}
+                      </div>
                       <p>{a.action === "skip" ? "Left blank" : a.answer}</p>
                       <small>
                         {a.superseded ? "Superseded by newer general profile details · not used" : a.reusable

@@ -1,0 +1,500 @@
+/* Browser assistant. Tokens only (--panel, --border, --green…): dark mode comes for free.
+   Required instructions use --ink; --muted (3.8:1 on white) is for helper text only. */
+.nav-chip {
+  font-size: 9px;
+  font-weight: 600;
+  line-height: 1.4;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: var(--hover);
+  color: var(--muted);
+}
+.nav-chip.amber {
+  background: var(--amber-bg);
+  color: var(--amber);
+}
+
+/* Hero */
+.ext-hero.green .automation-symbol {
+  background: var(--green-bg);
+  color: var(--green);
+}
+.ext-hero.amber .automation-symbol {
+  background: var(--amber-bg);
+  color: var(--amber);
+}
+.ext-hero h3 {
+  outline-offset: 4px;
+}
+.ext-hero p {
+  color: var(--ink);
+}
+.ext-detail,
+.ext-note {
+  font-size: 11px;
+  line-height: 1.7;
+  margin-top: 8px;
+}
+.ext-note {
+  color: var(--amber);
+}
+.ext-hero-actions {
+  margin-top: 12px;
+}
+.ext-waiting {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin-top: 10px;
+  color: var(--muted);
+  font-size: 11px;
+}
+.ext-pulse {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--amber);
+  animation: ext-pulse 1.4s ease-in-out infinite;
+}
+@keyframes ext-pulse {
+  50% {
+    opacity: 0.25;
+  }
+}
+.ext-stale {
+  font-size: 11px;
+  color: var(--amber);
+}
+
+/* Pairing request */
+.ext-pairing {
+  border-color: var(--amber);
+}
+.ext-pairing-grid {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 28px;
+  padding: 24px 22px 8px;
+  flex-wrap: wrap;
+}
+.ext-pairing-grid > div:first-child {
+  flex: 1 1 320px;
+  min-width: 0;
+}
+.ext-pairing h3 {
+  font-size: 17px;
+  font-weight: 550;
+  margin-bottom: 8px;
+  outline-offset: 4px;
+}
+.ext-pairing p,
+.ext-pairing small {
+  font-size: 12px;
+  line-height: 1.7;
+  display: block;
+  color: var(--ink);
+}
+.ext-pairing p + p {
+  margin-top: 6px;
+}
+.ext-pairing .eyebrow {
+  color: var(--amber);
+}
+.ext-pairing .ext-warning {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  margin-top: 12px;
+  padding: 9px 12px;
+  border-radius: 8px;
+  background: var(--red-bg);
+  color: var(--red) !important;
+  font-weight: 600;
+}
+.ext-warning svg {
+  flex: none;
+  margin-top: 3px;
+}
+.ext-code-wrap {
+  text-align: center;
+}
+.ext-code {
+  display: block;
+  font:
+    600 34px/1.2 ui-monospace,
+    SFMono-Regular,
+    Menlo,
+    monospace;
+  letter-spacing: 0.14em;
+  padding: 14px 20px;
+  border: 1px dashed var(--amber);
+  border-radius: 10px;
+  background: var(--amber-bg);
+  color: var(--ink);
+  user-select: all;
+}
+.ext-pairing .ext-code-wrap small {
+  margin-top: 8px;
+  color: var(--muted);
+}
+.ext-inline-code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  color: var(--ink);
+}
+.ext-banner .button {
+  align-self: center;
+}
+.ext-banner p {
+  color: var(--ink);
+}
+/* The global banner is redundant while the panel (which shows the same request) is open. */
+.ext-panel-open .ext-banner {
+  display: none;
+}
+
+/* Install guides */
+.ext-browsers {
+  align-items: start;
+}
+.ext-browser-body {
+  padding: 8px 22px 22px;
+}
+.ext-steps {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.ext-steps > li {
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr);
+  gap: 6px 12px;
+  padding: 13px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 12px;
+  line-height: 1.65;
+  color: var(--ink);
+}
+.ext-steps > li:last-child {
+  border-bottom: 0;
+}
+.ext-step-mark {
+  grid-row: 1 / span 2;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  display: grid;
+  place-items: center;
+  font-size: 10px;
+  color: var(--muted);
+}
+.ext-steps > li[data-done="true"] .ext-step-mark {
+  background: var(--green-bg);
+  border-color: var(--green);
+  color: var(--green);
+}
+.ext-steps > li[aria-current="step"] .ext-step-mark {
+  border-color: var(--green);
+  color: var(--green);
+  font-weight: 700;
+}
+.ext-step-actions {
+  grid-column: 2;
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+  margin-top: 4px;
+}
+.ext-install {
+  display: grid;
+  gap: 6px;
+  justify-items: start;
+  padding: 10px 0 4px;
+}
+.ext-install > .ext-detail {
+  margin: 0;
+  font-size: 12px;
+}
+.ext-install-path {
+  display: grid;
+  gap: 8px;
+  width: 100%;
+  margin-top: 4px;
+}
+.ext-inline {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.ext-path {
+  display: block;
+  flex: 1 1 100%;
+  font:
+    11px/1.6 ui-monospace,
+    SFMono-Regular,
+    Menlo,
+    monospace;
+  padding: 7px 10px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--hover);
+  color: var(--ink);
+  overflow-wrap: anywhere;
+  user-select: all;
+}
+.ext-found {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  margin: 10px 0 6px;
+  padding: 14px 16px;
+  border-radius: 9px;
+  background: var(--green-bg);
+  color: var(--green);
+}
+.ext-found svg {
+  flex: none;
+  margin-top: 2px;
+}
+.ext-found strong {
+  font-size: 12px;
+}
+.ext-found p {
+  margin-top: 4px;
+  font-size: 12px;
+  line-height: 1.7;
+  color: var(--ink);
+}
+.ext-more summary {
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 12px 0;
+}
+.ext-more > ol {
+  margin-top: 4px;
+}
+
+/* How it works */
+.ext-keys {
+  margin: 0;
+  padding: 6px 22px 12px;
+}
+.ext-keys > div {
+  display: grid;
+  grid-template-columns: 150px minmax(0, 1fr);
+  gap: 14px;
+  align-items: baseline;
+  padding: 11px 0;
+  border-bottom: 1px solid var(--border);
+}
+.ext-keys > div:last-child {
+  border-bottom: 0;
+}
+.ext-keys dt kbd {
+  display: inline-block;
+  font-size: 11px;
+  padding: 1px 8px;
+  color: var(--ink);
+  background: var(--hover);
+}
+.ext-keys dd {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.65;
+  color: var(--ink);
+}
+
+/* Settings */
+.ext-group {
+  margin: 0;
+  padding: 14px 24px 10px;
+  font-size: 9px;
+  letter-spacing: 1.4px;
+  text-transform: uppercase;
+  font-weight: 600;
+  color: var(--ink);
+  background: var(--hover);
+  border-bottom: 1px solid var(--border);
+}
+.ext-group:first-child {
+  border-top: 0;
+}
+.ext-cap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 11px;
+}
+.ext-cap input {
+  width: 96px;
+  text-align: right;
+}
+.ext-sites-row {
+  align-items: flex-start;
+}
+.ext-sites {
+  list-style: none;
+  margin: 12px 0 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.ext-sites li {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 4px 3px 10px;
+  border-radius: 999px;
+  background: var(--hover);
+  border: 1px solid var(--border);
+  font-size: 11px;
+  color: var(--ink);
+}
+.ext-sites button {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  color: var(--muted);
+}
+.ext-sites button:hover:not(:disabled) {
+  background: var(--border);
+  color: var(--ink);
+}
+.ext-add-site {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 12px;
+}
+.ext-add-site input {
+  flex: 1 1 220px;
+  max-width: 320px;
+}
+.ext-sites-row p.error-text {
+  margin-top: 8px;
+}
+.ext-drafts progress {
+  display: block;
+  appearance: none;
+  width: min(360px, 100%);
+  height: 6px;
+  margin-top: 10px;
+  border: 0;
+  border-radius: 3px;
+  overflow: hidden;
+  background: var(--hover);
+  color: var(--green);
+}
+.ext-drafts progress::-webkit-progress-bar {
+  background: var(--border);
+}
+.ext-drafts progress::-webkit-progress-value {
+  background: var(--green);
+}
+.ext-drafts progress::-moz-progress-bar {
+  background: var(--green);
+}
+
+/* Privacy, activity, Spanish guide */
+.ext-privacy ul {
+  margin: 8px 0 0;
+  padding-left: 18px;
+  list-style: disc;
+  font-size: 11px;
+  line-height: 1.75;
+  color: var(--ink);
+}
+.ext-privacy li + li {
+  margin-top: 3px;
+}
+.ext-privacy {
+  color: var(--green);
+}
+.ext-guide,
+.ext-help {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--panel);
+  padding: 14px 22px;
+  font-size: 12px;
+  line-height: 1.75;
+}
+.ext-guide summary,
+.ext-help summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+.ext-help dl {
+  margin: 12px 0 0;
+}
+.ext-help dt {
+  margin-top: 12px;
+  font-weight: 600;
+  color: var(--ink);
+}
+.ext-help dd {
+  margin: 2px 0 0;
+  color: var(--ink);
+}
+.ext-guide h4 {
+  margin: 16px 0 6px;
+  font-size: 12px;
+  font-weight: 600;
+}
+.ext-guide ol {
+  margin: 0;
+  padding-left: 20px;
+  list-style: decimal;
+}
+.ext-guide ul {
+  margin: 0;
+  padding-left: 20px;
+  list-style: disc;
+}
+.ext-guide li + li {
+  margin-top: 3px;
+}
+.ext-activity small {
+  font-size: 10px;
+}
+
+@media (max-width: 960px) {
+  .ext-browsers {
+    grid-template-columns: 1fr;
+  }
+}
+@media (max-width: 760px) {
+  .ext-keys > div {
+    grid-template-columns: 1fr;
+    gap: 4px;
+  }
+  .ext-code {
+    font-size: 28px;
+    padding: 12px 14px;
+  }
+  .ext-cap {
+    flex-wrap: wrap;
+  }
+}
+
+/* Tracker row: quiet confirmation that the assistant filled this application */
+.tracking-table td small.assist-note {
+  color: var(--green);
+}
+
+/* "Inserted by assistant" next to a remembered answer in the Profile memory list */
+.memory-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}

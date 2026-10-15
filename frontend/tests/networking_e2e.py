@@ -1,17 +1,25 @@
-"""Synthetic networking UI test. External navigation is intercepted; nobody is messaged."""
+"""Synthetic networking UI test. External navigation is intercepted; nobody is messaged.
+
+    .venv/bin/python frontend/tests/networking_e2e.py --base-url http://127.0.0.1:1420   (the dev server proxies /api to the backend)
+"""
+import argparse
 import asyncio
 import json
 from playwright.async_api import async_playwright, expect
 
 
 async def main():
+    parser=argparse.ArgumentParser()
+    parser.add_argument('--base-url',default='http://127.0.0.1:1420')
+    args=parser.parse_args()
+    base=args.base_url.rstrip('/')
     async with async_playwright() as p:
         browser=await p.chromium.launch(channel='chrome',headless=True)
         page=await browser.new_page(viewport={'width':1440,'height':1080})
         headers={'Authorization':'Bearer meridian-development-token'}
-        job=await (await page.request.post('http://127.0.0.1:8765/api/jobs',headers=headers,data={'title':'Software Engineer','company':'Networking Fixture','url':'https://networking-fixture.invalid/job'})).json()
-        await page.request.post('http://127.0.0.1:8765/api/facts',headers=headers,data={'category':'project','key':'networking fixture','value':'Built a verified Python pipeline.','verification_status':'verified'})
-        await page.goto('http://127.0.0.1:1420')
+        job=await (await page.request.post(base+'/api/jobs',headers=headers,data={'title':'Software Engineer','company':'Networking Fixture','url':'https://networking-fixture.invalid/job'})).json()
+        await page.request.post(base+'/api/facts',headers=headers,data={'category':'project','key':'networking fixture','value':'Built a verified Python pipeline.','verification_status':'verified'})
+        await page.goto(base)
         await page.get_by_role('navigation').get_by_role('button',name='Networking',exact=True).click()
         await expect(page.get_by_role('heading',name='Networking',exact=True)).to_be_visible()
         await page.get_by_role('combobox',name='Related opportunity').select_option(job['id'])
@@ -33,7 +41,7 @@ async def main():
         assert handoff['urls']==['https://www.linkedin.com/in/meridian-synthetic-fixture']
         assert 'Python pipeline' in handoff['copy']
         # Handoff must not silently mark a message sent.
-        contacts=await (await page.request.get('http://127.0.0.1:8765/api/networking/contacts',headers=headers)).json()
+        contacts=await (await page.request.get(base+'/api/networking/contacts',headers=headers)).json()
         contact=next(c for c in contacts['items'] if c['full_name']=='Synthetic Recruiter')
         assert contact['messages'][0]['state']=='MESSAGE_PREPARED'
         await page.get_by_role('button',name='I sent this message').click()

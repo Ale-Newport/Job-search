@@ -25,7 +25,7 @@ import {
   Zap,
 } from "lucide-react";
 import type { AppContext, Data, Page, Selection } from "./types";
-import { api, items, label, useResource } from "./api";
+import { api, items, label, showReviewWindow, useResource } from "./api";
 import {
   Activity,
   Analytics,
@@ -42,6 +42,8 @@ import { BrowserApply } from "./browser-apply";
 import { Daily, Tracker } from "./tracking";
 import { Automation, Settings } from "./settings";
 import { Detail } from "./details";
+import { ExtensionNavChip, ExtensionPairingBanner } from "./extension";
+import { assistantFlag, chipHint, useExtensionStatus } from "./extension-state";
 import {
   Button,
   Empty,
@@ -84,7 +86,8 @@ export default function App() {
     [sidebar, setSidebar] = useState(false);
   const health = useResource("/health", refresh),
     automation = useResource("/automation", refresh),
-    tasks = useResource("/human-tasks", refresh);
+    tasks = useResource("/human-tasks", refresh),
+    extension = useExtensionStatus(refresh);
   const reloadHealth = health.reload,
     reloadAutomation = automation.reload,
     reloadTasks = tasks.reload;
@@ -119,9 +122,16 @@ export default function App() {
     },
     [],
   );
+  const assistant = assistantFlag(extension.data);
+  const pairingId = extension.data?.pending_pairing?.id;
+  useEffect(() => {
+    // The window hides to the tray when closed: a new pairing request must be able to bring it back (once per request).
+    if (pairingId) void showReviewWindow().catch(() => undefined);
+  }, [pairingId]);
   const ctx = useMemo<AppContext>(
     () => ({
       refresh,
+      assistant,
       navigate,
       target,
       select: setSelection,
@@ -129,7 +139,7 @@ export default function App() {
       busy,
       toast,
     }),
-    [refresh, navigate, target, act, busy, toast],
+    [refresh, assistant, navigate, target, act, busy, toast],
   );
   useEffect(() => {
     const media = window.matchMedia("(prefers-color-scheme: dark)");
@@ -176,8 +186,12 @@ export default function App() {
   const attention = items(tasks.data).filter(
     (t) => !["resolved", "completed"].includes(String(t.status).toLowerCase()),
   ).length;
+  const assistantHint = chipHint(extension.data);
   return (
     <div className="app-shell">
+      <span id="assistant-hint" className="visually-hidden">
+        {assistantHint}
+      </span>
       <aside className={`sidebar ${sidebar ? "shown" : ""}`}>
         <div className="brand" data-tauri-drag-region>
           <span className="brand-symbol" aria-hidden="true">
@@ -231,6 +245,7 @@ export default function App() {
               <button
                 className={`nav-item ${page === n.id ? "active" : ""}`}
                 aria-current={page === n.id ? "page" : undefined}
+                aria-describedby={n.id === "settings" && assistantHint ? "assistant-hint" : undefined}
                 onClick={() => navigate(n.id)}
               >
                 <n.icon size={18} strokeWidth={1.7} />
@@ -238,6 +253,7 @@ export default function App() {
                 {n.id === "review" && attention > 0 && (
                   <span className="nav-count">{attention}</span>
                 )}
+                {n.id === "settings" && <ExtensionNavChip status={extension.data} />}
               </button>
             </div>
           ))}
@@ -336,6 +352,12 @@ export default function App() {
               </Button>
             </div>
           )}
+          {!(page === "settings" && target === "extension") && (
+            <ExtensionPairingBanner
+              status={extension.data}
+              onReview={() => navigate("settings", "extension")}
+            />
+          )}
           {page === "dashboard" ? (
             target === "setup" ? (
               <Dashboard ctx={ctx} />
@@ -367,7 +389,12 @@ export default function App() {
           ) : page === "activity" ? (
             <Activity ctx={ctx} />
           ) : (
-            <Settings ctx={ctx} theme={theme} setTheme={setTheme} />
+            <Settings
+              ctx={ctx}
+              theme={theme}
+              setTheme={setTheme}
+              extension={extension}
+            />
           )}
           <footer className="page-footer">
             <span>

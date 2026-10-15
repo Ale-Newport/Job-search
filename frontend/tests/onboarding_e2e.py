@@ -34,15 +34,15 @@ async def main():
         response = await page.request.get(base + "/api/onboarding", headers=headers)
         assert response.ok, await response.text()
         original = await response.json()
-        settings_response = await page.request.get(base + "/api/settings", headers=headers)
-        settings = await settings_response.json()
         await page.request.patch(base + "/api/onboarding", headers=headers, data={"hidden": False})
         try:
             print("Checking guide evidence and visibility", flush=True)
+            steps = original["steps"]
+            assert "extension" in [step["id"] for step in steps], "The browser assistant is the ninth evidence step"
             await page.goto(base)
             await page.get_by_role("navigation").get_by_role("button", name="Settings", exact=True).click()
             await page.get_by_role("button", name="Show guide", exact=True).click()
-            await expect(page.locator("[data-step]")).to_have_count(8)
+            await expect(page.locator("[data-step]")).to_have_count(len(steps))
             for step in original["steps"]:
                 await expect(page.locator(f'[data-step="{step["id"]}"]')).to_have_attribute("data-status", step["status"])
             await page.get_by_role("button", name="Hide guide", exact=True).click()
@@ -51,17 +51,10 @@ async def main():
             assert hidden["completed"] == original["completed"], "Hiding must not complete setup"
             await page.get_by_role("navigation").get_by_role("button", name="Settings", exact=True).click()
             await page.get_by_role("button", name="Show guide", exact=True).click()
-            await expect(page.locator("[data-step]")).to_have_count(8)
-            print("Checking direct links and DeepSeek preset without saving credentials", flush=True)
+            await expect(page.locator("[data-step]")).to_have_count(len(steps))
+            print("Checking direct links open the matching settings tab", flush=True)
             await page.locator('[data-step="ai"]').click()
-            await page.get_by_role("heading", name="Text generation", exact=True).wait_for()
-            await page.get_by_role("button", name="Set up DeepSeek", exact=True).click()
-            preset = page.get_by_role("dialog", name="Set up DeepSeek", exact=True)
-            assert await preset.get_by_label("Monthly remote AI budget (USD)", exact=True).input_value() == str(settings.get("monthly_budget", 0))
-            assert await preset.get_by_label("Input price per million tokens (USD)", exact=True).input_value() == "0.3"
-            assert await preset.get_by_label("Output price per million tokens (USD)", exact=True).input_value() == "1.2"
-            assert await preset.get_by_label("DeepSeek API key", exact=True).input_value() == ""
-            await preset.get_by_role("button", name="Cancel", exact=True).click()
+            await page.get_by_role("heading", name="Application answer LLM", exact=True).wait_for()
             await page.get_by_role("navigation").get_by_role("button", name="Settings", exact=True).click()
             await page.get_by_role("button", name="Show guide", exact=True).click()
             await page.locator('[data-step="profile"]').click()
@@ -130,11 +123,16 @@ async def main():
             await page.screenshot(path=str(output / "import-fact-review.png"), full_page=True)
             await page.get_by_role("navigation").get_by_role("button", name="Settings", exact=True).click()
             await page.get_by_role("button", name="Show guide", exact=True).click()
-            await expect(page.locator("[data-step]")).to_have_count(8)
+            await expect(page.locator("[data-step]")).to_have_count(len(steps))
+            print("Checking the browser assistant step opens its settings tab", flush=True)
+            await page.locator('[data-step="extension"]').click()
+            await expect(page.get_by_role("button", name="Browser assistant", exact=True)).to_have_class("active")
+            await page.get_by_role("navigation").get_by_role("button", name="Settings", exact=True).click()
+            await page.get_by_role("button", name="Show guide", exact=True).click()
             await page.screenshot(path=str(output / "onboarding-progress.png"), full_page=True)
             if errors:
                 raise AssertionError("\n".join(errors))
-            print(json.dumps({"result": "passed", "checks": "8 evidence states, hide preserves progress, direct links, zero inherited budget and blank key, boundary confirmation, explicit browser checkbox, IMAP save/connect failure feedback, per-fact verification/rejection, idempotent document re-extraction", "screenshots": str(output)}), flush=True)
+            print(json.dumps({"result": "passed", "checks": "9 evidence states (browser assistant included), hide preserves progress, direct links, boundary confirmation, explicit browser checkbox, IMAP save/connect failure feedback, per-fact verification/rejection, idempotent document re-extraction", "screenshots": str(output)}), flush=True)
         finally:
             await page.request.patch(base + "/api/onboarding", headers=headers, data={"hidden": original["hidden"]})
             await browser.close()

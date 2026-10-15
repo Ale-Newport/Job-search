@@ -1,15 +1,21 @@
 """Recovery controls and API reconnection on synthetic browser fixtures only.
 
-Requires the local Vite server. API routes for this test are mocked; no job site is opened.
+Requires the local Vite server (``--base-url``, default http://127.0.0.1:1420). API routes for this test are mocked; no job
+site is opened.
 """
+import argparse
 import asyncio
 import json
+import tempfile
 from pathlib import Path
 
 from playwright.async_api import async_playwright, expect
 
 
 async def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--base-url", default="http://127.0.0.1:1420")
+    args = parser.parse_args()
     async with async_playwright() as p:
         browser = await p.chromium.launch(channel="chrome", headless=True)
         page = await browser.new_page(viewport={"width": 1360, "height": 1000})
@@ -36,7 +42,7 @@ async def main():
             })
 
         await page.route("**/api/applications/recovery-fixture**", application_route)
-        await page.goto("http://127.0.0.1:1420")
+        await page.goto(args.base_url)
         await page.evaluate("""async () => {
             const {default: React} = await import('/node_modules/.vite/deps/react.js');
             const {default: ReactDOM} = await import('/node_modules/.vite/deps/react-dom_client.js');
@@ -109,7 +115,7 @@ async def main():
                 delete window.__TAURI_INTERNALS__;
             }
         }""")
-        output = Path("/tmp/meridian-ui-qa")
+        output = Path(tempfile.gettempdir()) / "meridian-ui-qa"
         output.mkdir(exist_ok=True)
         await page.screenshot(path=str(output / "recovery-controls.png"), full_page=True)
         assert not errors, errors

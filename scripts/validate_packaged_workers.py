@@ -17,6 +17,53 @@ import uuid
 import httpx
 
 
+def bridge_ports():
+    """Ports of the extension bridge to smoke-test, from MERIDIAN_BRIDGE_PORT: a port, LOW-HIGH, or empty/0 for none.
+
+    The bridge is off under MERIDIAN_TEST, so a packaged bridge smoke test opts in by setting MERIDIAN_BRIDGE_PORT when
+    starting this script, for example MERIDIAN_BRIDGE_PORT=47700-47709. Port 0 starts the bridge on an unpredictable
+    port: it still runs, but there is nothing fixed to probe, so it is not smoke-tested.
+    """
+    value = os.environ.get("MERIDIAN_BRIDGE_PORT", "").strip()
+    if not value:
+        return []
+    low, _, high = value.partition("-")
+    first, last = int(low), int(high or low)
+    assert 0 <= first <= last <= 65535, "MERIDIAN_BRIDGE_PORT must be a port or a LOW-HIGH range"
+    return [] if first == 0 else list(range(first, last + 1))
+
+
+def sidecar_environment(token, data, port):
+    environment = dict(
+        os.environ,
+        MERIDIAN_TEST="1",
+        MERIDIAN_API_TOKEN=token,
+        MERIDIAN_DATA_DIR=str(data),
+        MERIDIAN_PORT=str(port),
+        MERIDIAN_NO_NOTIFICATIONS="1",
+    )
+    # Only MERIDIAN_BRIDGE_PORT enables the bridge here; a forcing flag left in the shell must not.
+    environment.pop("MERIDIAN_BRIDGE", None)
+    return environment
+
+
+async def bridge_hello(ports):
+    """The packaged bridge answers GET /v1/hello as Meridian on one of the candidate ports (no credentials involved)."""
+    async with httpx.AsyncClient(timeout=3) as client:
+        deadline = time.monotonic() + 20
+        while time.monotonic() < deadline:
+            for candidate in ports:
+                try:
+                    response = await client.get(f"http://127.0.0.1:{candidate}/v1/hello")
+                    hello = response.json()
+                except (httpx.HTTPError, ValueError):
+                    continue
+                if response.status_code == 200 and hello.get("app") == "Meridian" and hello.get("port") == candidate:
+                    return hello
+            await asyncio.sleep(0.2)
+    raise AssertionError(f"The packaged extension bridge did not answer on ports {ports[0]}-{ports[-1]}")
+
+
 async def main(location_form=False):
     root = Path(__file__).resolve().parent.parent
     data = root / ".local-data" / ("packaged worker qa " + str(uuid.uuid4()))
@@ -38,14 +85,7 @@ async def main(location_form=False):
     log = open("/private/tmp/meridian-packaged-worker.log", "w")
     parent = subprocess.Popen(
         [str(binary)],
-        env=dict(
-            os.environ,
-            MERIDIAN_TEST="1",
-            MERIDIAN_API_TOKEN=token,
-            MERIDIAN_DATA_DIR=str(data),
-            MERIDIAN_PORT=str(port),
-            MERIDIAN_NO_NOTIFICATIONS="1",
-        ),
+        env=sidecar_environment(token, data, port),
         stdout=log,
         stderr=log,
         start_new_session=True,
@@ -71,6 +111,8 @@ async def main(location_form=False):
                 response.raise_for_status()
                 return response.json()
 
+            smoke_ports = bridge_ports()
+            bridge = await bridge_hello(smoke_ports) if smoke_ports else None
             response = await client.patch(
                 "/settings",
                 json={
@@ -157,14 +199,7 @@ async def main(location_form=False):
             parent.wait(timeout=5)
             parent = subprocess.Popen(
                 [str(binary)],
-                env=dict(
-                    os.environ,
-                    MERIDIAN_TEST="1",
-                    MERIDIAN_API_TOKEN=token,
-                    MERIDIAN_DATA_DIR=str(data),
-                    MERIDIAN_PORT=str(port),
-                    MERIDIAN_NO_NOTIFICATIONS="1",
-                ),
+                env=sidecar_environment(token, data, port),
                 stdout=log,
                 stderr=log,
                 start_new_session=True,
@@ -200,6 +235,8 @@ async def main(location_form=False):
                 "submitted": False,
                 "synthetic_data": True,
             }
+            if bridge:
+                report["extension_bridge"] = {"answered_as": bridge["app"], "port": bridge["port"], "protocol": bridge["bridge"]}
             if location_form:
                 report.pop('completed_steps_preserved')
                 report['searchable_location_verified'] = True

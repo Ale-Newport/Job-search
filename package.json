@@ -6,7 +6,11 @@
     "dev": "tauri dev",
     "build": ".venv/bin/python scripts/build_signed_app.py",
     "build:app": ".venv/bin/python scripts/build_signed_app.py --bundles app",
-    "typecheck": "npm --prefix frontend run typecheck",
+    "build:extension": ".venv/bin/python scripts/build_extension.py",
+    "build:safari": ".venv/bin/python scripts/build_extension.py --safari",
+    "typecheck": "npm --prefix frontend run typecheck && npm --prefix extension run typecheck",
+    "typecheck:extension": ".venv/bin/python scripts/build_extension.py --typecheck-only",
+    "test:extension": "npm --prefix extension test",
     "lint": "npm --prefix frontend run lint"
   },
   "devDependencies": {"@tauri-apps/cli": "^2.0.0"}

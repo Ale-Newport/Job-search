@@ -295,6 +295,26 @@ fn local_action(backend: &Backend, path: &str) {
     }
 }
 
+/// `Meridian.app/Contents/MacOS/meridian` becomes `Meridian.app`. `None` when the executable does not live in an
+/// application bundle (`tauri dev`, `cargo run`), so the backend never tries to reopen an unrelated installed copy.
+fn app_bundle_from_executable(executable: &Path) -> Option<PathBuf> {
+    let mut ancestors = executable.ancestors().skip(1);
+    let macos = ancestors.next()?;
+    let contents = ancestors.next()?;
+    let bundle = ancestors.next()?;
+    let named = |path: &Path, name: &str| path.file_name().is_some_and(|value| value == name);
+    (named(macos, "MacOS")
+        && named(contents, "Contents")
+        && bundle.extension().is_some_and(|value| value == "app"))
+    .then(|| bundle.to_path_buf())
+}
+
+/// A `meridian://` URL only brings the window forward. Its path and query are never read: any web page can open one.
+#[cfg(target_os = "macos")]
+fn is_meridian_url(urls: &[tauri::Url]) -> bool {
+    urls.iter().any(|url| url.scheme() == "meridian")
+}
+
 fn main() {
     let app = tauri::Builder::default()
         .plugin(tauri_plugin_single_instance::init(|app, _, _| {
@@ -341,6 +361,20 @@ fn main() {
                 .stdin(Stdio::null())
                 .stdout(Stdio::null())
                 .stderr(Stdio::from(log));
+            // Release builds tell the backend which bundle to bring forward when the browser extension needs Meridian
+            // (`open <bundle>`). Development runs are not in a bundle, and reopening an installed copy there would start
+            // it against the real data folder, so the variable is cleared even if the shell had one.
+            let bundle = if cfg!(debug_assertions) {
+                None
+            } else {
+                std::env::current_exe()
+                    .ok()
+                    .and_then(|exe| app_bundle_from_executable(&exe))
+            };
+            match bundle {
+                Some(bundle) => command.env("MERIDIAN_APP_BUNDLE", bundle),
+                None => command.env_remove("MERIDIAN_APP_BUNDLE"),
+            };
             let process = BackendProcess::start(command)?;
             app.manage(Backend {
                 process: Mutex::new(process),
@@ -405,6 +439,12 @@ fn main() {
         #[cfg(target_os = "macos")]
         tauri::RunEvent::Reopen { .. } => {
             let _ = show_review_window(handle.clone());
+        }
+        #[cfg(target_os = "macos")]
+        tauri::RunEvent::Opened { urls } => {
+            if is_meridian_url(&urls) {
+                let _ = show_review_window(handle.clone());
+            }
         }
         tauri::RunEvent::Exit => {
             if let Some(backend) = handle.try_state::<Backend>() {
@@ -509,5 +549,62 @@ mod export_tests {
             export_destination(&directory_link.join("new-export.pdf"), &fixture.root()).is_err()
         );
         assert_eq!(std::fs::read(source).unwrap(), b"verified fixture bytes");
+    }
+}
+
+#[cfg(test)]
+mod bundle_tests {
+    use super::*;
+
+    #[test]
+    fn bundle_is_found_only_for_the_macos_layout_of_an_app() {
+        assert_eq!(
+            app_bundle_from_executable(Path::new(
+                "/Applications/Meridian.app/Contents/MacOS/meridian"
+            )),
+            Some(PathBuf::from("/Applications/Meridian.app"))
+        );
+        assert_eq!(
+            app_bundle_from_executable(Path::new(
+                "/Users/me/My Apps/Meridian.app/Contents/MacOS/meridian"
+            )),
+            Some(PathBuf::from("/Users/me/My Apps/Meridian.app"))
+        );
+        // Development and test runs, helper tools and relocated binaries are not an installed app.
+        for executable in [
+            "/Users/me/Job-search/src-tauri/target/debug/meridian",
+            "/Users/me/Job-search/src-tauri/target/release/meridian",
+            "/Applications/Meridian.app/Contents/Resources/meridian",
+            "/Applications/Meridian/Contents/MacOS/meridian",
+            "/Applications/Meridian.app/MacOS/meridian",
+            "/meridian",
+            "meridian",
+        ] {
+            assert_eq!(
+                app_bundle_from_executable(Path::new(executable)),
+                None,
+                "{executable}"
+            );
+        }
+    }
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn only_the_meridian_scheme_raises_the_window_and_its_contents_are_irrelevant() {
+        let parse = |text: &str| tauri::Url::parse(text).unwrap();
+        assert!(is_meridian_url(&[parse("meridian://open")]));
+        assert!(is_meridian_url(&[parse(
+            "MERIDIAN://anything?next=https://example.com/steal#x"
+        )]));
+        assert!(is_meridian_url(&[
+            parse("https://example.com"),
+            parse("meridian://open")
+        ]));
+        assert!(!is_meridian_url(&[]));
+        assert!(!is_meridian_url(&[parse("https://meridian.example/open")]));
+        assert!(!is_meridian_url(&[parse("meridian-evil://open")]));
+        assert!(!is_meridian_url(&[parse(
+            "file:///Applications/Meridian.app"
+        )]));
     }
 }

@@ -28,3 +28,11 @@ test-results/
 
 src-tauri/gen/
 *.tsbuildinfo
+
+# Browser extension (extension/): dependencies and generated bundles. Sources, the lock file, extension/safari and the
+# public manifest key stay tracked. The Safari app build lands in build/ (ignored above).
+extension/node_modules/
+extension/dist/
+xcuserdata/
+DerivedData/
+*.xcuserstate

@@ -18,6 +18,9 @@ python3.12 -m venv .venv
 .venv/bin/python -m pip install --no-deps -e .
 npm ci
 npm --prefix frontend ci
+# Browser extension dependencies from extension/package-lock.json. This runs `npm ci --prefer-offline` in extension/, but only
+# when node_modules is missing or differs from the lock file, so a rerun (offline too) leaves a good install alone.
+.venv/bin/python scripts/build_extension.py --install-only
 if [[ ! -d '/Applications/Google Chrome.app' ]]; then
   echo 'Google Chrome is missing. Installing the Playwright Chromium runtime.'
   .venv/bin/python -m playwright install chromium

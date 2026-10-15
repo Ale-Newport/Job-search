@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Downshift demo application</title>
+<link rel="stylesheet" href="demo.css">
+<style>
+.row { display: flex; max-width: 420px; gap: 4px; } .row input { flex: 1; } .control { flex: 1; text-align: left; padding: 8px 10px; font: inherit; }
+.menu { list-style: none; margin: 2px 0 0; padding: 0; max-width: 420px; max-height: 220px; overflow: auto; border: 0; }
+.menu:not(:empty) { border: 1px solid #888; background: #fff; }
+.option { padding: 6px 8px; cursor: pointer; } .hl { background: #dde7ff; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script src="common.js"></script>
+<script type="module" src="downshift.js"></script>
+</body>
+</html>

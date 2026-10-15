@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Angular-style forms demo application</title>
+<link rel="stylesheet" href="demo.css">
+</head>
+<body>
+<h1>Angular-style ControlValueAccessor demo application</h1>
+<!-- A hand-written shim of what @angular/forms does to native controls: DefaultValueAccessor (input event, compositionstart/end,
+     blur -> touched), SelectControlValueAccessor ("0: value" option ids, change event), CheckboxControlValueAccessor and
+     RadioControlValueAccessor (change event), ngModelOptions updateOn change | blur | submit, and a zone-like tick after every
+     event that writes the MODEL back into the view. It is NOT Angular; it models the event contract. -->
+<form id="ng-form" novalidate>
+  <div class="field"><label class="label" for="ng_first">First name (updateOn: change)</label><input id="ng_first" name="first" type="text" data-ng="first" data-update-on="change"></div>
+  <div class="field"><label class="label" for="ng_email">Email (updateOn: blur)</label><input id="ng_email" name="email" type="email" data-ng="email" data-update-on="blur"></div>
+  <div class="field"><label class="label" for="ng_ref">Reference (updateOn: submit)</label><input id="ng_ref" name="ref" type="text" data-ng="ref" data-update-on="submit"></div>
+  <div class="field"><label class="label" for="ng_country">Country</label>
+    <select id="ng_country" name="country" data-ng="country"><option value="0: null">Select</option><option value="1: gb">United Kingdom</option><option value="2: es">Spain</option></select></div>
+  <fieldset class="field"><legend class="label">Authorised to work in the UK?</legend>
+    <label><input type="radio" name="auth" value="yes" data-ng="auth"> Yes</label> <label><input type="radio" name="auth" value="no" data-ng="auth"> No</label></fieldset>
+  <div class="field"><label><input type="checkbox" name="alerts" data-ng="alerts"> Send me job alerts</label></div>
+  <div class="field"><label class="label" for="ng_bio">Short bio</label><textarea id="ng_bio" name="bio" data-ng="bio" data-update-on="change"></textarea></div>
+  <button type="submit">Submit application</button>
+</form>
+<script src="common.js"></script>
+<script>
+(() => {
+  const model = {};                        // the FormGroup values
+  const view = new Map();                  // control name -> {el, accessor}
+  let composing = false;
+  const zone = () => setTimeout(() => {    // change detection: model -> view (writeValue), like NgModel after every zone turn
+    for (const [name, c] of view) c.write(model[name]);
+  }, 0);
+  const commit = (name, value) => { model[name] = value; zone(); };
+  for (const el of document.querySelectorAll('[data-ng]')) {
+    const name = el.dataset.ng, updateOn = el.dataset.updateOn || 'change';
+    let pendingView;                       // updateOn blur/submit: the view value waits here
+    if (el.tagName === 'SELECT') {
+      const options = new Map([...el.options].map(o => [o.value, o.value.split(': ')[1]]));
+      el.addEventListener('change', () => commit(name, options.get(el.value) === 'null' ? null : options.get(el.value)));
+      view.set(name, { el, write: v => { const hit = [...options].find(([, val]) => (val === 'null' ? null : val) === (v ?? null)); if (hit && el.value !== hit[0]) el.value = hit[0]; } });
+    } else if (el.type === 'checkbox') {
+      el.addEventListener('change', () => commit(name, el.checked));
+      view.set(name, { el, write: v => { if (el.checked !== !!v) el.checked = !!v; } });
+    } else if (el.type === 'radio') {
+      el.addEventListener('change', () => commit(name, el.value));
+      if (!view.has(name)) view.set(name, { el, write: v => { for (const r of document.querySelectorAll(`input[type=radio][name=${name}]`)) r.checked = r.value === v; } });
+    } else {                               // DefaultValueAccessor
+      el.addEventListener('compositionstart', () => { composing = true; });
+      el.addEventListener('compositionend', () => { composing = false; if (updateOn === 'change') commit(name, el.value); else pendingView = el.value; });
+      el.addEventListener('input', () => {
+        if (composing) return;
+        if (updateOn === 'change') commit(name, el.value); else pendingView = el.value;
+      });
+      el.addEventListener('blur', () => { if (updateOn === 'blur' && pendingView !== undefined) { commit(name, pendingView); pendingView = undefined; } });
+      view.set(name, { el, write: v => { if (updateOn === 'change' && (el.value !== (v ?? ''))) el.value = v ?? ''; }, pending: () => pendingView });
+    }
+  }
+  document.getElementById('ng-form').addEventListener('submit', () => {
+    for (const [name, c] of view) if (c.pending && c.pending() !== undefined) model[name] = c.pending();
+  });
+  window.__state = () => JSON.parse(JSON.stringify(model));
+  window.__pending = () => Object.fromEntries([...view].filter(([, c]) => c.pending).map(([n, c]) => [n, c.pending() ?? null]));
+})();
+</script>
+</body>
+</html>

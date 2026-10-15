@@ -1,0 +1,13 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><title>Dropzone with a hidden file input</title>
+<style>body{font:16px system-ui;padding:24px;max-width:720px}label{display:block;margin:10px 0}
+.zone{display:block;border:2px dashed #888;padding:24px;margin:18px 0;background:#fafafa}
+.zone input{position:absolute;width:1px;height:1px;opacity:0;overflow:hidden;clip:rect(0 0 0 0)}
+.field{position:relative}</style>
+<h1>Apply</h1>
+<form onsubmit="event.preventDefault()">
+<label>First name <input name="first"></label>
+<div class="field"><span id="zone_label">Resume</span>
+  <label class="zone" id="zone"><input type="file" id="cv" name="resume" aria-labelledby="zone_label"><span>Drop your resume here or click to browse</span></label></div>
+<label>Last name <input name="last"></label>
+<button type="button" id="next">Next</button>
+</form></html>

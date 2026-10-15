@@ -1,0 +1,16 @@
+/* Minimal look shared by the demo pages: real layout (visible, focusable, sized) without any library theme. */
+body { font: 15px/1.4 system-ui, sans-serif; margin: 0; padding: 24px 32px 480px; max-width: 760px; color: #1b1b1b; background: #fff; }
+h1 { font-size: 20px; margin: 0 0 16px; }
+.field { margin: 14px 0; position: relative; }
+.label, label.block { display: block; font-weight: 600; margin-bottom: 4px; }
+.req { color: #b00020; margin-left: 2px; }
+input[type=text], input[type=email], input[type=tel], input[type=number], input[type=date], input[type=month], input[type=search], textarea, select {
+  box-sizing: border-box; width: 100%; max-width: 420px; padding: 8px 10px; font: inherit; border: 1px solid #888; border-radius: 4px;
+}
+textarea { min-height: 70px; }
+.select__container { max-width: 420px; }
+.select__control { min-height: 38px; }
+button[type=submit] { margin-top: 18px; padding: 10px 18px; font: inherit; }
+.hint, .counter { font-size: 12px; color: #555; }
+.error { color: #b00020; font-size: 12px; }
+.sr-only { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); border: 0; padding: 0; }

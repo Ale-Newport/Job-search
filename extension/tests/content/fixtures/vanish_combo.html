@@ -1,0 +1,47 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><title>A select that hides its input once a value is chosen</title>
+<style>body{font:16px system-ui;padding:24px;max-width:720px}label{display:block;margin:12px 0}
+.control{position:relative;display:flex;align-items:center;border:1px solid #888;padding:4px 8px;min-height:30px;min-width:260px}
+.control .single{margin-right:6px}
+.control input{border:0;outline:0;width:120px}
+.control input.hidden{opacity:0;width:2px}
+[role=listbox]{border:1px solid #888;background:#fff;position:absolute;left:0;top:100%;z-index:9;margin:0;padding:4px;list-style:none;min-width:240px}
+[role=option]{padding:6px;cursor:pointer}</style>
+<h1>Apply</h1>
+<form onsubmit="event.preventDefault()">
+<label>First name <input name="first"></label>
+<div class="field"><label for="seniority">Seniority</label>
+  <div class="control"><span class="single" id="single"></span>
+    <input id="seniority" role="combobox" aria-haspopup="listbox" aria-expanded="false" aria-controls="sen-list" autocomplete="off"></div></div>
+<label>Time zone <input name="tz"></label>
+<button type="button" id="next">Next</button>
+</form>
+<script>
+// react-select without classNamePrefix: after a choice the (empty-looking) input shrinks to 2 px and turns invisible, the chosen value is
+// shown by a sibling. The input keeps focus, but a page scan no longer sees a control a person can use.
+window.selected = null;
+const input = document.getElementById('seniority');
+let list = null;
+const close = () => { if (list) { list.remove(); list = null; } input.setAttribute('aria-expanded', 'false'); };
+const open = () => {
+  close();
+  input.setAttribute('aria-expanded', 'true');
+  list = document.createElement('ul'); list.id = 'sen-list'; list.setAttribute('role', 'listbox');
+  for (const text of ['Junior', 'Mid-level', 'Senior']) {
+    const li = document.createElement('li'); li.setAttribute('role', 'option'); li.textContent = text;
+    li.addEventListener('mousedown', (e) => e.preventDefault());
+    li.addEventListener('click', () => {
+      window.selected = text;
+      document.getElementById('single').textContent = text;
+      input.value = text;
+      close();
+      // ?remove=1: the widget throws the input away altogether (a re-mounted select): the element the person was on is gone from the page
+      if (new URLSearchParams(location.search).has('remove')) input.remove();
+      else input.classList.add('hidden');
+    });
+    list.append(li);
+  }
+  input.closest('.control').append(list);
+};
+input.addEventListener('mousedown', () => { if (input.getAttribute('aria-expanded') !== 'true') open(); });
+input.addEventListener('keydown', (e) => { if (e.key === 'Escape') close(); if (e.key === 'ArrowDown' && input.getAttribute('aria-expanded') !== 'true') open(); });
+</script></html>

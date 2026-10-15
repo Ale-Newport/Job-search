@@ -1,0 +1,32 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><title>Radix-style select with a text chevron</title>
+<style>body{font:16px system-ui;padding:24px;max-width:720px}label{display:block;margin:10px 0}.trigger{min-width:200px;text-align:left}
+.popup{list-style:none;margin:0;padding:4px;border:1px solid #888;width:200px}.popup li{padding:4px;cursor:pointer}.popup[hidden]{display:none}</style>
+<h1>Apply</h1>
+<form onsubmit="return false">
+  <label>First name <input name="first"></label>
+  <div><label id="fruit_label" for="rx_fruit">Favourite fruit</label>
+  <!-- what @radix-ui/react-select renders by default: the value span, then an aria-hidden icon (here drawn with a TEXT character) -->
+  <button type="button" id="rx_fruit" class="trigger" role="combobox" aria-controls="rx_list" aria-expanded="false" aria-autocomplete="none" dir="ltr"
+    data-state="closed" data-placeholder=""><span id="rx_value" style="pointer-events:none">Select a fruit…</span><span id="rx_icon" aria-hidden="true">▼</span></button>
+  <ul class="popup" id="rx_list" role="listbox" hidden><li role="option" data-value="apple">Apple</li><li role="option" data-value="banana">Banana</li><li role="option" data-value="cherry">Cherry</li></ul></div>
+  <label>Last name <input name="last"></label>
+</form>
+<script>
+  const q = new URLSearchParams(location.search);
+  const trigger = document.getElementById('rx_fruit'), list = document.getElementById('rx_list'), value = document.getElementById('rx_value'), icon = document.getElementById('rx_icon');
+  window.picked = null;
+  if (q.get('chevron') === 'svg') icon.innerHTML = '<svg width="10" height="10" viewBox="0 0 10 10"><path d="M1 3l4 4 4-4" fill="none" stroke="currentColor"/></svg>';
+  if (q.get('chevron') === 'leading') trigger.insertBefore(icon, value);
+  if (q.get('marker') === '0') trigger.removeAttribute('data-placeholder');
+  // a placeholder that does not read like one ("Any size"): only the trigger's own data-placeholder says that nothing is chosen
+  if (q.get('ph')) value.textContent = q.get('ph');
+  if (q.get('value')) { value.textContent = q.get('value'); trigger.removeAttribute('data-placeholder'); window.picked = q.get('value').toLowerCase(); }
+  // a library that keeps a TEXT-valued data-placeholder as a setting (Chosen, Select2 ...) on a combobox that shows a real answer
+  if (q.get('dp')) trigger.setAttribute('data-placeholder', q.get('dp'));
+  const setOpen = (open) => { list.hidden = !open; trigger.setAttribute('aria-expanded', String(open)); trigger.dataset.state = open ? 'open' : 'closed'; };
+  trigger.addEventListener('click', () => setOpen(list.hidden));
+  list.addEventListener('click', (e) => {
+    const li = e.target.closest('li'); if (!li) return;
+    value.textContent = li.textContent; trigger.removeAttribute('data-placeholder'); window.picked = li.dataset.value; setOpen(false);
+  });
+</script></html>

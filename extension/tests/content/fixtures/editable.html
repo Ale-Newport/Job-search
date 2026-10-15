@@ -1,0 +1,23 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><title>Rich text editor field</title>
+<style>body{font:16px system-ui;padding:24px;max-width:720px}label{display:block;margin:10px 0}
+#note{border:1px solid #999;min-height:60px;padding:8px}</style>
+<h1>About you</h1>
+<form onsubmit="event.preventDefault()">
+<label>Name <input name="name"></label>
+<label id="notelabel">Cover note</label>
+<div id="note" role="textbox" aria-multiline="true" aria-labelledby="notelabel" contenteditable="true"></div>
+<label>Headline <input name="headline"></label>
+<button type="button">Next</button>
+</form>
+<output id="model"></output>
+<script>
+// a model-backed editor: it handles beforeinput itself (like Lexical / Draft), keeps its own model and re-renders
+const note = document.getElementById('note');
+const model = { text: '' };
+function render() { note.textContent = model.text; document.getElementById('model').textContent = model.text; }
+note.addEventListener('beforeinput', e => {
+  if (e.inputType === 'insertText' && e.data != null) { e.preventDefault(); model.text += e.data; render(); }
+  else if (e.inputType === 'deleteContentBackward' || e.inputType === 'deleteContent') { e.preventDefault(); model.text = ''; render(); }
+});
+window.__model = () => model.text;
+</script></html>

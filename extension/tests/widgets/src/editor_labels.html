@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Rich-text editors inside question containers</title>
+<link rel="stylesheet" href="demo.css">
+<style>.editor { min-height: 60px; border: 1px solid #888; padding: 6px; max-width: 420px; }</style>
+</head>
+<body>
+<h1>Editors in questions</h1>
+<form id="el" onsubmit="return false" novalidate>
+  <div class="application-question"><label>Tell us about yourself</label>
+    <div id="bio" class="editor" contenteditable="true" role="textbox" aria-multiline="true"></div>
+    <input type="text" id="linkedin" aria-label="LinkedIn Profile"></div>
+  <div class="application-question"><label>Anything else?</label><input type="text" id="extra" name="extra"></div>
+  <ul style="list-style:none;padding:0">
+    <li class="application-question"><label><div class="application-label">Additional information</div>
+      <div class="application-field"><div id="info" class="editor" contenteditable="plaintext-only" role="textbox"></div></div></label></li>
+    <li class="application-question"><label><div class="application-label">Phone</div>
+      <div class="application-field"><input type="tel" id="phone" name="phone"></div></label></li>
+  </ul>
+  <span id="cap">Cover <span id="cap_editor" contenteditable="" role="textbox"></span> letter</span>
+  <div class="field"><input id="cover" type="text" aria-labelledby="cap" name="cover"></div>
+  <div class="application-question"><label>Why us?</label><div id="why" class="editor" role="textbox" tabindex="0"></div>
+    <input type="text" id="site" aria-label="Website" name="site"></div>
+</form>
+<script src="common.js"></script>
+</body>
+</html>

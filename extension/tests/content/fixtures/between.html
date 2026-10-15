@@ -1,0 +1,23 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><title>Controls between questions</title>
+<style>body{font:16px system-ui;padding:24px;max-width:720px}label{display:block;margin:10px 0}.field{margin:12px 0}
+.toolbar button{margin-right:4px}fieldset{margin:14px 0}</style>
+<h1>Apply</h1>
+<form onsubmit="event.preventDefault()">
+<label>First name <input name="first"></label>
+<p>Need help? <a href="#help" id="help">Read the guide</a></p>
+<label>Last name <input name="last"></label>
+<div class="field"><label for="cv">Cover note</label>
+  <div class="toolbar"><button type="button" id="bold">B</button><button type="button" id="italic">I</button></div>
+  <textarea id="cv" name="cover" rows="3"></textarea></div>
+<div class="field"><label>Email <input name="email" type="email"></label> <button type="button" id="clear_email">Clear</button></div>
+<label>Phone <input name="phone"></label>
+<label>Reference <input name="ref" value="R-1" readonly></label>
+<fieldset><legend>Which languages do you speak?</legend>
+  <label><input type="checkbox" name="lang" value="en">English</label>
+  <label><input type="checkbox" name="lang" value="es">Spanish</label></fieldset>
+<button type="button" id="add_education">Add another education</button>
+<label>School <input name="school"></label>
+<label>Degree <input name="degree" value="MSc"></label>
+<label>Notes <input name="notes"></label>
+<button type="button" id="next">Next</button>
+</form></html>

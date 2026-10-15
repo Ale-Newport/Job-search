@@ -1,0 +1,27 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><title>Covers that never take a click</title>
+<style>
+body{font:16px system-ui;padding:24px;max-width:720px}.row{margin:12px 0}.rel{position:relative;width:320px;height:34px}.rel input{position:absolute;left:0;top:0;width:300px;height:30px;box-sizing:border-box}
+.cv{position:absolute;left:0;top:0;width:100%;height:100%;background:#fff;pointer-events:none;z-index:5}
+.pa::after{content:"";position:absolute;inset:0;background:#fff;pointer-events:none;z-index:5}
+</style>
+<h1>Apply</h1>
+<form onsubmit="event.preventDefault()">
+<!-- what a person sees: plain fields, and fields with a floating label / an icon / an outline / a thin veil over them (pointer-events: none, hiding nothing) -->
+<div class="row"><label for="ok_first">First name</label><div class="rel"><input id="ok_first" name="first_name"></div></div>
+<div class="row"><label for="ok_float" style="display:block">Hotel floating email</label><div class="rel"><input id="ok_float" name="ok_float" type="email"><span style="position:absolute;left:8px;top:6px;pointer-events:none;color:#888">you@example.com</span></div></div>
+<div class="row"><label for="ok_icon">India icon phone</label><div class="rel"><input id="ok_icon" name="ok_icon" type="tel"><svg width="16" height="16" style="position:absolute;right:30px;top:7px;pointer-events:none"><circle cx="8" cy="8" r="7" fill="#369"/></svg></div></div>
+<div class="row"><label for="ok_outline">Juliet outlined city</label><div class="rel"><input id="ok_outline" name="ok_outline"><fieldset aria-hidden="true" style="position:absolute;inset:-4px 18px 0 0;margin:0;padding:0;border:1px solid #888;border-radius:4px;pointer-events:none"></fieldset></div></div>
+<div class="row"><label for="ok_veil">Kilo veiled surname</label><div class="rel"><input id="ok_veil" name="ok_veil"><div style="position:absolute;inset:0;background:rgba(255,255,255,.3);pointer-events:none"></div></div></div>
+<!-- what a person does not see: opaque layers that a pointer falls through -->
+<div class="row"><label for="c_div">Alpha email</label><div class="rel"><input id="c_div" name="c_div" type="email"><div class="cv"></div></div></div>
+<div class="row"><label for="c_after">Bravo email</label><div class="rel pa"><input id="c_after" name="c_after" type="email"></div></div>
+<div class="row"><label for="c_img">Charlie email</label><div class="rel"><input id="c_img" name="c_img" type="email"><img alt="" src="data:image/gif;base64,R0lGODlhAQABAIAAAP///wAAACwAAAAAAQABAAACAkQBADs=" style="position:absolute;left:0;top:0;width:100%;height:100%;pointer-events:none;z-index:5"></div></div>
+<div class="row"><label for="c_opacity">Delta email</label><div class="rel"><input id="c_opacity" name="c_opacity" type="email"><div class="cv" style="opacity:.999"></div></div></div>
+<div class="row"><label for="c_text">Echo email</label><div class="rel"><input id="c_text" name="c_text" type="email"><p class="cv" style="margin:0">Please wait, loading your application form</p></div></div>
+<div class="row"><label for="c_label">Foxtrot email</label><div class="rel"><input id="c_label" name="c_label" type="email"><label for="c_label" class="cv" style="margin:0">Loading</label></div></div>
+<div class="row"><label for="c_phone">Golf phone</label><div class="rel"><input id="c_phone" name="c_phone" type="tel"><div class="cv"></div></div></div>
+<div class="row"><label for="c_cv">Resume/CV</label><div class="rel"><input id="c_cv" name="c_cv" type="file"><div class="cv"></div></div></div>
+<div class="row"><label for="c_cvl">Resume upload</label><div class="rel"><input id="c_cvl" name="c_cvl" type="file"><label for="c_cvl" class="cv" style="margin:0">Choose</label></div></div>
+<div class="row"><label for="ok_last">Last name</label><div class="rel"><input id="ok_last" name="last_name"></div></div>
+</form>
+</html>

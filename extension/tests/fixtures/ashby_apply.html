@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Junior Machine Learning Engineer - Acme Robotics</title>
+<meta property="og:site_name" content="Acme Robotics">
+<link rel="stylesheet" href="/_base.css">
+<script type="application/ld+json">
+{"@context": "https://schema.org/", "@type": "JobPosting", "title": "Junior Machine Learning Engineer",
+ "description": "<p>Acme Robotics builds warehouse robots that help small businesses ship orders faster. The perception team trains and ships the models that let our robots see.</p>",
+ "hiringOrganization": {"@type": "Organization", "name": "Acme Robotics"},
+ "jobLocation": {"@type": "Place", "address": {"@type": "PostalAddress", "addressLocality": "London", "addressCountry": "GB"}}}
+</script>
+<style>
+  .ashby-application-form-field-entry { margin: 18px 0; }
+  .ashby-application-form-question-title { font-weight: 600; display: block; margin-bottom: 4px; }
+  .ashby-application-form-question-description { color: #5a6570; font-size: 14px; margin-bottom: 4px; }
+  .combo { position: relative; max-width: 480px; }
+  .combo input { width: 100%; padding: 8px; box-sizing: border-box; font: inherit; }
+  [role=listbox] { position: absolute; z-index: 20; left: 0; right: 0; top: 100%; margin: 0; padding: 0; list-style: none;
+    background: #fff; border: 1px solid #bbb; max-height: 220px; overflow: auto; box-shadow: 0 4px 12px rgba(0,0,0,.15); }
+  [role=option] { padding: 8px 10px; cursor: pointer; }
+  [role=option][aria-selected=true], [role=option]:hover { background: #e8f3ff; }
+  .clipped { border: 0; clip: rect(0,0,0,0); clip-path: inset(50%); height: 1px; width: 1px; position: absolute; overflow: hidden; }
+  .yesno button { margin-right: 8px; }
+  .yesno button[aria-pressed=true] { background: #173f36; color: #fff; }
+</style>
+<script src="/_guard.js"></script>
+<script>
+// ?long=1: a posting whose visible description is much longer than its JSON-LD description (the job location is only in the JSON-LD).
+if (new URLSearchParams(location.search).has('long')) {
+  addEventListener('DOMContentLoaded', () => {
+    const box = document.querySelector('.ashby-job-posting-description');
+    for (const text of [
+      'About the team. The perception team at Acme Robotics is small, senior and kind. We run weekly demos on the warehouse floor, we write down our decisions and we review every change before it reaches a robot.',
+      'What you will do. You will train and evaluate vision models, build the data pipelines that feed them, profile the code that runs on the robot and work with the hardware team to ship improvements every two weeks.',
+      'What we offer. A learning budget, flexible hours, a pension scheme, private healthcare, twenty-five days of holiday and the chance to see your code move real pallets on the day you ship it.',
+    ]) { const p = document.createElement('p'); p.textContent = text; box.append(p); }
+  });
+}
+</script>
+</head>
+<body>
+<header class="site"><span class="brand">Acme Robotics</span></header>
+<main>
+<h1>Junior Machine Learning Engineer</h1>
+<p class="ashby-job-posting-location">London, United Kingdom - Engineering - Full time</p>
+<div class="ashby-job-posting-description"><p>Acme Robotics builds warehouse robots that help small businesses ship orders faster.
+  The perception team trains and ships the models that let our robots see shelves, pallets and people. This is an entry
+  level role for engineers who enjoy applied machine learning, clean data pipelines and shipping to real hardware.</p></div>
+<div id="loading" role="status">Loading application form...</div>
+<template id="form-template">
+<form id="ashby_form" action="#" novalidate>
+  <div class="ashby-application-form-field-entry" data-field-path="_systemfield_name">
+    <label class="ashby-application-form-question-title _required_x" for="name">Name</label>
+    <input id="name" name="_systemfield_name" type="text" required></div>
+  <div class="ashby-application-form-field-entry" data-field-path="_systemfield_email">
+    <label class="ashby-application-form-question-title _required_x" for="email">Email</label>
+    <input id="email" name="_systemfield_email" type="email" required></div>
+  <div class="ashby-application-form-field-entry" data-field-path="_systemfield_resume">
+    <label class="ashby-application-form-question-title _required_x" for="resume">Resume</label>
+    <div class="ashby-application-form-input-file">
+      <input id="resume" name="_systemfield_resume" type="file" class="clipped" accept=".pdf,.doc,.docx">
+      <button class="ashby-application-form-input-file-dropzone-upload" type="button">Upload File</button></div></div>
+  <div class="ashby-application-form-field-entry" data-field-path="linkedin">
+    <label class="ashby-application-form-question-title" for="linkedin">LinkedIn Profile</label>
+    <input id="linkedin" name="linkedin" type="text"></div>
+  <div class="ashby-application-form-field-entry" data-field-path="notice">
+    <label class="ashby-application-form-question-title _required_x" for="notice">What is your current notice period?</label>
+    <div class="combo"><input id="notice" role="combobox" aria-expanded="false" aria-controls="notice-list" aria-autocomplete="list"
+      autocomplete="off" placeholder="Start typing..." data-options="Immediately available|1 week|2 weeks|1 month|6 weeks|2 months|3 months|6 months|Other"></div></div>
+  <div class="ashby-application-form-field-entry" data-field-path="location">
+    <label class="ashby-application-form-question-title" for="location">Where are you currently located?</label>
+    <div class="combo"><input id="location" role="combobox" aria-expanded="false" aria-controls="location-list" aria-autocomplete="list"
+      autocomplete="off" placeholder="Start typing..." data-options="London, Greater London, England, United Kingdom|London, Ontario, Canada|Madrid, Spain|Manchester, England, United Kingdom"></div></div>
+  <div class="ashby-application-form-field-entry" data-field-path="sponsor">
+    <label class="ashby-application-form-question-title _required_x">Do you require sponsorship now or in the future to work in the job's location?</label>
+    <div class="ashby-application-form-input-yesno yesno">
+      <button type="button" data-option="yes" aria-pressed="false" id="sponsor_yes">Yes</button>
+      <button type="button" data-option="no" aria-pressed="false" id="sponsor_no">No</button>
+      <input type="checkbox" tabindex="-1" hidden></div></div>
+  <div class="ashby-application-form-field-entry" data-field-path="salary">
+    <label class="ashby-application-form-question-title" for="salary">What are your salary expectations?</label>
+    <input id="salary" name="salary" type="number"></div>
+  <div class="ashby-application-form-field-entry" data-field-path="ai">
+    <label class="ashby-application-form-question-title" for="ai">How are you currently using AI?</label>
+    <textarea id="ai" name="ai"></textarea></div>
+  <p><button type="submit" id="submit_app" data-submit>Submit Application</button></p>
+</form>
+</template>
+</main>
+<script>
+// Ashby renders its form after a short client-side fetch; the extension must pick the late-appearing controls up.
+setTimeout(() => {
+  document.getElementById('loading').remove();
+  document.querySelector('main').append(document.getElementById('form-template').content.cloneNode(true));
+  document.querySelectorAll('[data-option]').forEach((button) => button.addEventListener('click', (event) => {
+    event.preventDefault();
+    button.parentNode.querySelectorAll('button').forEach((peer) => peer.setAttribute('aria-pressed', String(peer === button)));
+    window.selections.sponsor = button.getAttribute('data-option');
+  }));
+  document.querySelectorAll('[role=combobox]').forEach((input) => {
+    const list = document.createElement('ul'); list.id = input.getAttribute('aria-controls'); list.setAttribute('role', 'listbox'); list.hidden = true;
+    input.parentNode.append(list);
+    const options = input.dataset.options.split('|');
+    let search = 0;  // the pending search (results arrive late); a pick ends it: its results are for nobody
+    const render = (filter) => {
+      list.replaceChildren();
+      const needle = filter.trim().toLowerCase();
+      options.filter((value) => !needle || value.toLowerCase().includes(needle) || (needle.startsWith('london') && value.startsWith('London')))
+        .forEach((value, index) => {
+          const option = document.createElement('li'); option.setAttribute('role', 'option'); option.id = `${input.id}-opt-${index}`;
+          option.textContent = value;
+          option.addEventListener('mousedown', (event) => event.preventDefault());
+          option.addEventListener('click', () => {
+            clearTimeout(search);
+            input.value = value; window.selections[input.id] = value; list.hidden = true; input.setAttribute('aria-expanded', 'false');
+            input.dispatchEvent(new Event('change', { bubbles: true }));
+          });
+          list.append(option);
+        });
+      list.hidden = !list.children.length; input.setAttribute('aria-expanded', String(!list.hidden));
+    };
+    input.addEventListener('click', () => render(''));
+    input.addEventListener('keydown', (event) => { if (event.key === 'ArrowDown') render(input.value); });
+    input.addEventListener('input', () => { clearTimeout(search); search = setTimeout(() => render(input.value), 120); });
+    input.addEventListener('blur', () => setTimeout(() => { list.hidden = true; input.setAttribute('aria-expanded', 'false'); }, 150));
+  });
+  // ?overlay=N: once a location is chosen the page puts a suggestions popover (role=listbox) over the NEXT question for N ms, the way a
+  // popover with a slow exit animation or a late "did you mean" list does. Nobody can see (or should write into) the question under it.
+  const overlayMs = Number(new URLSearchParams(location.search).get('overlay')) || 0;
+  if (overlayMs) document.getElementById('location').addEventListener('change', () => {
+    const target = document.getElementById('sponsor_yes').parentNode.getBoundingClientRect();
+    const pop = document.createElement('ul'); pop.id = 'late-popover'; pop.setAttribute('role', 'listbox');
+    pop.style.cssText = `position:absolute;z-index:50;margin:0;padding:8px;list-style:none;background:#fff;border:1px solid #999;` +
+      `left:${target.left + scrollX - 8}px;top:${target.top + scrollY - 8}px;width:${target.width + 16}px;height:${target.height + 16}px`;
+    const option = document.createElement('li'); option.setAttribute('role', 'option'); option.textContent = 'Did you mean: London, UK?';
+    pop.append(option); document.body.append(pop);
+    setTimeout(() => pop.remove(), overlayMs);
+  });
+  document.getElementById('ashby_form').addEventListener('submit', (event) => {
+    event.preventDefault(); window.submissions = (window.submissions || 0) + 1;
+    document.querySelector('main').innerHTML = '<h1>Application submitted</h1><p>Your application has been received.</p>';
+  });
+}, 400);
+window.selections = {};
+</script>
+</body>
+</html>

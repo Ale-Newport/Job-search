@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Job posting header variants</title>
+<link rel="stylesheet" href="demo.css">
+</head>
+<body>
+<div id="app"></div>
+<script>
+// ?case=<name>: where the posting says the job is (page report `location_hint`), and decoys that must never be read as the place.
+const long = (n) => 'x'.repeat(n);
+const cases = {
+  // Greenhouse (boards): the location sits next to the title
+  greenhouse: '<div id="header"><span class="company-name">Acme</span><h1 class="app-title">Senior Engineer</h1><div class="location">Remote - London, UK</div></div>',
+  // Greenhouse job-boards
+  jobboards: '<div class="job__header"><h1>Backend Engineer</h1><div class="job__location"><div>Madrid, Spain</div></div></div>',
+  // schema.org microdata, anywhere on the page
+  schema: '<h1>Data Analyst</h1><p>An introduction long enough to be a paragraph.</p><section><span itemprop="jobLocation" itemscope itemtype="https://schema.org/Place"><span itemprop="address">Dublin, Ireland</span></span></section>',
+  // Lever: the title is an h2 inside .posting-headline
+  lever: '<div class="posting-headline"><h2>Product Designer</h2><div class="posting-categories"><div class="location sort-by-time posting-category medium-category-label">Berlin, Germany</div><div class="commitment">Full-time</div></div></div>',
+  // a "Location:" caption is not part of the place
+  label: '<div class="posting-header"><h1>QA Engineer</h1><div data-qa="posting-location">Location: Lisbon, Portugal</div></div>',
+  // a wrapper holding another location element: the inner one is the place
+  nested: '<header><h1>Support Lead</h1><div class="job-location-block"><span class="location-city">Paris</span></div></header>',
+  // 199 characters are fine (the limit is 200)
+  limit: '<div class="header"><h1>Title</h1><div class="location">' + long(199) + '</div></div>',
+  // decoys: nothing may come out of any of these
+  form_field: '<div class="header"><h1>Title</h1><div class="location"><input value="Secret City" aria-label="location"></div></div>' +
+    '<form><label class="location-label" for="loc">Your location</label><input id="loc" class="location-input" value="Hidden Town"></form>',
+  filter: '<div class="header"><h1>Jobs</h1></div><div role="search"><div class="location-filter">Anywhere</div></div>',
+  footer: '<div class="header"><h1>Title</h1></div><footer><div class="location">Our office: Madrid</div></footer>',
+  too_long: '<div class="header"><h1>Title</h1><div class="location">' + long(260) + '</div></div>',
+  wrapper_of_everything: '<div class="location"><h1>Title</h1><p>' + long(500) + '</p></div>',
+};
+const name = new URLSearchParams(location.search).get('case') || 'greenhouse';
+document.getElementById('app').innerHTML = (cases[name] || '') +
+  '<form onsubmit="return false"><div class="field"><label for="full">Full name</label><input id="full" name="full" type="text"></div></form>';
+</script>
+<script src="common.js"></script>
+</body>
+</html>

@@ -1,0 +1,4730 @@
+{
+ "ashby_apply.html": {
+  "plain": {
+   "frames": [
+    {
+     "controls": [
+      [
+       "name",
+       "textbox",
+       "text",
+       "Name",
+       "",
+       true,
+       0,
+       [
+        "CLEAR",
+        "TYPE_TEXT"
+       ]
+      ],
+      [
+       "email",
+       "textbox",
+       "email",
+       "Email",
+       "",
+       true,
+       0,
+       [
+        "CLEAR",
+        "TYPE_TEXT"
+       ]
+      ],
+      [
+       "resume",
+       "upload",
+       "file",
+       "Resume",
+       "",
+       true,
+       0,
+       [
+        "UPLOAD"
+       ]
+      ],
+      [
+       "linkedin",
+       "textbox",
+       "text",
+       "LinkedIn Profile",
+       "",
+       false,
+       0,
+       [
+        "CLEAR",
+        "TYPE_TEXT"
+       ]
+      ],
+      [
+       "notice",
+       "combobox",
+       "text",
+       "What is your current notice period?",
+       "",
+       true,
+       0,
+       [
+        "CLICK",
+        "TYPE_TEXT"
+       ]
+      ],
+      [
+       "location",
+       "combobox",
+       "text",
+       "Where are you currently located?",
+       "",
+       false,
+       0,
+       [
+        "CLICK",
+        "TYPE_TEXT"
+       ]
+      ],
+      [
+       "sponsor_yes",
+       "radio",
+       "button",
+       "Yes",
+       "sponsor",
+       true,
+       0,
+       [
+        "CHECK"
+       ]
+      ],
+      [
+       "sponsor_no",
+       "radio",
+       "button",
+       "No",
+       "sponsor",
+       true,
+       0,
+       [
+        "CHECK"
+       ]
+      ],
+      [
+       "salary",
+       "textbox",
+       "number",
+       "What are your salary expectations?",
+       "",
+       false,
+       0,
+       [
+        "CLEAR",
+        "TYPE_TEXT"
+       ]
+      ],
+      [
+       "ai",
+       "textbox",
+       "textarea",
+       "How are you currently using AI?",
+       "",
+       false,
+       0,
+       [
+        "CLEAR",
+        "TYPE_TEXT"
+       ]
+      ]
+     ],
+     "flags": [
+      false,
+      false,
+      false
+     ],
+     "frame": "ashby_apply.html"
+    }
+   ]
+  },
+  "widgets": {
+   "frames": [
+    {
+     "controls": [
+      [
+       "name",
+       "textbox",
+       "text",
+       "Name",
+       "",
+       true,
+       0,
+       [
+        "CLEAR",
+        "TYPE_TEXT"
+       ]
+      ],
+      [
+       "email",
+       "textbox",
+       "email",
+       "Email",
+       "",
+       true,
+       0,
+       [
+        "CLEAR",
+        "TYPE_TEXT"
+       ]
+      ],
+      [
+       "resume",
+       "upload",
+       "file",
+       "Resume",
+       "",
+       true,
+       0,
+       [
+        "UPLOAD"
+       ]
+      ],
+      [
+       "linkedin",
+       "textbox",
+       "text",
+       "LinkedIn Profile",
+       "",
+       false,
+       0,
+       [
+        "CLEAR",
+        "TYPE_TEXT"
+       ]
+      ],
+      [
+       "notice",
+       "combobox",
+       "text",
+       "What is your current notice period?",
+       "",
+       true,
+       0,
+       [
+        "CLICK",
+        "TYPE_TEXT"
+       ]
+      ],
+      [
+       "location",
+       "combobox",
+       "text",
+       "Where are you currently located?",
+       "",
+       false,
+       0,
+       [
+        "CLICK",
+        "TYPE_TEXT"
+       ]
+      ],
+      [
+       "sponsor_yes",
+       "radio",
+       "button",
+       "Yes",
+       "sponsor",
+       true,
+       0,
+       [
+        "CHECK"
+       ]
+      ],
+      [
+       "sponsor_no",
+       "radio",
+       "button",
+       "No",
+       "sponsor",
+       true,
+       0,
+       [
+        "CHECK"
+       ]
+      ],
+      [
+       "salary",
+       "textbox",
+       "number",
+       "What are your salary expectations?",
+       "",
+       false,
+       0,
+       [
+        "CLEAR",
+        "TYPE_TEXT"
+       ]
+      ],
+      [
+       "ai",
+       "textbox",
+       "textarea",
+       "How are you currently using AI?",
+       "",
+       false,
+       0,
+       [
+        "CLEAR",
+        "TYPE_TEXT"
+       ]
+      ]
+     ],
+     "flags": [
+      false,
+      false,
+      false
+     ],
+     "frame": "ashby_apply.html"
+    }
+   ]
+  }
+ },
+ "ashby_apply.html?long=1": {
+  "plain": {
+   "frames": [
+    {
+     "controls": [
+      [
+       "name",
+       "textbox",
+       "text",
+       "Name",
+       "",
+       true,
+       0,
+       [
+        "CLEAR",
+        "TYPE_TEXT"
+       ]
+      ],
+      [
+       "email",
+       "textbox",
+       "email",
+       "Email",
+       "",
+       true,
+       0,
+       [
+        "CLEAR",
+        "TYPE_TEXT"
+       ]
+      ],
+      [
+       "resume",
+       "upload",
+       "file",
+       "Resume",
+       "",
+       true,
+       0,
+       [
+        "UPLOAD"
+       ]
+      ],
+      [
+       "linkedin",
+       "textbox",
+       "text",
+       "LinkedIn Profile",
+       "",
+       false,
+       0,
+       [
+        "CLEAR",
+        "TYPE_TEXT"
+       ]
+      ],
+      [
+       "notice",
+       "combobox",
+       "text",
+       "What is your current notice period?",
+       "",
+       true,
+       0,
+       [
+        "CLICK",
+        "TYPE_TEXT"
+       ]
+      ],
+      [
+       "location",
+       "combobox",
+       "text",
+       "Where are you currently located?",
+       "",
+       false,
+       0,
+       [
+        "CLICK",
+        "TYPE_TEXT"
+       ]
+      ],
+      [
+       "sponsor_yes",
+       "radio",
+       "button",
+       "Yes",
+       "sponsor",
+       true,
+       0,
+       [
+        "CHECK"
+       ]
+      ],
+      [
+       "sponsor_no",
+       "radio",
+       "button",
+       "No",
+       "sponsor",
+       true,
+       0,
+       [
+        "CHECK"
+       ]
+      ],
+      [
+       "salary",
+       "textbox",
+       "number",
+       "What are your salary expectations?",
+       "",
+       false,
+       0,
+       [
+        "CLEAR",
+        "TYPE_TEXT"
+       ]
+      ],
+      [
+       "ai",
+       "textbox",
+       "textarea",
+       "How are you currently using AI?",
+       "",
+       false,
+       0,
+       [
+        "CLEAR",
+        "TYPE_TEXT"
+       ]
+      ]
+     ],
+     "flags": [
+      false,
+      false,
+      false
+     ],
+     "frame": "ashby_apply.html"
+    }
+   ]
+  },
+  "widgets": {
+   "frames": [
+    {
+     "controls": [
+      [
+       "name",
+       "textbox",
+       "text",
+       "Name",
+       "",
+       true,
+       0,
+       [
+        "CLEAR",
+        "TYPE_TEXT"
+       ]
+      ],
+      [
+       "email",
+       "textbox",
+       "email",
+       "Email",
+       "",
+       true,
+       0,
+       [
+        "CLEAR",
+        "TYPE_TEXT"
+       ]
+      ],
+      [
+       "resume",
+       "upload",
+       "file",
+       "Resume",
+       "",
+       true,
+       0,
+       [
+        "UPLOAD"
+       ]
+      ],
+      [
+       "linkedin",
+       "textbox",
+       "text",
+       "LinkedIn Profile",
+       "",
+       false,
+       0,
+       [
+        "CLEAR",
+        "TYPE_TEXT"
+       ]
+      ],
+      [
+       "notice",
+       "combobox",
+       "text",
+       "What is your current notice period?",
+       "",
+       true,
+       0,
+       [
+        "CLICK",
+        "TYPE_TEXT"
+       ]
+      ],
+      [
+       "location",
+       "combobox",
+       "text",
+       "Where are you currently located?",
+       "",
+       false,
+       0,
+       [
+        "CLICK",
+        "TYPE_TEXT"
+       ]
+      ],
+      [
+       "sponsor_yes",
+       "radio",
+       "button",
+       "Yes",
+       "sponsor",
+       true,
+       0,
+       [
+        "CHECK"
+       ]
+      ],
+      [
+       "sponsor_no",
+       "radio",
+       "button",
+       "No",
+       "sponsor",
+       true,
+       0,
+       [
+        "CHECK"
+       ]
+      ],
+      [
+       "salary",
+       "textbox",
+       "number",
+       "What are your salary expectations?",
+       "",
+       false,
+       0,
+       [
+        "CLEAR",
+        "TYPE_TEXT"
+       ]
+      ],
+      [
+       "ai",
+       "textbox",
+       "textarea",
+       "How are you currently using AI?",
+       "",
+       false,
+       0,
+       [
+        "CLEAR",
+        "TYPE_TEXT"
+       ]
+      ]
+     ],
+     "flags": [
+      false,
+      false,
+      false
+     ],
+     "frame": "ashby_apply.html"
+    }
+   ]
+  }
+ },
+ "captcha_gate.html": {
+  "plain": {
+   "frames": [
+    {
+     "controls": [
+      [
+       "first_name",
+       "textbox",
+       "text",
+       "First name",
+       "",
+       false,
+       0,
+       [
+        "CLEAR",
+        "TYPE_TEXT"
+       ]
+      ],
+      [
+       "email",
+       "textbox",
+       "email",
+       "Email",
+       "",
+       false,
+       0,
+       [
+        "CLEAR",
+        "TYPE_TEXT"
+       ]
+      ]
+     ],
+     "flags": [
+      true,
+      false,
+      false
+     ],
+     "frame": "captcha_gate.html"
+    },
+    {
+     "controls": [
+      [
+       "recaptcha-anchor",
+       "checkbox",
+       "checkbox",
+       "I'm not a robot",
+       "",
+       false,
+       0,
+       [
+        "CHECK",
+        "CLEAR",
+        "UNCHECK"
+       ]
+      ]
+     ],
+     "flags": [
+      false,
+      false,
+      false
+     ],
+     "frame": "anchor"
+    }
+   ]
+  },
+  "widgets": {
+   "frames": [
+    {
+     "controls": [
+      [
+       "first_name",
+       "textbox",
+       "text",
+       "First name",
+       "",
+       false,
+       0,
+       [
+        "CLEAR",
+        "TYPE_TEXT"
+       ]
+      ],
+      [
+       "email",
+       "textbox",
+       "email",
+       "Email",
+       "",
+       false,
+       0,
+       [
+        "CLEAR",
+        "TYPE_TEXT"
+       ]
+      ]
+     ],
+     "flags": [
+      true,
+      false,
+      false
+     ],
+     "frame": "captcha_gate.html"
+    },
+    {
+     "controls": [
+      [
+       "recaptcha-anchor",
+       "checkbox",
+       "checkbox",
+       "I'm not a robot",
+       "",
+       false,
+       0,
+       [
+        "CHECK",
+        "CLEAR",
+        "UNCHECK"
+       ]
+      ]
+     ],
+     "flags": [
+      false,
+      false,
+      false
+     ],
+     "frame": "anchor"
+    }
+   ]
+  }
+ },
+ "choices.html": {
+  "plain": {
+   "frames": [
+    {
+     "controls": [
+      [
+       "country",
+       "combobox",
+       "select-one",
+       "Country of residence *",
+       "",
+       true,
+       4,
+       [
+        "CLEAR",
+        "CLICK",
+        "SELECT"
+       ]
+      ],
+      [
+       "relocate_yes",
+       "radio",
+       "radio",
+       "Yes",
+       "relocate",
+       false,
+       0,
+       [
+        "CHECK",
+        "CLEAR"
+       ]
+      ],
+      [
+       "relocate_no",
+       "radio",
+       "radio",
+       "No",
+       "relocate",
+       false,
+       0,
+       [
+        "CHECK",
+        "CLEAR"
+       ]
+      ],
+      [
+       "auth_yes",
+       "radio",
+       "radio",
+       "Yes",
+       "auth",
+       true,
+       0,
+       [
+        "CHECK",
+        "CLEAR"
+       ]
+      ],
+      [
+       "auth_no",
+       "radio",
+       "radio",
+       "No",
+       "auth",
+       false,
+       0,
+       [
+        "CHECK",
+        "CLEAR"
+       ]
+      ],
+      [
+       "lang_en",
+       "checkbox",
+       "checkbox",
+       "English",
+       "choice-10",
+       false,
+       0,
+       [
+        "CHECK",
+        "CLEAR",
+        "UNCHECK"
+       ]
+      ],
+      [
+       "lang_es",
+       "checkbox",
+       "checkbox",
+       "Spanish",
+       "choice-10",
+       false,
+       0,
+       [
+        "CHECK",
+        "CLEAR",
+        "UNCHECK"
+       ]
+      ],
+      [
+       "lang_fr",
+       "checkbox",
+       "checkbox",
+       "French",
+       "choice-10",
+       false,
+       0,
+       [
+        "CHECK",
+        "CLEAR",
+        "UNCHECK"
+       ]
+      ],
+      [
+       "lang_de",
+       "checkbox",
+       "checkbox",
+       "German",
+       "choice-10",
+       false,
+       0,
+       [
+        "CHECK",
+        "CLEAR",
+        "UNCHECK"
+       ]
+      ],
+      [
+       "languages_multi",
+       "combobox",
+       "select-multiple",
+       "Which languages do you speak fluently? (select all that apply)",
+       "",
+       false,
+       4,
+       [
+        "CLEAR",
+        "CLICK",
+        "SELECT"
+       ]
+      ],
+      [
+       "workplace",
+       "combobox",
+       "select-one",
+       "Workplace preference",
+       "",
+       false,
+       4,
+       [
+        "CLEAR",
+        "CLICK",
+        "SELECT"
+       ]
+      ]
+     ],
+     "flags": [
+      false,
+      false,
+      false
+     ],
+     "frame": "choices.html"
+    }
+   ]
+  },
+  "widgets": {
+   "frames": [
+    {
+     "controls": [
+      [
+       "country",
+       "combobox",
+       "select-one",
+       "Country of residence *",
+       "",
+       true,
+       4,
+       [
+        "CLEAR",
+        "CLICK",
+        "SELECT"
+       ]
+      ],
+      [
+       "relocate_yes",
+       "radio",
+       "radio",
+       "Yes",
+       "relocate",
+       false,
+       0,
+       [
+        "CHECK",
+        "CLEAR"
+       ]
+      ],
+      [
+       "relocate_no",
+       "radio",
+       "radio",
+       "No",
+       "relocate",
+       false,
+       0,
+       [
+        "CHECK",
+        "CLEAR"
+       ]
+      ],
+      [
+       "auth_yes",
+       "radio",
+       "radio",
+       "Yes",
+       "auth",
+       true,
+       0,
+       [
+        "CHECK",
+        "CLEAR"
+       ]
+      ],
+      [
+       "auth_no",
+       "radio",
+       "radio",
+       "No",
+       "auth",
+       false,
+       0,
+       [
+        "CHECK",
+        "CLEAR"
+       ]
+      ],
+      [
+       "lang_en",
+       "checkbox",
+       "checkbox",
+       "English",
+       "choice-10",
+       false,
+       0,
+       [
+        "CHECK",
+        "CLEAR",
+        "UNCHECK"
+       ]
+      ],
+      [
+       "lang_es",
+       "checkbox",
+       "checkbox",
+       "Spanish",
+       "choice-10",
+       false,
+       0,
+       [
+        "CHECK",
+        "CLEAR",
+        "UNCHECK"
+       ]
+      ],
+      [
+       "lang_fr",
+       "checkbox",
+       "checkbox",
+       "French",
+       "choice-10",
+       false,
+       0,
+       [
+        "CHECK",
+        "CLEAR",
+        "UNCHECK"
+       ]
+      ],
+      [
+       "lang_de",
+       "checkbox",
+       "checkbox",
+       "German",
+       "choice-10",
+       false,
+       0,
+       [
+        "CHECK",
+        "CLEAR",
+        "UNCHECK"
+       ]
+      ],
+      [
+       "languages_multi",
+       "combobox",
+       "select-multiple",
+       "Which languages do you speak fluently? (select all that apply)",
+       "",
+       false,
+       4,
+       [
+        "CLEAR",
+        "CLICK",
+        "SELECT"
+       ]
+      ],
+      [
+       "workplace",
+       "combobox",
+       "select-one",
+       "Workplace preference",
+       "",
+       false,
+       4,
+       [
+        "CLEAR",
+        "CLICK",
+        "SELECT"
+       ]
+      ]
+     ],
+     "flags": [
+      false,
+      false,
+      false
+     ],
+     "frame": "choices.html"
+    }
+   ]
+  }
+ },
+ "conditional.html": {
+  "plain": {
+   "frames": [
+    {
+     "controls": [
+      [
+       "sponsor_yes",
+       "radio",
+       "radio",
+       "Yes",
+       "sponsor",
+       true,
+       0,
+       [
+        "CHECK",
+        "CLEAR"
+       ]
+      ],
+      [
+       "sponsor_no",
+       "radio",
+       "radio",
+       "No",
+       "sponsor",
+       false,
+       0,
+       [
+        "CHECK",
+        "CLEAR"
+       ]
+      ],
+      [
+       "email",
+       "textbox",
+       "email",
+       "Email *",
+       "",
+       true,
+       0,
+       [
+        "CLEAR",
+        "TYPE_TEXT"
+       ]
+      ]
+     ],
+     "flags": [
+      false,
+      false,
+      false
+     ],
+     "frame": "conditional.html"
+    }
+   ]
+  },
+  "widgets": {
+   "frames": [
+    {
+     "controls": [
+      [
+       "sponsor_yes",
+       "radio",
+       "radio",
+       "Yes",
+       "sponsor",
+       true,
+       0,
+       [
+        "CHECK",
+        "CLEAR"
+       ]
+      ],
+      [
+       "sponsor_no",
+       "radio",
+       "radio",
+       "No",
+       "sponsor",
+       false,
+       0,
+       [
+        "CHECK",
+        "CLEAR"
+       ]
+      ],
+      [
+       "email",
+       "textbox",
+       "email",
+       "Email *",
+       "",
+       true,
+       0,
+       [
+        "CLEAR",
+        "TYPE_TEXT"
+       ]
+      ]
+     ],
+     "flags": [
+      false,
+      false,
+      false
+     ],
+     "frame": "conditional.html"
+    }
+   ]
+  }
+ },
+ "consent_demographics.html": {
+  "plain": {
+   "frames": [
+    {
+     "controls": [
+      [
+       "pronouns",
+       "combobox",
+       "select-one",
+       "Preferred pronouns",
+       "",
+       false,
+       5,
+       [
+        "CLEAR",
+        "CLICK",
+        "SELECT"
+       ]
+      ],
+      [
+       "gender",
+       "combobox",
+       "select-one",
+       "What is your gender?",
+       "",
+       false,
+       5,
+       [
+        "CLEAR",
+        "CLICK",
+        "SELECT"
+       ]
+      ],
+      [
+       "disability_yes",
+       "radio",
+       "radio",
+       "Yes",
+       "disability",
+       false,
+       0,
+       [
+        "CHECK",
+        "CLEAR"
+       ]
+      ],
+      [
+       "disability_no",
+       "radio",
+       "radio",
+       "No",
+       "disability",
+       false,
+       0,
+       [
+        "CHECK",
+        "CLEAR"
+       ]
+      ],
+      [
+       "disability_na",
+       "radio",
+       "radio",
+       "Prefer not to say",
+       "disability",
+       false,
+       0,
+       [
+        "CHECK",
+        "CLEAR"
+       ]
+      ],
+      [
+       "terms",
+       "checkbox",
+       "checkbox",
+       "I agree to the terms and conditions. *",
+       "terms",
+       true,
+       0,
+       [
+        "CHECK",
+        "CLEAR",
+        "UNCHECK"
+       ]
+      ],
+      [
+       "marketing",
+       "checkbox",
+       "checkbox",
+       "I consent to receive marketing emails from Acme Robotics.",
+       "marketing",
+       false,
+       0,
+       [
+        "CHECK",
+        "CLEAR",
+        "UNCHECK"
+       ]
+      ],
+      [
+       "transcribe_yes",
+       "radio",
+       "radio",
+       "Yes, I consent",
+       "transcribe",
+       false,
+       0,
+       [
+        "CHECK",
+        "CLEAR"
+       ]
+      ],
+      [
+       "transcribe_no",
+       "radio",
+       "radio",
+       "No, I do not consent",
+       "transcribe",
+       false,
+       0,
+       [
+        "CHECK",
+        "CLEAR"
+       ]
+      ]
+     ],
+     "flags": [
+      false,
+      false,
+      false
+     ],
+     "frame": "consent_demographics.html"
+    }
+   ]
+  },
+  "widgets": {
+   "frames": [
+    {
+     "controls": [
+      [
+       "pronouns",
+       "combobox",
+       "select-one",
+       "Preferred pronouns",
+       "",
+       false,
+       5,
+       [
+        "CLEAR",
+        "CLICK",
+        "SELECT"
+       ]
+      ],
+      [
+       "gender",
+       "combobox",
+       "select-one",
+       "What is your gender?",
+       "",
+       false,
+       5,
+       [
+        "CLEAR",
+        "CLICK",
+        "SELECT"
+       ]
+      ],
+      [
+       "disability_yes",
+       "radio",
+       "radio",
+       "Yes",
+       "disability",
+       false,
+       0,
+       [
+        "CHECK",
+        "CLEAR"
+       ]
+      ],
+      [
+       "disability_no",
+       "radio",
+       "radio",
+       "No",
+       "disability",
+       false,
+       0,
+       [
+        "CHECK",
+        "CLEAR"
+       ]
+      ],
+      [
+       "disability_na",
+       "radio",
+       "radio",
+       "Prefer not to say",
+       "disability",
+       false,
+       0,
+       [
+        "CHECK",
+        "CLEAR"
+       ]
+      ],
+      [
+       "terms",
+       "checkbox",
+       "checkbox",
+       "I agree to the terms and conditions. *",
+       "terms",
+       true,
+       0,
+       [
+        "CHECK",
+        "CLEAR",
+        "UNCHECK"
+       ]
+      ],
+      [
+       "marketing",
+       "checkbox",
+       "checkbox",
+       "I consent to receive marketing emails from Acme Robotics.",
+       "marketing",
+       false,
+       0,
+       [
+        "CHECK",
+        "CLEAR",
+        "UNCHECK"
+       ]
+      ],
+      [
+       "transcribe_yes",
+       "radio",
+       "radio",
+       "Yes, I consent",
+       "transcribe",
+       false,
+       0,
+       [
+        "CHECK",
+        "CLEAR"
+       ]
+      ],
+      [
+       "transcribe_no",
+       "radio",
+       "radio",
+       "No, I do not consent",
+       "transcribe",
+       false,
+       0,
+       [
+        "CHECK",
+        "CLEAR"
+       ]
+      ]
+     ],
+     "flags": [
+      false,
+      false,
+      false
+     ],
+     "frame": "consent_demographics.html"
+    }
+   ]
+  }
+ },
+ "contenteditable.html": {
+  "plain": {
+   "frames": [
+    {
+     "controls": [
+      [
+       "editor_name",
+       "textbox",
+       "",
+       "Full name",
+       "",
+       false,
+       0,
+       [
+        "TYPE_TEXT"
+       ]
+      ],
+      [
+       "editor_why",
+       "textbox",
+       "",
+       "Why do you want to work at Acme Robotics?",
+       "",
+       false,
+       0,
+       [
+        "TYPE_TEXT"
+       ]
+      ],
+      [
+       "editor_framework",
+       "textbox",
+       "",
+       "Email address",
+       "",
+       false,
+       0,
+       [
+        "TYPE_TEXT"
+       ]
+      ]
+     ],
+     "flags": [
+      false,
+      false,
+      false
+     ],
+     "frame": "contenteditable.html"
+    }
+   ]
+  },
+  "widgets": {
+   "frames": [
+    {
+     "controls": [
+      [
+       "editor_name",
+       "textbox",
+       "",
+       "Full name",
+       "",
+       false,
+       0,
+       [
+        "TYPE_TEXT"
+       ]
+      ],
+      [
+       "editor_why",
+       "textbox",
+       "",
+       "Why do you want to work at Acme Robotics?",
+       "",
+       false,
+       0,
+       [
+        "TYPE_TEXT"
+       ]
+      ],
+      [
+       "editor_framework",
+       "textbox",
+       "",
+       "Email address",
+       "",
+       false,
+       0,
+       [
+        "TYPE_TEXT"
+       ]
+      ]
+     ],
+     "flags": [
+      false,
+      false,
+      false
+     ],
+     "frame": "contenteditable.html"
+    }
+   ]
+  }
+ },
+ "decoy.html": {
+  "plain": {
+   "frames": [
+    {
+     "controls": [
+      [
+       "site_search",
+       "textbox",
+       "search",
+       "Search the site",
+       "",
+       false,
+       0,
+       [
+        "CLEAR",
+        "TYPE_TEXT"
+       ]
+      ]
+     ],
+     "flags": [
+      false,
+      false,
+      false
+     ],
+     "frame": "decoy.html"
+    }
+   ]
+  },
+  "widgets": {
+   "frames": [
+    {
+     "controls": [
+      [
+       "site_search",
+       "textbox",
+       "search",
+       "Search the site",
+       "",
+       false,
+       0,
+       [
+        "CLEAR",
+        "TYPE_TEXT"
+       ]
+      ]
+     ],
+     "flags": [
+      false,
+      false,
+      false
+     ],
+     "frame": "decoy.html"
+    }
+   ]
+  }
+ },
+ "file_upload.html": {
+  "plain": {
+   "frames": [
+    {
+     "controls": [
+      [
+       "resume",
+       "upload",
+       "file",
+       "resume resume",
+       "",
+       false,
+       0,
+       [
+        "UPLOAD"
+       ]
+      ],
+      [
+       "cover_letter",
+       "upload",
+       "file",
+       "cover letter cover letter",
+       "",
+       false,
+       0,
+       [
+        "UPLOAD"
+       ]
+      ],
+      [
+       "transcript",
+       "upload",
+       "file",
+       "transcript transcript",
+       "",
+       false,
+       0,
+       [
+        "UPLOAD"
+       ]
+      ],
+      [
+       "work_sample",
+       "upload",
+       "file",
+       "Work sample (optional)",
+       "",
+       false,
+       0,
+       [
+        "UPLOAD"
+       ]
+      ]
+     ],
+     "flags": [
+      false,
+      false,
+      false
+     ],
+     "frame": "file_upload.html"
+    }
+   ]
+  },
+  "widgets": {
+   "frames": [
+    {
+     "controls": [
+      [
+       "resume",
+       "upload",
+       "file",
+       "Resume/CV",
+       "",
+       false,
+       0,
+       [
+        "UPLOAD"
+       ]
+      ],
+      [
+       "cover_letter",
+       "upload",
+       "file",
+       "Cover letter",
+       "",
+       false,
+       0,
+       [
+        "UPLOAD"
+       ]
+      ],
+      [
+       "transcript",
+       "upload",
+       "file",
+       "Academic transcript",
+       "",
+       false,
+       0,
+       [
+        "UPLOAD"
+       ]
+      ],
+      [
+       "work_sample",
+       "upload",
+       "file",
+       "Work sample (optional)",
+       "",
+       false,
+       0,
+       [
+        "UPLOAD"
+       ]
+      ]
+     ],
+     "flags": [
+      false,
+      false,
+      false
+     ],
+     "frame": "file_upload.html"
+    }
+   ]
+  }
+ },
+ "greenhouse_apply.html": {
+  "plain": {
+   "frames": [
+    {
+     "controls": [
+      [
+       "first_name",
+       "textbox",
+       "text",
+       "First Name *",
+       "",
+       true,
+       0,
+       [
+        "CLEAR",
+        "TYPE_TEXT"
+       ]
+      ],
+      [
+       "last_name",
+       "textbox",
+       "text",
+       "Last Name *",
+       "",
+       true,
+       0,
+       [
+        "CLEAR",
+        "TYPE_TEXT"
+       ]
+      ],
+      [
+       "email",
+       "textbox",
+       "email",
+       "Email *",
+       "",
+       true,
+       0,
+       [
+        "CLEAR",
+        "TYPE_TEXT"
+       ]
+      ],
+      [
+       "phone",
+       "textbox",
+       "tel",
+       "Phone *",
+       "",
+       true,
+       0,
+       [
+        "CLEAR",
+        "TYPE_TEXT"
+       ]
+      ],
+      [
+       "resume",
+       "upload",
+       "file",
+       "job application[resume] resume",
+       "",
+       true,
+       0,
+       [
+        "UPLOAD"
+       ]
+      ],
+      [
+       "cover_letter",
+       "upload",
+       "file",
+       "job application[cover letter] cover letter",
+       "",
+       false,
+       0,
+       [
+        "UPLOAD"
+       ]
+      ],
+      [
+       "linkedin",
+       "textbox",
+       "text",
+       "LinkedIn Profile",
+       "",
+       false,
+       0,
+       [
+        "CLEAR",
+        "TYPE_TEXT"
+       ]
+      ],
+      [
+       "github",
+       "textbox",
+       "text",
+       "GitHub",
+       "",
+       false,
+       0,
+       [
+        "CLEAR",
+        "TYPE_TEXT"
+       ]
+      ],
+      [
+       "portfolio",
+       "textbox",
+       "text",
+       "Portfolio / personal website",
+       "",
+       false,
+       0,
+       [
+        "CLEAR",
+        "TYPE_TEXT"
+       ]
+      ],
+      [
+       "degree",
+       "textbox",
+       "text",
+       "Highest completed degree",
+       "",
+       false,
+       0,
+       [
+        "CLEAR",
+        "TYPE_TEXT"
+       ]
+      ],
+      [
+       "employer",
+       "textbox",
+       "text",
+       "Most recent employer",
+       "",
+       false,
+       0,
+       [
+        "CLEAR",
+        "TYPE_TEXT"
+       ]
+      ],
+      [
+       "colour",
+       "textbox",
+       "text",
+       "What is your favourite colour?",
+       "",
+       false,
+       0,
+       [
+        "CLEAR",
+        "TYPE_TEXT"
+       ]
+      ],
+      [
+       "authorised",
+       "combobox",
+       "select-one",
+       "Are you legally authorized to work in the United Kingdom? *",
+       "",
+       true,
+       3,
+       [
+        "CLEAR",
+        "CLICK",
+        "SELECT"
+       ]
+      ],
+      [
+       "sponsorship_yes",
+       "radio",
+       "radio",
+       "Yes",
+       "sponsorship",
+       true,
+       0,
+       [
+        "CHECK",
+        "CLEAR"
+       ]
+      ],
+      [
+       "sponsorship_no",
+       "radio",
+       "radio",
+       "No",
+       "sponsorship",
+       false,
+       0,
+       [
+        "CHECK",
+        "CLEAR"
+       ]
+      ],
+      [
+       "salary",
+       "textbox",
+       "number",
+       "What are your salary expectations (GBP)?",
+       "",
+       false,
+       0,
+       [
+        "CLEAR",
+        "TYPE_TEXT"
+       ]
+      ],
+      [
+       "start_date",
+       "textbox",
+       "date",
+       "When can you start?",
+       "",
+       false,
+       0,
+       [
+        "CLEAR",
+        "TYPE_TEXT"
+       ]
+      ],
+      [
+       "source",
+       "combobox",
+       "select-one",
+       "How did you hear about this job?",
+       "",
+       false,
+       5,
+       [
+        "CLEAR",
+        "CLICK",
+        "SELECT"
+       ]
+      ],
+      [
+       "lang_en",
+       "checkbox",
+       "checkbox",
+       "English",
+       "choice-31",
+       false,
+       0,
+       [
+        "CHECK",
+        "CLEAR",
+        "UNCHECK"
+       ]
+      ],
+      [
+       "lang_es",
+       "checkbox",
+       "checkbox",
+       "Spanish",
+       "choice-31",
+       false,
+       0,
+       [
+        "CHECK",
+        "CLEAR",
+        "UNCHECK"
+       ]
+      ],
+      [
+       "lang_fr",
+       "checkbox",
+       "checkbox",
+       "French",
+       "choice-31",
+       false,
+       0,
+       [
+        "CHECK",
+        "CLEAR",
+        "UNCHECK"
+       ]
+      ],
+      [
+       "lang_de",
+       "checkbox",
+       "checkbox",
+       "German",
+       "choice-31",
+       false,
+       0,
+       [
+        "CHECK",
+        "CLEAR",
+        "UNCHECK"
+       ]
+      ],
+      [
+       "why",
+       "textbox",
+       "textarea",
+       "Why do you want to work at Acme Robotics?",
+       "",
+       false,
+       0,
+       [
+        "CLEAR",
+        "TYPE_TEXT"
+       ]
+      ],
+      [
+       "gender",
+       "combobox",
+       "select-one",
+       "Gender",
+       "",
+       false,
+       5,
+       [
+        "CLEAR",
+        "CLICK",
+        "SELECT"
+       ]
+      ],
+      [
+       "ethnicity",
+       "combobox",
+       "select-one",
+       "Race / Ethnicity",
+       "",
+       false,
+       5,
+       [
+        "CLEAR",
+        "CLICK",
+        "SELECT"
+       ]
+      ],
+      [
+       "disability_yes",
+       "radio",
+       "radio",
+       "Yes",
+       "disability",
+       false,
+       0,
+       [
+        "CHECK",
+        "CLEAR"
+       ]
+      ],
+      [
+       "disability_no",
+       "radio",
+       "radio",
+       "No",
+       "disability",
+       false,
+       0,
+       [
+        "CHECK",
+        "CLEAR"
+       ]
+      ],
+      [
+       "disability_na",
+       "radio",
+       "radio",
+       "Prefer not to say",
+       "disability",
+       false,
+       0,
+       [
+        "CHECK",
+        "CLEAR"
+       ]
+      ],
+      [
+       "veteran",
+       "combobox",
+       "select-one",
+       "Veteran status",
+       "",
+       false,
+       4,
+       [
+        "CLEAR",
+        "CLICK",
+        "SELECT"
+       ]
+      ],
+      [
+       "gdpr_consent",
+       "checkbox",
+       "checkbox",
+       "I consent to Acme Robotics processing my personal data for recruitment purposes (GDPR). *",
+       "gdpr_consent",
+       true,
+       0,
+       [
+        "CHECK",
+        "CLEAR",
+        "UNCHECK"
+       ]
+      ],
+      [
+       "privacy_notice",
+       "checkbox",
+       "checkbox",
+       "I have read and agree to the privacy notice. *",
+       "privacy_notice",
+       true,
+       0,
+       [
+        "CHECK",
+        "CLEAR",
+        "UNCHECK"
+       ]
+      ]
+     ],
+     "flags": [
+      false,
+      false,
+      false
+     ],
+     "frame": "greenhouse_apply.html"
+    },
+    {
+     "controls": [],
+     "flags": [
+      false,
+      false,
+      false
+     ],
+     "frame": "anchor"
+    }
+   ]
+  },
+  "widgets": {
+   "frames": [
+    {
+     "controls": [
+      [
+       "first_name",
+       "textbox",
+       "text",
+       "First Name *",
+       "",
+       true,
+       0,
+       [
+        "CLEAR",
+        "TYPE_TEXT"
+       ]
+      ],
+      [
+       "last_name",
+       "textbox",
+       "text",
+       "Last Name *",
+       "",
+       true,
+       0,
+       [
+        "CLEAR",
+        "TYPE_TEXT"
+       ]
+      ],
+      [
+       "email",
+       "textbox",
+       "email",
+       "Email *",
+       "",
+       true,
+       0,
+       [
+        "CLEAR",
+        "TYPE_TEXT"
+       ]
+      ],
+      [
+       "phone",
+       "textbox",
+       "tel",
+       "Phone *",
+       "",
+       true,
+       0,
+       [
+        "CLEAR",
+        "TYPE_TEXT"
+       ]
+      ],
+      [
+       "resume",
+       "upload",
+       "file",
+       "Resume/CV",
+       "",
+       true,
+       0,
+       [
+        "UPLOAD"
+       ]
+      ],
+      [
+       "cover_letter",
+       "upload",
+       "file",
+       "Cover Letter",
+       "",
+       false,
+       0,
+       [
+        "UPLOAD"
+       ]
+      ],
+      [
+       "linkedin",
+       "textbox",
+       "text",
+       "LinkedIn Profile",
+       "",
+       false,
+       0,
+       [
+        "CLEAR",
+        "TYPE_TEXT"
+       ]
+      ],
+      [
+       "github",
+       "textbox",
+       "text",
+       "GitHub",
+       "",
+       false,
+       0,
+       [
+        "CLEAR",
+        "TYPE_TEXT"
+       ]
+      ],
+      [
+       "portfolio",
+       "textbox",
+       "text",
+       "Portfolio / personal website",
+       "",
+       false,
+       0,
+       [
+        "CLEAR",
+        "TYPE_TEXT"
+       ]
+      ],
+      [
+       "degree",
+       "textbox",
+       "text",
+       "Highest completed degree",
+       "",
+       false,
+       0,
+       [
+        "CLEAR",
+        "TYPE_TEXT"
+       ]
+      ],
+      [
+       "employer",
+       "textbox",
+       "text",
+       "Most recent employer",
+       "",
+       false,
+       0,
+       [
+        "CLEAR",
+        "TYPE_TEXT"
+       ]
+      ],
+      [
+       "colour",
+       "textbox",
+       "text",
+       "What is your favourite colour?",
+       "",
+       false,
+       0,
+       [
+        "CLEAR",
+        "TYPE_TEXT"
+       ]
+      ],
+      [
+       "authorised",
+       "combobox",
+       "select-one",
+       "Are you legally authorized to work in the United Kingdom? *",
+       "",
+       true,
+       3,
+       [
+        "CLEAR",
+        "CLICK",
+        "SELECT"
+       ]
+      ],
+      [
+       "sponsorship_yes",
+       "radio",
+       "radio",
+       "Yes",
+       "sponsorship",
+       true,
+       0,
+       [
+        "CHECK",
+        "CLEAR"
+       ]
+      ],
+      [
+       "sponsorship_no",
+       "radio",
+       "radio",
+       "No",
+       "sponsorship",
+       false,
+       0,
+       [
+        "CHECK",
+        "CLEAR"
+       ]
+      ],
+      [
+       "salary",
+       "textbox",
+       "number",
+       "What are your salary expectations (GBP)?",
+       "",
+       false,
+       0,
+       [
+        "CLEAR",
+        "TYPE_TEXT"
+       ]
+      ],
+      [
+       "start_date",
+       "textbox",
+       "date",
+       "When can you start?",
+       "",
+       false,
+       0,
+       [
+        "CLEAR",
+        "TYPE_TEXT"
+       ]
+      ],
+      [
+       "source",
+       "combobox",
+       "select-one",
+       "How did you hear about this job?",
+       "",
+       false,
+       5,
+       [
+        "CLEAR",
+        "CLICK",
+        "SELECT"
+       ]
+      ],
+      [
+       "lang_en",
+       "checkbox",
+       "checkbox",
+       "English",
+       "choice-31",
+       false,
+       0,
+       [
+        "CHECK",
+        "CLEAR",
+        "UNCHECK"
+       ]
+      ],
+      [
+       "lang_es",
+       "checkbox",
+       "checkbox",
+       "Spanish",
+       "choice-31",
+       false,
+       0,
+       [
+        "CHECK",
+        "CLEAR",
+        "UNCHECK"
+       ]
+      ],
+      [
+       "lang_fr",
+       "checkbox",
+       "checkbox",
+       "French",
+       "choice-31",
+       false,
+       0,
+       [
+        "CHECK",
+        "CLEAR",
+        "UNCHECK"
+       ]
+      ],
+      [
+       "lang_de",
+       "checkbox",
+       "checkbox",
+       "German",
+       "choice-31",
+       false,
+       0,
+       [
+        "CHECK",
+        "CLEAR",
+        "UNCHECK"
+       ]
+      ],
+      [
+       "why",
+       "textbox",
+       "textarea",
+       "Why do you want to work at Acme Robotics?",
+       "",
+       false,
+       0,
+       [
+        "CLEAR",
+        "TYPE_TEXT"
+       ]
+      ],
+      [
+       "gender",
+       "combobox",
+       "select-one",
+       "Gender",
+       "",
+       false,
+       5,
+       [
+        "CLEAR",
+        "CLICK",
+        "SELECT"
+       ]
+      ],
+      [
+       "ethnicity",
+       "combobox",
+       "select-one",
+       "Race / Ethnicity",
+       "",
+       false,
+       5,
+       [
+        "CLEAR",
+        "CLICK",
+        "SELECT"
+       ]
+      ],
+      [
+       "disability_yes",
+       "radio",
+       "radio",
+       "Yes",
+       "disability",
+       false,
+       0,
+       [
+        "CHECK",
+        "CLEAR"
+       ]
+      ],
+      [
+       "disability_no",
+       "radio",
+       "radio",
+       "No",
+       "disability",
+       false,
+       0,
+       [
+        "CHECK",
+        "CLEAR"
+       ]
+      ],
+      [
+       "disability_na",
+       "radio",
+       "radio",
+       "Prefer not to say",
+       "disability",
+       false,
+       0,
+       [
+        "CHECK",
+        "CLEAR"
+       ]
+      ],
+      [
+       "veteran",
+       "combobox",
+       "select-one",
+       "Veteran status",
+       "",
+       false,
+       4,
+       [
+        "CLEAR",
+        "CLICK",
+        "SELECT"
+       ]
+      ],
+      [
+       "gdpr_consent",
+       "checkbox",
+       "checkbox",
+       "I consent to Acme Robotics processing my personal data for recruitment purposes (GDPR). *",
+       "gdpr_consent",
+       true,
+       0,
+       [
+        "CHECK",
+        "CLEAR",
+        "UNCHECK"
+       ]
+      ],
+      [
+       "privacy_notice",
+       "checkbox",
+       "checkbox",
+       "I have read and agree to the privacy notice. *",
+       "privacy_notice",
+       true,
+       0,
+       [
+        "CHECK",
+        "CLEAR",
+        "UNCHECK"
+       ]
+      ]
+     ],
+     "flags": [
+      false,
+      false,
+      false
+     ],
+     "frame": "greenhouse_apply.html"
+    },
+    {
+     "controls": [],
+     "flags": [
+      false,
+      false,
+      false
+     ],
+     "frame": "anchor"
+    }
+   ]
+  }
+ },
+ "hear_about.html": {
+  "plain": {
+   "frames": [
+    {
+     "controls": [
+      [
+       "first_name",
+       "textbox",
+       "text",
+       "First name",
+       "",
+       false,
+       0,
+       [
+        "CLEAR",
+        "TYPE_TEXT"
+       ]
+      ],
+      [
+       "hear_select",
+       "combobox",
+       "select-one",
+       "How did you hear about us? *",
+       "",
+       true,
+       7,
+       [
+        "CLEAR",
+        "CLICK",
+        "SELECT"
+       ]
+      ],
+      [
+       "hear_text",
+       "textbox",
+       "text",
+       "How did you hear about us? Please tell us more.",
+       "",
+       false,
+       0,
+       [
+        "CLEAR",
+        "TYPE_TEXT"
+       ]
+      ],
+      [
+       "hear_linkedin",
+       "radio",
+       "radio",
+       "LinkedIn",
+       "hear_group",
+       false,
+       0,
+       [
+        "CHECK",
+        "CLEAR"
+       ]
+      ],
+      [
+       "hear_indeed",
+       "radio",
+       "radio",
+       "Indeed",
+       "hear_group",
+       false,
+       0,
+       [
+        "CHECK",
+        "CLEAR"
+       ]
+      ],
+      [
+       "hear_referral",
+       "radio",
+       "radio",
+       "Employee referral",
+       "hear_group",
+       false,
+       0,
+       [
+        "CHECK",
+        "CLEAR"
+       ]
+      ],
+      [
+       "hear_other",
+       "radio",
+       "radio",
+       "Other",
+       "hear_group",
+       false,
+       0,
+       [
+        "CHECK",
+        "CLEAR"
+       ]
+      ],
+      [
+       "hear_board",
+       "textbox",
+       "text",
+       "Which job board or website did you find this job on?",
+       "",
+       false,
+       0,
+       [
+        "CLEAR",
+        "TYPE_TEXT"
+       ]
+      ]
+     ],
+     "flags": [
+      false,
+      false,
+      false
+     ],
+     "frame": "hear_about.html"
+    }
+   ]
+  },
+  "widgets": {
+   "frames": [
+    {
+     "controls": [
+      [
+       "first_name",
+       "textbox",
+       "text",
+       "First name",
+       "",
+       false,
+       0,
+       [
+        "CLEAR",
+        "TYPE_TEXT"
+       ]
+      ],
+      [
+       "hear_select",
+       "combobox",
+       "select-one",
+       "How did you hear about us? *",
+       "",
+       true,
+       7,
+       [
+        "CLEAR",
+        "CLICK",
+        "SELECT"
+       ]
+      ],
+      [
+       "hear_text",
+       "textbox",
+       "text",
+       "How did you hear about us? Please tell us more.",
+       "",
+       false,
+       0,
+       [
+        "CLEAR",
+        "TYPE_TEXT"
+       ]
+      ],
+      [
+       "hear_linkedin",
+       "radio",
+       "radio",
+       "LinkedIn",
+       "hear_group",
+       false,
+       0,
+       [
+        "CHECK",
+        "CLEAR"
+       ]
+      ],
+      [
+       "hear_indeed",
+       "radio",
+       "radio",
+       "Indeed",
+       "hear_group",
+       false,
+       0,
+       [
+        "CHECK",
+        "CLEAR"
+       ]
+      ],
+      [
+       "hear_referral",
+       "radio",
+       "radio",
+       "Employee referral",
+       "hear_group",
+       false,
+       0,
+       [
+        "CHECK",
+        "CLEAR"
+       ]
+      ],
+      [
+       "hear_other",
+       "radio",
+       "radio",
+       "Other",
+       "hear_group",
+       false,
+       0,
+       [
+        "CHECK",
+        "CLEAR"
+       ]
+      ],
+      [
+       "hear_board",
+       "textbox",
+       "text",
+       "Which job board or website did you find this job on?",
+       "",
+       false,
+       0,
+       [
+        "CLEAR",
+        "TYPE_TEXT"
+       ]
+      ]
+     ],
+     "flags": [
+      false,
+      false,
+      false
+     ],
+     "frame": "hear_about.html"
+    }
+   ]
+  }
+ },
+ "lever_apply.html": {
+  "plain": {
+   "frames": [
+    {
+     "controls": [
+      [
+       "resume",
+       "upload",
+       "file",
+       "resume resume",
+       "",
+       true,
+       0,
+       [
+        "UPLOAD"
+       ]
+      ],
+      [
+       "name",
+       "textbox",
+       "text",
+       "Full name\u2731",
+       "",
+       true,
+       0,
+       [
+        "CLEAR",
+        "TYPE_TEXT"
+       ]
+      ],
+      [
+       "email",
+       "textbox",
+       "email",
+       "Email \u2731",
+       "",
+       true,
+       0,
+       [
+        "CLEAR",
+        "TYPE_TEXT"
+       ]
+      ],
+      [
+       "phone",
+       "textbox",
+       "tel",
+       "Phone",
+       "",
+       false,
+       0,
+       [
+        "CLEAR",
+        "TYPE_TEXT"
+       ]
+      ],
+      [
+       "org",
+       "textbox",
+       "text",
+       "Current company",
+       "",
+       false,
+       0,
+       [
+        "CLEAR",
+        "TYPE_TEXT"
+       ]
+      ],
+      [
+       "linkedin",
+       "textbox",
+       "text",
+       "LinkedIn URL",
+       "",
+       false,
+       0,
+       [
+        "CLEAR",
+        "TYPE_TEXT"
+       ]
+      ],
+      [
+       "github",
+       "textbox",
+       "text",
+       "GitHub URL",
+       "",
+       false,
+       0,
+       [
+        "CLEAR",
+        "TYPE_TEXT"
+       ]
+      ],
+      [
+       "portfolio",
+       "textbox",
+       "text",
+       "Portfolio URL",
+       "",
+       false,
+       0,
+       [
+        "CLEAR",
+        "TYPE_TEXT"
+       ]
+      ],
+      [
+       "comments",
+       "textbox",
+       "textarea",
+       "Additional information",
+       "",
+       false,
+       0,
+       [
+        "CLEAR",
+        "TYPE_TEXT"
+       ]
+      ],
+      [
+       "work_auth",
+       "combobox",
+       "select-one",
+       "Are you legally authorized to work in the United Kingdom? \u2731",
+       "",
+       true,
+       3,
+       [
+        "CLEAR",
+        "CLICK",
+        "SELECT"
+       ]
+      ],
+      [
+       "eeo_gender",
+       "combobox",
+       "select-one",
+       "Gender",
+       "",
+       false,
+       4,
+       [
+        "CLEAR",
+        "CLICK",
+        "SELECT"
+       ]
+      ],
+      [
+       "eeo_race",
+       "combobox",
+       "select-one",
+       "Race",
+       "",
+       false,
+       5,
+       [
+        "CLEAR",
+        "CLICK",
+        "SELECT"
+       ]
+      ]
+     ],
+     "flags": [
+      false,
+      false,
+      false
+     ],
+     "frame": "lever_apply.html"
+    }
+   ]
+  },
+  "widgets": {
+   "frames": [
+    {
+     "controls": [
+      [
+       "resume",
+       "upload",
+       "file",
+       "Resume/CV",
+       "",
+       true,
+       0,
+       [
+        "UPLOAD"
+       ]
+      ],
+      [
+       "name",
+       "textbox",
+       "text",
+       "Full name\u2731",
+       "",
+       true,
+       0,
+       [
+        "CLEAR",
+        "TYPE_TEXT"
+       ]
+      ],
+      [
+       "email",
+       "textbox",
+       "email",
+       "Email \u2731",
+       "",
+       true,
+       0,
+       [
+        "CLEAR",
+        "TYPE_TEXT"
+       ]
+      ],
+      [
+       "phone",
+       "textbox",
+       "tel",
+       "Phone",
+       "",
+       false,
+       0,
+       [
+        "CLEAR",
+        "TYPE_TEXT"
+       ]
+      ],
+      [
+       "org",
+       "textbox",
+       "text",
+       "Current company",
+       "",
+       false,
+       0,
+       [
+        "CLEAR",
+        "TYPE_TEXT"
+       ]
+      ],
+      [
+       "linkedin",
+       "textbox",
+       "text",
+       "LinkedIn URL",
+       "",
+       false,
+       0,
+       [
+        "CLEAR",
+        "TYPE_TEXT"
+       ]
+      ],
+      [
+       "github",
+       "textbox",
+       "text",
+       "GitHub URL",
+       "",
+       false,
+       0,
+       [
+        "CLEAR",
+        "TYPE_TEXT"
+       ]
+      ],
+      [
+       "portfolio",
+       "textbox",
+       "text",
+       "Portfolio URL",
+       "",
+       false,
+       0,
+       [
+        "CLEAR",
+        "TYPE_TEXT"
+       ]
+      ],
+      [
+       "comments",
+       "textbox",
+       "textarea",
+       "Additional information",
+       "",
+       false,
+       0,
+       [
+        "CLEAR",
+        "TYPE_TEXT"
+       ]
+      ],
+      [
+       "work_auth",
+       "combobox",
+       "select-one",
+       "Are you legally authorized to work in the United Kingdom? \u2731",
+       "",
+       true,
+       3,
+       [
+        "CLEAR",
+        "CLICK",
+        "SELECT"
+       ]
+      ],
+      [
+       "eeo_gender",
+       "combobox",
+       "select-one",
+       "Gender",
+       "",
+       false,
+       4,
+       [
+        "CLEAR",
+        "CLICK",
+        "SELECT"
+       ]
+      ],
+      [
+       "eeo_race",
+       "combobox",
+       "select-one",
+       "Race",
+       "",
+       false,
+       5,
+       [
+        "CLEAR",
+        "CLICK",
+        "SELECT"
+       ]
+      ]
+     ],
+     "flags": [
+      false,
+      false,
+      false
+     ],
+     "frame": "lever_apply.html"
+    }
+   ]
+  }
+ },
+ "masked_phone.html": {
+  "plain": {
+   "frames": [
+    {
+     "controls": [
+      [
+       "email",
+       "textbox",
+       "email",
+       "Email *",
+       "",
+       true,
+       0,
+       [
+        "CLEAR",
+        "TYPE_TEXT"
+       ]
+      ],
+      [
+       "phone_national",
+       "textbox",
+       "tel",
+       "Mobile phone number *",
+       "",
+       true,
+       0,
+       [
+        "CLEAR",
+        "TYPE_TEXT"
+       ]
+      ]
+     ],
+     "flags": [
+      false,
+      false,
+      false
+     ],
+     "frame": "masked_phone.html"
+    }
+   ]
+  },
+  "widgets": {
+   "frames": [
+    {
+     "controls": [
+      [
+       "email",
+       "textbox",
+       "email",
+       "Email *",
+       "",
+       true,
+       0,
+       [
+        "CLEAR",
+        "TYPE_TEXT"
+       ]
+      ],
+      [
+       "phone_national",
+       "textbox",
+       "tel",
+       "Mobile phone number *",
+       "",
+       true,
+       0,
+       [
+        "CLEAR",
+        "TYPE_TEXT"
+       ]
+      ]
+     ],
+     "flags": [
+      false,
+      false,
+      false
+     ],
+     "frame": "masked_phone.html"
+    }
+   ]
+  }
+ },
+ "password_signup.html": {
+  "plain": {
+   "frames": [
+    {
+     "controls": [
+      [
+       "signup_email",
+       "textbox",
+       "email",
+       "Email address",
+       "",
+       false,
+       0,
+       [
+        "CLEAR",
+        "TYPE_TEXT"
+       ]
+      ],
+      [
+       "signup_terms",
+       "checkbox",
+       "checkbox",
+       "I have read and accept the candidate terms.",
+       "terms",
+       false,
+       0,
+       [
+        "CHECK",
+        "CLEAR",
+        "UNCHECK"
+       ]
+      ]
+     ],
+     "flags": [
+      false,
+      true,
+      false
+     ],
+     "frame": "password_signup.html"
+    }
+   ]
+  },
+  "widgets": {
+   "frames": [
+    {
+     "controls": [
+      [
+       "signup_email",
+       "textbox",
+       "email",
+       "Email address",
+       "",
+       false,
+       0,
+       [
+        "CLEAR",
+        "TYPE_TEXT"
+       ]
+      ],
+      [
+       "signup_terms",
+       "checkbox",
+       "checkbox",
+       "I have read and accept the candidate terms.",
+       "terms",
+       false,
+       0,
+       [
+        "CHECK",
+        "CLEAR",
+        "UNCHECK"
+       ]
+      ]
+     ],
+     "flags": [
+      false,
+      true,
+      false
+     ],
+     "frame": "password_signup.html"
+    }
+   ]
+  }
+ },
+ "prefilled.html": {
+  "plain": {
+   "frames": [
+    {
+     "controls": [
+      [
+       "first_name",
+       "textbox",
+       "text",
+       "First name",
+       "",
+       false,
+       0,
+       [
+        "CLEAR",
+        "TYPE_TEXT"
+       ]
+      ],
+      [
+       "last_name",
+       "textbox",
+       "text",
+       "Last name",
+       "",
+       false,
+       0,
+       [
+        "CLEAR",
+        "TYPE_TEXT"
+       ]
+      ],
+      [
+       "email",
+       "textbox",
+       "email",
+       "Email",
+       "",
+       false,
+       0,
+       [
+        "CLEAR",
+        "TYPE_TEXT"
+       ]
+      ],
+      [
+       "country",
+       "combobox",
+       "select-one",
+       "Country of residence",
+       "",
+       false,
+       3,
+       [
+        "CLEAR",
+        "CLICK",
+        "SELECT"
+       ]
+      ],
+      [
+       "phone",
+       "textbox",
+       "tel",
+       "Phone",
+       "",
+       false,
+       0,
+       [
+        "CLEAR",
+        "TYPE_TEXT"
+       ]
+      ]
+     ],
+     "flags": [
+      false,
+      false,
+      false
+     ],
+     "frame": "prefilled.html"
+    }
+   ]
+  },
+  "widgets": {
+   "frames": [
+    {
+     "controls": [
+      [
+       "first_name",
+       "textbox",
+       "text",
+       "First name",
+       "",
+       false,
+       0,
+       [
+        "CLEAR",
+        "TYPE_TEXT"
+       ]
+      ],
+      [
+       "last_name",
+       "textbox",
+       "text",
+       "Last name",
+       "",
+       false,
+       0,
+       [
+        "CLEAR",
+        "TYPE_TEXT"
+       ]
+      ],
+      [
+       "email",
+       "textbox",
+       "email",
+       "Email",
+       "",
+       false,
+       0,
+       [
+        "CLEAR",
+        "TYPE_TEXT"
+       ]
+      ],
+      [
+       "country",
+       "combobox",
+       "select-one",
+       "Country of residence",
+       "",
+       false,
+       3,
+       [
+        "CLEAR",
+        "CLICK",
+        "SELECT"
+       ]
+      ],
+      [
+       "phone",
+       "textbox",
+       "tel",
+       "Phone",
+       "",
+       false,
+       0,
+       [
+        "CLEAR",
+        "TYPE_TEXT"
+       ]
+      ]
+     ],
+     "flags": [
+      false,
+      false,
+      false
+     ],
+     "frame": "prefilled.html"
+    }
+   ]
+  }
+ },
+ "react_form.html": {
+  "plain": {
+   "frames": [
+    {
+     "controls": [
+      [
+       "first",
+       "textbox",
+       "text",
+       "First name",
+       "",
+       false,
+       0,
+       [
+        "CLEAR",
+        "TYPE_TEXT"
+       ]
+      ],
+      [
+       "last",
+       "textbox",
+       "text",
+       "Last name",
+       "",
+       false,
+       0,
+       [
+        "CLEAR",
+        "TYPE_TEXT"
+       ]
+      ],
+      [
+       "email",
+       "textbox",
+       "email",
+       "Email",
+       "",
+       false,
+       0,
+       [
+        "CLEAR",
+        "TYPE_TEXT"
+       ]
+      ],
+      [
+       "country",
+       "combobox",
+       "select-one",
+       "Country of residence",
+       "",
+       false,
+       4,
+       [
+        "CLEAR",
+        "CLICK",
+        "SELECT"
+       ]
+      ],
+      [
+       "work_yes",
+       "radio",
+       "radio",
+       "Yes",
+       "work",
+       false,
+       0,
+       [
+        "CHECK",
+        "CLEAR"
+       ]
+      ],
+      [
+       "work_no",
+       "radio",
+       "radio",
+       "No",
+       "work",
+       false,
+       0,
+       [
+        "CHECK",
+        "CLEAR"
+       ]
+      ],
+      [
+       "terms",
+       "checkbox",
+       "checkbox",
+       "I agree to the terms and conditions",
+       "terms",
+       false,
+       0,
+       [
+        "CHECK",
+        "CLEAR",
+        "UNCHECK"
+       ]
+      ],
+      [
+       "cv",
+       "upload",
+       "file",
+       "resume cv",
+       "",
+       false,
+       0,
+       [
+        "UPLOAD"
+       ]
+      ]
+     ],
+     "flags": [
+      false,
+      false,
+      false
+     ],
+     "frame": "react_form.html"
+    }
+   ]
+  },
+  "widgets": {
+   "frames": [
+    {
+     "controls": [
+      [
+       "first",
+       "textbox",
+       "text",
+       "First name",
+       "",
+       false,
+       0,
+       [
+        "CLEAR",
+        "TYPE_TEXT"
+       ]
+      ],
+      [
+       "last",
+       "textbox",
+       "text",
+       "Last name",
+       "",
+       false,
+       0,
+       [
+        "CLEAR",
+        "TYPE_TEXT"
+       ]
+      ],
+      [
+       "email",
+       "textbox",
+       "email",
+       "Email",
+       "",
+       false,
+       0,
+       [
+        "CLEAR",
+        "TYPE_TEXT"
+       ]
+      ],
+      [
+       "country",
+       "combobox",
+       "select-one",
+       "Country of residence",
+       "",
+       false,
+       4,
+       [
+        "CLEAR",
+        "CLICK",
+        "SELECT"
+       ]
+      ],
+      [
+       "work_yes",
+       "radio",
+       "radio",
+       "Yes",
+       "work",
+       false,
+       0,
+       [
+        "CHECK",
+        "CLEAR"
+       ]
+      ],
+      [
+       "work_no",
+       "radio",
+       "radio",
+       "No",
+       "work",
+       false,
+       0,
+       [
+        "CHECK",
+        "CLEAR"
+       ]
+      ],
+      [
+       "terms",
+       "checkbox",
+       "checkbox",
+       "I agree to the terms and conditions",
+       "terms",
+       false,
+       0,
+       [
+        "CHECK",
+        "CLEAR",
+        "UNCHECK"
+       ]
+      ],
+      [
+       "cv",
+       "upload",
+       "file",
+       "Resume/CV",
+       "",
+       false,
+       0,
+       [
+        "UPLOAD"
+       ]
+      ]
+     ],
+     "flags": [
+      false,
+      false,
+      false
+     ],
+     "frame": "react_form.html"
+    }
+   ]
+  }
+ },
+ "shadow_form.html": {
+  "plain": {
+   "frames": [
+    {
+     "controls": [
+      [
+       "first_name",
+       "textbox",
+       "text",
+       "First name",
+       "",
+       false,
+       0,
+       [
+        "CLEAR",
+        "TYPE_TEXT"
+       ]
+      ],
+      [
+       "email",
+       "textbox",
+       "email",
+       "Email",
+       "",
+       false,
+       0,
+       [
+        "CLEAR",
+        "TYPE_TEXT"
+       ]
+      ],
+      [
+       "phone",
+       "textbox",
+       "tel",
+       "Phone",
+       "",
+       false,
+       0,
+       [
+        "CLEAR",
+        "TYPE_TEXT"
+       ]
+      ]
+     ],
+     "flags": [
+      false,
+      false,
+      false
+     ],
+     "frame": "shadow_form.html"
+    }
+   ]
+  },
+  "widgets": {
+   "frames": [
+    {
+     "controls": [
+      [
+       "first_name",
+       "textbox",
+       "text",
+       "First name",
+       "",
+       false,
+       0,
+       [
+        "CLEAR",
+        "TYPE_TEXT"
+       ]
+      ],
+      [
+       "email",
+       "textbox",
+       "email",
+       "Email",
+       "",
+       false,
+       0,
+       [
+        "CLEAR",
+        "TYPE_TEXT"
+       ]
+      ],
+      [
+       "phone",
+       "textbox",
+       "tel",
+       "Phone",
+       "",
+       false,
+       0,
+       [
+        "CLEAR",
+        "TYPE_TEXT"
+       ]
+      ]
+     ],
+     "flags": [
+      false,
+      false,
+      false
+     ],
+     "frame": "shadow_form.html"
+    }
+   ]
+  }
+ },
+ "spa_wizard.html": {
+  "plain": {
+   "frames": [
+    {
+     "controls": [
+      [
+       "first_name",
+       "textbox",
+       "text",
+       "First name",
+       "",
+       false,
+       0,
+       [
+        "CLEAR",
+        "TYPE_TEXT"
+       ]
+      ],
+      [
+       "last_name",
+       "textbox",
+       "text",
+       "Last name",
+       "",
+       false,
+       0,
+       [
+        "CLEAR",
+        "TYPE_TEXT"
+       ]
+      ]
+     ],
+     "flags": [
+      false,
+      false,
+      false
+     ],
+     "frame": "spa_wizard.html"
+    }
+   ]
+  },
+  "widgets": {
+   "frames": [
+    {
+     "controls": [
+      [
+       "first_name",
+       "textbox",
+       "text",
+       "First name",
+       "",
+       false,
+       0,
+       [
+        "CLEAR",
+        "TYPE_TEXT"
+       ]
+      ],
+      [
+       "last_name",
+       "textbox",
+       "text",
+       "Last name",
+       "",
+       false,
+       0,
+       [
+        "CLEAR",
+        "TYPE_TEXT"
+       ]
+      ]
+     ],
+     "flags": [
+      false,
+      false,
+      false
+     ],
+     "frame": "spa_wizard.html"
+    }
+   ]
+  }
+ },
+ "spa_wizard.html?step=2": {
+  "plain": {
+   "frames": [
+    {
+     "controls": [
+      [
+       "email",
+       "textbox",
+       "email",
+       "Email",
+       "",
+       false,
+       0,
+       [
+        "CLEAR",
+        "TYPE_TEXT"
+       ]
+      ],
+      [
+       "phone",
+       "textbox",
+       "tel",
+       "Phone",
+       "",
+       false,
+       0,
+       [
+        "CLEAR",
+        "TYPE_TEXT"
+       ]
+      ],
+      [
+       "linkedin",
+       "textbox",
+       "text",
+       "LinkedIn Profile",
+       "",
+       false,
+       0,
+       [
+        "CLEAR",
+        "TYPE_TEXT"
+       ]
+      ]
+     ],
+     "flags": [
+      false,
+      false,
+      false
+     ],
+     "frame": "spa_wizard.html"
+    }
+   ]
+  },
+  "widgets": {
+   "frames": [
+    {
+     "controls": [
+      [
+       "email",
+       "textbox",
+       "email",
+       "Email",
+       "",
+       false,
+       0,
+       [
+        "CLEAR",
+        "TYPE_TEXT"
+       ]
+      ],
+      [
+       "phone",
+       "textbox",
+       "tel",
+       "Phone",
+       "",
+       false,
+       0,
+       [
+        "CLEAR",
+        "TYPE_TEXT"
+       ]
+      ],
+      [
+       "linkedin",
+       "textbox",
+       "text",
+       "LinkedIn Profile",
+       "",
+       false,
+       0,
+       [
+        "CLEAR",
+        "TYPE_TEXT"
+       ]
+      ]
+     ],
+     "flags": [
+      false,
+      false,
+      false
+     ],
+     "frame": "spa_wizard.html"
+    }
+   ]
+  }
+ },
+ "submit_flow.html": {
+  "plain": {
+   "frames": [
+    {
+     "controls": [
+      [
+       "first_name",
+       "textbox",
+       "text",
+       "First name",
+       "",
+       false,
+       0,
+       [
+        "CLEAR",
+        "TYPE_TEXT"
+       ]
+      ],
+      [
+       "last_name",
+       "textbox",
+       "text",
+       "Last name",
+       "",
+       false,
+       0,
+       [
+        "CLEAR",
+        "TYPE_TEXT"
+       ]
+      ],
+      [
+       "email",
+       "textbox",
+       "email",
+       "Email",
+       "",
+       false,
+       0,
+       [
+        "CLEAR",
+        "TYPE_TEXT"
+       ]
+      ]
+     ],
+     "flags": [
+      false,
+      false,
+      false
+     ],
+     "frame": "submit_flow.html"
+    }
+   ]
+  },
+  "widgets": {
+   "frames": [
+    {
+     "controls": [
+      [
+       "first_name",
+       "textbox",
+       "text",
+       "First name",
+       "",
+       false,
+       0,
+       [
+        "CLEAR",
+        "TYPE_TEXT"
+       ]
+      ],
+      [
+       "last_name",
+       "textbox",
+       "text",
+       "Last name",
+       "",
+       false,
+       0,
+       [
+        "CLEAR",
+        "TYPE_TEXT"
+       ]
+      ],
+      [
+       "email",
+       "textbox",
+       "email",
+       "Email",
+       "",
+       false,
+       0,
+       [
+        "CLEAR",
+        "TYPE_TEXT"
+       ]
+      ]
+     ],
+     "flags": [
+      false,
+      false,
+      false
+     ],
+     "frame": "submit_flow.html"
+    }
+   ]
+  }
+ },
+ "widget_patterns.html": {
+  "plain": {
+   "frames": [
+    {
+     "controls": [
+      [
+       "dz_resume",
+       "upload",
+       "file",
+       "attachment 1 dz resume",
+       "",
+       false,
+       0,
+       [
+        "UPLOAD"
+       ]
+      ]
+     ],
+     "flags": [
+      false,
+      false,
+      false
+     ],
+     "frame": "widget_patterns.html"
+    }
+   ]
+  },
+  "widgets": {
+   "frames": [
+    {
+     "controls": [
+      [
+       "dz_resume",
+       "upload",
+       "file",
+       "Resume/CV",
+       "",
+       false,
+       0,
+       [
+        "UPLOAD"
+       ]
+      ],
+      [
+       "team",
+       "combobox",
+       "button",
+       "Preferred team",
+       "",
+       false,
+       0,
+       [
+        "CLICK"
+       ]
+      ],
+      [
+       "remote_yes",
+       "radio",
+       "button",
+       "Yes",
+       "pair-6",
+       false,
+       0,
+       [
+        "CHECK"
+       ]
+      ],
+      [
+       "remote_no",
+       "radio",
+       "button",
+       "No",
+       "pair-6",
+       false,
+       0,
+       [
+        "CHECK"
+       ]
+      ]
+     ],
+     "flags": [
+      false,
+      false,
+      false
+     ],
+     "frame": "widget_patterns.html"
+    }
+   ]
+  }
+ },
+ "workday_apply.html": {
+  "plain": {
+   "frames": [
+    {
+     "controls": [
+      [
+       "contact_name",
+       "textbox",
+       "text",
+       "Full name",
+       "",
+       false,
+       0,
+       [
+        "CLEAR",
+        "TYPE_TEXT"
+       ]
+      ],
+      [
+       "alert_email",
+       "textbox",
+       "email",
+       "Email for job alerts",
+       "",
+       false,
+       0,
+       [
+        "CLEAR",
+        "TYPE_TEXT"
+       ]
+      ]
+     ],
+     "flags": [
+      false,
+      false,
+      false
+     ],
+     "frame": "workday_apply.html"
+    },
+    {
+     "controls": [
+      [
+       "legal_first",
+       "textbox",
+       "text",
+       "Legal first name *",
+       "",
+       true,
+       0,
+       [
+        "CLEAR",
+        "TYPE_TEXT"
+       ]
+      ],
+      [
+       "legal_last",
+       "textbox",
+       "text",
+       "Legal last name *",
+       "",
+       true,
+       0,
+       [
+        "CLEAR",
+        "TYPE_TEXT"
+       ]
+      ],
+      [
+       "phone_number",
+       "textbox",
+       "tel",
+       "Phone number *",
+       "",
+       true,
+       0,
+       [
+        "CLEAR",
+        "TYPE_TEXT"
+       ]
+      ]
+     ],
+     "flags": [
+      false,
+      false,
+      false
+     ],
+     "frame": "workday_frame.html"
+    }
+   ]
+  },
+  "widgets": {
+   "frames": [
+    {
+     "controls": [
+      [
+       "contact_name",
+       "textbox",
+       "text",
+       "Full name",
+       "",
+       false,
+       0,
+       [
+        "CLEAR",
+        "TYPE_TEXT"
+       ]
+      ],
+      [
+       "alert_email",
+       "textbox",
+       "email",
+       "Email for job alerts",
+       "",
+       false,
+       0,
+       [
+        "CLEAR",
+        "TYPE_TEXT"
+       ]
+      ]
+     ],
+     "flags": [
+      false,
+      false,
+      false
+     ],
+     "frame": "workday_apply.html"
+    },
+    {
+     "controls": [
+      [
+       "legal_first",
+       "textbox",
+       "text",
+       "Legal first name *",
+       "",
+       true,
+       0,
+       [
+        "CLEAR",
+        "TYPE_TEXT"
+       ]
+      ],
+      [
+       "legal_last",
+       "textbox",
+       "text",
+       "Legal last name *",
+       "",
+       true,
+       0,
+       [
+        "CLEAR",
+        "TYPE_TEXT"
+       ]
+      ],
+      [
+       "phone_number",
+       "textbox",
+       "tel",
+       "Phone number *",
+       "",
+       true,
+       0,
+       [
+        "CLEAR",
+        "TYPE_TEXT"
+       ]
+      ]
+     ],
+     "flags": [
+      false,
+      false,
+      false
+     ],
+     "frame": "workday_frame.html"
+    }
+   ]
+  }
+ },
+ "workday_apply.html?bare=1": {
+  "plain": {
+   "frames": [
+    {
+     "controls": [
+      [
+       "contact_name",
+       "textbox",
+       "text",
+       "Full name",
+       "",
+       false,
+       0,
+       [
+        "CLEAR",
+        "TYPE_TEXT"
+       ]
+      ]
+     ],
+     "flags": [
+      false,
+      false,
+      false
+     ],
+     "frame": "workday_apply.html"
+    },
+    {
+     "controls": [
+      [
+       "legal_first",
+       "textbox",
+       "text",
+       "Legal first name *",
+       "",
+       true,
+       0,
+       [
+        "CLEAR",
+        "TYPE_TEXT"
+       ]
+      ],
+      [
+       "legal_last",
+       "textbox",
+       "text",
+       "Legal last name *",
+       "",
+       true,
+       0,
+       [
+        "CLEAR",
+        "TYPE_TEXT"
+       ]
+      ],
+      [
+       "phone_number",
+       "textbox",
+       "tel",
+       "Phone number *",
+       "",
+       true,
+       0,
+       [
+        "CLEAR",
+        "TYPE_TEXT"
+       ]
+      ]
+     ],
+     "flags": [
+      false,
+      false,
+      false
+     ],
+     "frame": "workday_frame.html"
+    }
+   ]
+  },
+  "widgets": {
+   "frames": [
+    {
+     "controls": [
+      [
+       "contact_name",
+       "textbox",
+       "text",
+       "Full name",
+       "",
+       false,
+       0,
+       [
+        "CLEAR",
+        "TYPE_TEXT"
+       ]
+      ]
+     ],
+     "flags": [
+      false,
+      false,
+      false
+     ],
+     "frame": "workday_apply.html"
+    },
+    {
+     "controls": [
+      [
+       "legal_first",
+       "textbox",
+       "text",
+       "Legal first name *",
+       "",
+       true,
+       0,
+       [
+        "CLEAR",
+        "TYPE_TEXT"
+       ]
+      ],
+      [
+       "legal_last",
+       "textbox",
+       "text",
+       "Legal last name *",
+       "",
+       true,
+       0,
+       [
+        "CLEAR",
+        "TYPE_TEXT"
+       ]
+      ],
+      [
+       "phone_number",
+       "textbox",
+       "tel",
+       "Phone number *",
+       "",
+       true,
+       0,
+       [
+        "CLEAR",
+        "TYPE_TEXT"
+       ]
+      ]
+     ],
+     "flags": [
+      false,
+      false,
+      false
+     ],
+     "frame": "workday_frame.html"
+    }
+   ]
+  }
+ },
+ "workday_apply.html?tail=field": {
+  "plain": {
+   "frames": [
+    {
+     "controls": [
+      [
+       "contact_name",
+       "textbox",
+       "text",
+       "Full name",
+       "",
+       false,
+       0,
+       [
+        "CLEAR",
+        "TYPE_TEXT"
+       ]
+      ],
+      [
+       "alert_email",
+       "textbox",
+       "email",
+       "Email for job alerts",
+       "",
+       false,
+       0,
+       [
+        "CLEAR",
+        "TYPE_TEXT"
+       ]
+      ]
+     ],
+     "flags": [
+      false,
+      false,
+      false
+     ],
+     "frame": "workday_apply.html"
+    },
+    {
+     "controls": [
+      [
+       "legal_first",
+       "textbox",
+       "text",
+       "Legal first name *",
+       "",
+       true,
+       0,
+       [
+        "CLEAR",
+        "TYPE_TEXT"
+       ]
+      ],
+      [
+       "legal_last",
+       "textbox",
+       "text",
+       "Legal last name *",
+       "",
+       true,
+       0,
+       [
+        "CLEAR",
+        "TYPE_TEXT"
+       ]
+      ],
+      [
+       "phone_number",
+       "textbox",
+       "tel",
+       "Phone number *",
+       "",
+       true,
+       0,
+       [
+        "CLEAR",
+        "TYPE_TEXT"
+       ]
+      ]
+     ],
+     "flags": [
+      false,
+      false,
+      false
+     ],
+     "frame": "workday_frame.html"
+    }
+   ]
+  },
+  "widgets": {
+   "frames": [
+    {
+     "controls": [
+      [
+       "contact_name",
+       "textbox",
+       "text",
+       "Full name",
+       "",
+       false,
+       0,
+       [
+        "CLEAR",
+        "TYPE_TEXT"
+       ]
+      ],
+      [
+       "alert_email",
+       "textbox",
+       "email",
+       "Email for job alerts",
+       "",
+       false,
+       0,
+       [
+        "CLEAR",
+        "TYPE_TEXT"
+       ]
+      ]
+     ],
+     "flags": [
+      false,
+      false,
+      false
+     ],
+     "frame": "workday_apply.html"
+    },
+    {
+     "controls": [
+      [
+       "legal_first",
+       "textbox",
+       "text",
+       "Legal first name *",
+       "",
+       true,
+       0,
+       [
+        "CLEAR",
+        "TYPE_TEXT"
+       ]
+      ],
+      [
+       "legal_last",
+       "textbox",
+       "text",
+       "Legal last name *",
+       "",
+       true,
+       0,
+       [
+        "CLEAR",
+        "TYPE_TEXT"
+       ]
+      ],
+      [
+       "phone_number",
+       "textbox",
+       "tel",
+       "Phone number *",
+       "",
+       true,
+       0,
+       [
+        "CLEAR",
+        "TYPE_TEXT"
+       ]
+      ]
+     ],
+     "flags": [
+      false,
+      false,
+      false
+     ],
+     "frame": "workday_frame.html"
+    }
+   ]
+  }
+ }
+}

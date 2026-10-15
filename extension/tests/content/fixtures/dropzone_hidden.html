@@ -1,0 +1,30 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><title>Drop areas whose file input cannot take focus</title>
+<style>body{font:16px system-ui;padding:24px;max-width:720px}label.row{display:block;margin:10px 0}.field{margin:14px 0}
+.dropzone{position:relative;border:2px dashed #888;border-radius:8px;padding:24px;max-width:420px;text-align:center;cursor:pointer}</style>
+<h1>Apply</h1>
+<!-- Dropzone.js / react-dropzone style: the real <input type=file> is visibility:hidden (or display:none) and lives inside a plain div; the person
+     sees and clicks the div. Neither input can ever take keyboard focus, and the div has no tabindex. -->
+<form onsubmit="return false">
+  <label class="row">First name <input name="first"></label>
+  <div class="field"><div id="cv-label">Resume</div>
+    <div class="dropzone" id="cv" aria-labelledby="cv-label"><div class="dz-message">Drop your resume here or click to browse</div>
+      <input type="file" name="candidate[resume]" accept=".pdf,.doc,.docx" style="visibility:hidden;position:absolute;top:0;left:0;height:0;width:0"></div></div>
+  <div class="field"><div id="cl-label">Cover letter</div>
+    <div class="dropzone" id="cl" aria-labelledby="cl-label"><div class="dz-message">Drop your cover letter here</div>
+      <input type="file" name="candidate[cover_letter]" accept=".pdf" style="display:none"></div></div>
+  <label class="row">Last name <input name="last"></label>
+  <button type="button" id="next">Next</button>
+</form>
+<script>
+  // ?plain=1: a read-only text box (no assist field, a stop of the browser's own Tab) sits in front of the first drop area
+  if (new URLSearchParams(location.search).get('plain')) {
+    document.querySelector('#cv-label').parentElement.insertAdjacentHTML('beforebegin', '<label class="row">Reference <input name="ref" value="R-1" readonly></label>');
+  }
+  window.attached = {};
+  window.opened = 0;
+  for (const zone of ['cv', 'cl']) {
+    const file = document.querySelector('#' + zone + ' input');
+    file.addEventListener('change', () => { window.attached[zone] = [...file.files].map(f => f.name); });
+    document.getElementById(zone).addEventListener('click', () => { window.opened++; });  // the page would open the file dialog here
+  }
+</script></html>

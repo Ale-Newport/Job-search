@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Apply - Acme Robotics (rich text answers)</title>
+<meta property="og:site_name" content="Acme Robotics">
+<link rel="stylesheet" href="/_base.css">
+<style>
+  [contenteditable] { border: 1px solid #aaa; padding: 8px; min-height: 40px; max-width: 520px; border-radius: 4px; }
+  [contenteditable].tall { min-height: 120px; }
+  [contenteditable]:empty::before { content: attr(data-placeholder); color: #888; }
+</style>
+<script src="/_guard.js"></script>
+</head>
+<body>
+<header class="site"><span class="brand">Acme Robotics</span></header>
+<main>
+<h1>Software Engineer application</h1>
+<p class="job-description">Acme Robotics builds warehouse robots that help small businesses ship orders faster.
+  Answers on this page use rich text editors (contenteditable) instead of plain inputs.</p>
+<form id="rich_form" action="#" novalidate>
+  <div class="field"><label id="name_label" for="editor_name">Full name</label>
+    <div id="editor_name" contenteditable="true" role="textbox" aria-labelledby="name_label" data-placeholder="Your name"></div></div>
+  <div class="field"><label id="why_label" for="editor_why">Why do you want to work at Acme Robotics?</label>
+    <div id="editor_why" class="tall" contenteditable="true" role="textbox" aria-multiline="true" aria-labelledby="why_label"
+      data-placeholder="Write your answer"></div></div>
+  <div class="field"><!-- the editor below owns a model (Draft.js / Slate style, see the script): its label is the plain question, because the plain-question gate (rightly) leaves a label with notes in brackets to the person -->
+    <label id="fw_label" for="editor_framework">Email address</label>
+    <div id="editor_framework" contenteditable="true" role="textbox" aria-labelledby="fw_label" data-placeholder="you@example.com"></div></div>
+  <p><button type="submit" id="submit_app" data-submit>Submit application</button></p>
+</form>
+</main>
+<script>
+// Plain editor: the page learns about edits only through `input` events, like most contenteditable widgets.
+window.__editorText = {};
+for (const id of ['editor_name', 'editor_why']) {
+  const el = document.getElementById(id);
+  el.addEventListener('input', () => { window.__editorText[id] = el.innerText; });
+}
+// "Framework" editor (Draft.js / Slate style): owns a model, cancels beforeinput and re-renders from the model.
+// A write that does not go through a real beforeinput/insertText path leaves the model empty.
+window.__model = { editor_framework: '' };
+const fw = document.getElementById('editor_framework');
+fw.addEventListener('beforeinput', (event) => {
+  if (event.inputType === 'insertText' || event.inputType === 'insertFromPaste' || event.inputType === 'insertReplacementText') {
+    event.preventDefault();
+    const data = event.data ?? event.dataTransfer?.getData('text/plain') ?? '';
+    window.__model.editor_framework += data;
+    fw.textContent = window.__model.editor_framework;
+  } else if (event.inputType === 'deleteContentBackward') {
+    event.preventDefault();
+    window.__model.editor_framework = window.__model.editor_framework.slice(0, -1);
+    fw.textContent = window.__model.editor_framework;
+  }
+});
+document.getElementById('rich_form').addEventListener('submit', (event) => { event.preventDefault(); });
+</script>
+</body>
+</html>

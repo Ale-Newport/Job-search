@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Application - Acme Robotics</title>
+<link rel="stylesheet" href="/_base.css">
+<style>body { padding: 12px 18px; } .step { display: none; } .step.active { display: block; }
+  .progress { color: #5a6570; font-size: 14px; margin-bottom: 8px; }</style>
+<script src="/_guard.js"></script>
+</head>
+<body>
+<div class="progress" id="progress" aria-live="polite">Step 1 of 3: My Information</div>
+<form id="wd_form" action="#" novalidate>
+  <section class="step active" id="step1" aria-label="My Information">
+    <h2>My Information</h2>
+    <div class="field"><label for="legal_first">Legal first name <span class="asterisk">*</span></label>
+      <input type="text" id="legal_first" name="legalName--firstName" required></div>
+    <div class="field"><label for="legal_last">Legal last name <span class="asterisk">*</span></label>
+      <input type="text" id="legal_last" name="legalName--lastName" required></div>
+    <div class="field"><label for="phone_number">Phone number <span class="asterisk">*</span></label>
+      <input type="tel" id="phone_number" name="phoneNumber" required></div>
+    <p><button type="button" id="next1" data-next>Save and Continue</button></p>
+  </section>
+  <section class="step" id="step2" aria-label="My Experience">
+    <h2>My Experience</h2>
+    <div class="field"><label for="wd_linkedin">LinkedIn</label>
+      <input type="text" id="wd_linkedin" name="linkedin"></div>
+    <div class="field"><label for="wd_resume">Resume/CV</label>
+      <input type="file" id="wd_resume" name="resume"></div>
+    <p><button type="button" id="next2" data-next>Save and Continue</button></p>
+  </section>
+  <section class="step" id="step3" aria-label="Review">
+    <h2>Review</h2>
+    <p>Please review your information and submit your application.</p>
+    <p><button type="submit" id="wd_submit" data-submit>Submit</button></p>
+  </section>
+</form>
+<script>
+const steps = ['step1', 'step2', 'step3'];
+const label = ['My Information', 'My Experience', 'Review'];
+function show(index) {
+  steps.forEach((id, i) => document.getElementById(id).classList.toggle('active', i === index));
+  document.getElementById('progress').textContent = `Step ${index + 1} of 3: ${label[index]}`;
+}
+// ?tail=field: the step's button is disabled until the form is valid, so the last field is the frame's last tab stop
+if (new URLSearchParams(location.search).get('tail') === 'field') document.getElementById('next1').disabled = true;
+document.getElementById('next1').addEventListener('click', () => show(1));
+document.getElementById('next2').addEventListener('click', () => show(2));
+document.getElementById('wd_form').addEventListener('submit', (event) => {
+  event.preventDefault();
+  window.submissions = (window.submissions || 0) + 1;
+  document.body.innerHTML = '<h1>Application submitted</h1><p>We have received your application.</p>';
+});
+</script>
+</body>
+</html>

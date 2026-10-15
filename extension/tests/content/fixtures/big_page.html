@@ -1,0 +1,32 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><title>A very large application page</title>
+<style>body{font:14px system-ui;padding:12px}section{margin:6px 0;border-bottom:1px solid #ddd}span{display:inline-block;margin:1px 4px}label{display:block;margin:4px 0}</style>
+<h1>Large careers site</h1>
+<label>Country <select name="country"><option value="">Select</option><option value="gb">United Kingdom</option></select></label>
+<div id="root"></div>
+<button id="churn" type="button">churn</button>
+<script>
+// ~6,000 elements of site chrome plus 120 form controls spread through the page.
+const root = document.getElementById('root');
+const frag = document.createDocumentFragment();
+for (let s = 0; s < 40; s++) {
+  const sec = document.createElement('section');
+  for (let i = 0; i < 120; i++) {
+    const span = document.createElement('span');
+    span.className = 'chrome';
+    const a = document.createElement('a'); a.href = '#s' + s + '-' + i; a.textContent = 'link ' + s + '.' + i;
+    span.append(a, document.createElement('b'));
+    sec.append(span);
+  }
+  if (s % 1 === 0) for (let k = 0; k < 3; k++) {
+    const l = document.createElement('label'); l.textContent = 'Question ' + s + '.' + k + ' ';
+    const input = document.createElement('input'); input.name = 'q_' + s + '_' + k; l.append(input); sec.append(l);
+  }
+  frag.append(sec);
+}
+root.append(frag);
+window.churnCount = 0;
+document.getElementById('churn').addEventListener('click', () => {
+  // a framework tick: many mutations inside the form area
+  for (let i = 0; i < 40; i++) { const l = root.querySelectorAll('label')[i]; if (l) l.firstChild.textContent = 'Question (rev ' + (++window.churnCount) + ') '; }
+});
+</script></html>

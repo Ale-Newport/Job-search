@@ -1,0 +1,10 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><title>Form with anti-spam honeypots</title>
+<style>body{font:16px system-ui;padding:24px}label{display:block;margin:10px 0}.trap{position:absolute;left:-9999px;top:0}.tiny{width:1px;height:1px;overflow:hidden;position:absolute}</style>
+<form onsubmit="event.preventDefault()">
+<label>First name <input name="first_name"></label>
+<label class="trap">Website <input name="website" autocomplete="off"></label>
+<label>Last name <input name="last_name"></label>
+<label>Fax <input name="fax" tabindex="-1"></label>
+<label class="tiny">Company URL <input name="company_url"></label>
+<label>Email <input name="email" type="email"></label>
+</form></html>

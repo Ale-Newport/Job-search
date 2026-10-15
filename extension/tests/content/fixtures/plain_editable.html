@@ -1,0 +1,7 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><title>Plain contenteditable</title>
+<style>body{font:16px system-ui;padding:24px;max-width:720px}label{display:block;margin:10px 0}#note{border:1px solid #999;min-height:60px;padding:8px}</style>
+<form onsubmit="event.preventDefault()">
+<label>Name <input name="name"></label>
+<div id="note" role="textbox" aria-label="Cover note" contenteditable="true"></div>
+<label>Headline <input name="headline"></label>
+</form></html>

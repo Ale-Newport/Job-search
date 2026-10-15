@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Careers at Acme Robotics - Platform Engineer</title>
+<meta property="og:site_name" content="Acme Robotics">
+<link rel="stylesheet" href="/_base.css">
+<script src="/_guard.js"></script>
+</head>
+<body>
+<header class="site"><span class="brand">Acme Robotics Careers</span></header>
+<main>
+<h1>Platform Engineer</h1>
+<p class="job-description">Acme Robotics builds warehouse robots that help small businesses ship orders faster.
+  Join the platform team to build the services behind them. Applications are handled by our recruiting partner below.</p>
+<div class="field"><label for="contact_name">Full name</label>
+  <input type="text" id="contact_name" name="contact_name"></div>
+<!-- The recruiting partner's application lives on ANOTHER origin (localhost vs 127.0.0.1): an out-of-process iframe.
+     It receives this page's query string ({{QUERY}}): ?tail=field leaves the frame's LAST tab stop an assist field (its 'Save and
+     Continue' button is disabled until the form is valid, so Tab out of the last field goes to the host page). -->
+<iframe id="ats_frame" title="Application" src="{{FRAME_ORIGIN}}/workday_frame.html{{QUERY}}"
+  style="width:100%;height:560px;border:1px solid #ccc"></iframe>
+<div class="field"><label for="alert_email">Email for job alerts</label>
+  <input type="email" id="alert_email" name="alert_email"></div>
+<p><button type="button" id="back_to_jobs" data-next>Back to jobs</button></p>
+</main>
+<script>
+// ?bare=1: the recruiting partner's frame is the last thing on the page (no field of the host page after it).
+// ?prefill=1: the host page already holds an email in 'Email for job alerts' (the page's own doing, not the person's typing).
+const params = new URLSearchParams(location.search);
+if (params.has('bare')) document.getElementById('alert_email').closest('.field').remove();
+else if (params.has('prefill')) document.getElementById('alert_email').value = 'already.there@example.test';
+</script>
+</body>
+</html>

@@ -1,0 +1,21 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><title>The popup of the field above covers the next field</title>
+<style>body{font:16px system-ui;padding:24px;max-width:720px}label{display:block;margin:12px 0}.field{position:relative;margin:0 0 28px}
+#popup,#stray{position:absolute;left:0;width:340px;height:70px;background:#fff;border:1px solid #888;z-index:5;display:none}</style>
+<h1>Application</h1>
+<form onsubmit="event.preventDefault()">
+<div class="field" id="fa"><label>First name <input name="first_name"></label><div id="popup">A calendar that belongs to the first name</div></div>
+<div class="field"><label>Email <input name="email" type="email"></label></div>
+<div class="field" id="fc"><label>Phone <input name="phone"></label></div>
+<div class="field"><label>City <input name="city"></label></div>
+<button type="submit">Submit application</button>
+</form>
+<script>
+// the first question's own popup lands on the email field below it (the key that would have closed it went to the assistant)
+// `?role=dialog`: the popup says what it is (a calendar a date picker draws is a dialog)
+window.showPopup = () => { const p = document.getElementById('popup'); if (location.search.includes('role=dialog')) p.setAttribute('role', 'dialog'); const e = document.querySelector('[name=email]').getBoundingClientRect(); const f = document.getElementById('fa').getBoundingClientRect();
+  p.style.display = 'block'; p.style.top = (e.top - f.top - 4) + 'px'; };
+// a layer that belongs to no question at all, over the phone field
+window.showStray = () => { const s = document.createElement('div'); s.id = 'stray'; document.body.append(s); const r = document.querySelector('[name=phone]').getBoundingClientRect();
+  s.style.display = 'block'; s.style.left = (r.left + window.scrollX - 4) + 'px'; s.style.top = (r.top + window.scrollY - 4) + 'px'; };
+</script>
+</html>

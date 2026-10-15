@@ -1,0 +1,13 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><title>Open shadow root form and a decoy assistant host</title>
+<style>body{font:16px system-ui;padding:24px}</style>
+<h1>Shadow DOM application</h1>
+<div id="app"></div>
+<div id="decoy" data-meridian-assistant></div>
+<script>
+const app = document.getElementById('app');
+const root = app.attachShadow({ mode: 'open' });
+root.innerHTML = '<form onsubmit="return false"><label>First name <input name="first_name"></label><label>Last name <input name="last_name"></label></form>';
+// what an open-mode assistant UI looks like to the observer: a host element carrying the attribute, inputs in its root
+const decoy = document.getElementById('decoy').attachShadow({ mode: 'open' });
+decoy.innerHTML = '<input name="ui_secret_input" aria-label="UI Search"><button>Insert</button>';
+</script></html>

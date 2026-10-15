@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Scanner patterns (hand-written markup of widget families)</title>
+<link rel="stylesheet" href="demo.css">
+<style>
+button.trigger, .trigger { box-sizing: border-box; width: 100%; max-width: 420px; text-align: left; padding: 8px 10px; font: inherit; border: 1px solid #888; border-radius: 4px; background: #fff; cursor: pointer; }
+ul.popup { list-style: none; margin: 2px 0 0; padding: 4px 0; max-width: 420px; border: 1px solid #888; background: #fff; position: absolute; z-index: 5; } ul.popup[hidden] { display: none; }
+ul.popup li { padding: 6px 10px; cursor: pointer; }
+.yn button { padding: 6px 16px; margin-right: 6px; border: 2px solid #999; background: #fff; border-radius: 6px; cursor: pointer; } .yn button[aria-pressed=true] { border-color: #173f36; background: #e6f2ee; }
+.dropzone { border: 2px dashed #888; padding: 14px; max-width: 360px; }
+.cards { display: flex; gap: 8px; } .card { border: 2px solid #999; border-radius: 6px; padding: 6px 14px; cursor: pointer; }
+.control { display: flex; align-items: center; width: 300px; height: 38px; border: 1px solid #888; border-radius: 4px; padding: 0 8px; box-sizing: border-box; }
+.control input { border: 0; padding: 0; margin: 0; outline: 0; background: transparent; height: 21px; }
+table.q td, table.q th { padding: 6px 12px 6px 0; text-align: left; vertical-align: top; font-weight: 400; }
+</style>
+</head>
+<body>
+<header class="site"><button type="button" id="lang" aria-haspopup="listbox" aria-label="Language">English</button></header>
+<h1>Scanner patterns</h1>
+<!-- Each block is the markup of one widget family or one decoy of it. The comments say what the scanner must make of it. -->
+<form id="sp" onsubmit="return false">
+
+  <!-- A. dropdowns that are <button>s -->
+  <div class="field" data-case="radix"><label for="rx_fruit">Favourite fruit</label>
+    <button type="button" id="rx_fruit" class="trigger" role="combobox" aria-controls="rx_list" aria-expanded="false" aria-autocomplete="none" dir="ltr" data-state="closed" data-placeholder=""><span style="pointer-events:none">Select a fruit…</span><span aria-hidden="true"><svg width="10" height="10" viewBox="0 0 10 10"><path d="M1 3l4 4 4-4" fill="none" stroke="currentColor"/></svg></span></button>
+    <select aria-hidden="true" tabindex="-1" style="position:absolute;border:0;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;word-wrap:normal"><option value=""></option><option value="apple">Apple</option><option value="banana">Banana</option></select>
+    <ul class="popup" id="rx_list" role="listbox" hidden><li role="option" data-value="apple">Apple</li><li role="option" data-value="banana">Banana</li><li role="option" data-value="cherry">Cherry</li></ul></div>
+
+  <div class="field" data-case="radix-text-icon"><label for="rx_size">T-shirt size</label>
+    <button type="button" id="rx_size" class="trigger" role="combobox" aria-controls="rx_size_list" aria-expanded="false" aria-autocomplete="none" dir="ltr" data-state="closed" data-placeholder=""><span style="pointer-events:none">Select a size…</span><span aria-hidden="true">▼</span></button></div>
+
+  <div class="field" data-case="radix-any"><label for="rx_any">Preferred size</label>
+    <button type="button" id="rx_any" class="trigger" role="combobox" aria-controls="rx_any_list" aria-expanded="false" dir="ltr" data-state="closed" data-placeholder=""><span style="pointer-events:none">Any size</span><span aria-hidden="true">▼</span></button></div>
+  <div class="field" data-case="radix-icon-without-marker"><label for="rx_icon">Favourite colour</label>
+    <button type="button" id="rx_icon" class="trigger" role="combobox" aria-controls="rx_icon_list" aria-expanded="false" dir="ltr" data-state="closed"><span style="pointer-events:none">Select a colour…</span><span aria-hidden="true">▼</span></button></div>
+
+  <div class="field" data-case="headless-listbox"><label id="lb_label">Preferred work mode</label>
+    <button type="button" id="lb_mode" class="trigger" aria-haspopup="listbox" aria-expanded="false" aria-labelledby="lb_label lb_mode" data-headlessui-state="">Select...</button></div>
+
+  <div class="field" data-case="workday-button"><label id="wd_label" for="wd_country">Country<abbr>*</abbr></label>
+    <button type="button" id="wd_country" class="trigger" aria-haspopup="listbox" aria-expanded="false" aria-labelledby="wd_label" value="">Select One</button></div>
+
+  <div class="field" data-case="aria-label-only"><button type="button" id="al_level" class="trigger" aria-haspopup="listbox" aria-expanded="false" aria-label="Seniority level">Select a level</button></div>
+
+  <!-- decoys that must NOT become assist fields -->
+  <div class="field" data-case="menu-button"><button type="button" id="menu_btn" aria-haspopup="menu" aria-label="Row actions">Actions</button></div>
+  <div class="field" data-case="listbox-submit-by-default"><label for="sub_default">Pick one (no type attribute: inside a form it submits)</label><button id="sub_default" aria-haspopup="listbox">Pick</button></div>
+  <div class="field" data-case="listbox-submit"><button type="submit" id="sub_explicit" aria-haspopup="listbox" aria-label="Send application">Send</button></div>
+  <div class="field" data-case="unlabelled-combobox-button"><button type="button" id="sort_by" role="combobox" aria-expanded="false">Sort by</button></div>
+  <div class="field" data-case="unlabelled-listbox-button"><button type="button" id="sort_by2" aria-haspopup="listbox" aria-expanded="false">Newest first</button></div>
+  <div class="field" data-case="combobox-button-submit-by-default"><label for="rc_submit">Pick a team (a combobox button with no type inside a form submits it)</label><button id="rc_submit" role="combobox" aria-expanded="false">Pick</button></div>
+  <div class="field" data-case="combobox-button-submit"><button type="submit" id="rc_type_submit" role="combobox" aria-label="Apply now" aria-expanded="false">Apply</button></div>
+  <div class="field" data-case="chevron-tabindex"><button type="button" id="cv_tab" tabindex="-1" aria-haspopup="listbox" aria-label="Toggle the list" aria-expanded="false">▾</button></div>
+  <div class="field" data-case="chevron-sibling-input"><input id="cv_input" type="text" role="combobox" aria-label="City" aria-expanded="false"><button type="button" id="cv_sibling" aria-haspopup="listbox" aria-label="Show cities" aria-expanded="false">▾</button></div>
+  <div class="field" data-case="chevron-shared-popup"><input id="cv_input2" type="text" role="combobox" aria-label="Region" aria-controls="cv_popup" aria-expanded="false"><div><div><button type="button" id="cv_shared" aria-haspopup="listbox" aria-label="Show regions" aria-controls="cv_popup" aria-expanded="false">▾</button></div></div><ul id="cv_popup" role="listbox" hidden></ul></div>
+  <div class="field" data-case="chevron"><label for="cx">Country of residence</label><div class="row"><input id="cx" type="text" role="combobox" aria-controls="cx_list" aria-expanded="false" aria-haspopup="listbox"><button type="button" id="cx_toggle" tabindex="-1" aria-haspopup="listbox" aria-controls="cx_list" aria-expanded="false" aria-label="Show countries">▾</button></div><ul id="cx_list" role="listbox" hidden></ul></div>
+
+  <!-- B. two buttons that are a Yes/No question -->
+  <div class="field" data-case="yes-no"><div id="yn1" class="label">Are you willing to relocate?</div><div class="yn" role="group" aria-labelledby="yn1"><button type="button" id="yn1_yes" aria-pressed="false">Yes</button><button type="button" id="yn1_no" aria-pressed="false">No</button></div></div>
+  <div class="field" data-case="si-no"><div id="yn2" class="label">¿Dispone de permiso de trabajo?</div><div class="yn" role="group" aria-labelledby="yn2"><button type="button" id="yn2_si" aria-pressed="false">Sí</button><button type="button" id="yn2_no" aria-pressed="true">No</button></div></div>
+  <div class="field" data-case="accept-decline"><div id="yn3" class="label">Marketing e-mails</div><div class="yn" role="group" aria-labelledby="yn3"><button type="button" id="yn3_a" aria-pressed="false">Accept</button><button type="button" id="yn3_d" aria-pressed="false">Decline</button></div></div>
+  <div class="field" data-case="yes-no-maybe"><div id="yn4" class="label">Can you start next month?</div><div class="yn" role="group" aria-labelledby="yn4"><button type="button" id="yn4_y" aria-pressed="false">Yes</button><button type="button" id="yn4_n" aria-pressed="false">No</button><button type="button" id="yn4_m" aria-pressed="false">Maybe</button></div></div>
+
+  <!-- C. file inputs inside a drop area -->
+  <div class="field" data-case="dropzone"><div id="dz1_l" class="label">Portfolio PDF</div><div class="dropzone" role="presentation" id="dz1"><input type="file" name="portfolio" style="display:none" aria-labelledby="dz1_l"><p>Drag a file here</p></div></div>
+  <div class="field" data-case="dropzone-two-inputs"><div id="dz2_l" class="label">Writing sample</div><div class="dropzone" id="dz2"><input type="text" name="caption" placeholder="Caption"><input type="file" name="sample" style="display:none"></div></div>
+  <div class="field" data-case="hidden-file-no-zone"><label>Loose hidden upload</label><input type="file" name="loose" style="display:none"></div>
+  <div class="field" data-case="tiny-zone"><label>Tiny zone</label><div class="dropzone" style="width:10px;height:10px;overflow:hidden;padding:0;border:0"><input type="file" name="tiny" style="display:none"></div></div>
+
+  <!-- D. react-select style search inputs: a few pixels wide inside a wide control -->
+  <div class="field" data-case="narrow-in-control"><label for="rs_a">Where are you based</label><div class="select__control control"><input id="rs_a" type="text" role="combobox" aria-expanded="false" aria-haspopup="true" style="width:4px"></div></div>
+  <div class="field" data-case="narrow-labelled"><label for="rs_b">Labelled narrow combobox</label><input id="rs_b" type="text" role="combobox" aria-expanded="false" style="width:4px;height:21px;border:0;padding:0"></div>
+  <!-- honeypots that stay honeypots -->
+  <div class="field" data-case="trap-1px"><div class="select__control control"><input name="trap_1px" type="text" role="combobox" aria-label="Website" style="width:1px"></div></div>
+  <div class="field" data-case="trap-tabindex"><div class="select__control control"><input name="trap_tab" type="text" role="combobox" tabindex="-1" aria-label="Fax" style="width:4px"></div></div>
+  <div class="field" data-case="trap-unlabelled"><input name="trap_loose" type="text" role="combobox" style="width:4px;height:21px;border:0;padding:0"></div>
+  <div class="select__control control" style="position:absolute;left:-9999px;top:0" data-case="trap-offscreen"><input name="trap_off" type="text" role="combobox" aria-label="Company" style="width:4px"></div>
+
+  <!-- E. what a combobox shows while nothing is chosen is NOT a selection -->
+  <div class="field" data-case="mui-zero-width"><label id="mui_l">Employment level</label><div id="mui_sel" class="trigger" role="combobox" tabindex="0" aria-labelledby="mui_l" aria-haspopup="listbox" aria-expanded="false">&#8203;</div></div>
+  <div class="field" data-case="select2-placeholder"><label id="s2_l">Home country</label><span id="s2_sel" class="select2-selection trigger" role="combobox" tabindex="0" aria-labelledby="s2_l" aria-haspopup="true" aria-expanded="false"><span class="select2-selection__rendered"><span class="select2-selection__placeholder">Select a country</span></span></span></div>
+  <div class="field" data-case="workday-select-one"><label id="wd2_l">Visa type</label><div id="wd2_sel" class="trigger" role="combobox" tabindex="0" aria-labelledby="wd2_l" aria-haspopup="listbox" aria-expanded="false">Select One</div></div>
+  <div class="field" data-case="real-selection"><label id="ok_l">Nationality</label><div id="ok_sel" class="trigger" role="combobox" tabindex="0" aria-labelledby="ok_l" aria-haspopup="listbox" aria-expanded="false">&#8203;United Kingdom&#8203;</div></div>
+  <div class="field" data-case="blind-div"><label id="bl_l">Preferred office</label>
+    <div id="bl_sel" class="trigger" role="combobox" tabindex="0" aria-labelledby="bl_l" aria-haspopup="listbox" aria-expanded="false" aria-controls="bl_list"></div><span id="bl_shown" class="hint"></span>
+    <ul class="popup" id="bl_list" role="listbox" hidden><li role="option" data-value="london">London</li><li role="option" data-value="madrid">Madrid</li></ul></div>
+  <div class="field" data-case="typed-text"><label for="typed">Preferred name</label><input id="typed" name="typed" type="text"></div>
+  <div class="field" data-case="typed-textarea"><label for="typed_area">Anything else</label><textarea id="typed_area" name="typed_area"></textarea></div>
+
+  <!-- F. radio groups whose question is NOT in a label of the group -->
+  <table class="q" data-case="tables"><tbody>
+    <tr><th scope="row">Do you hold a driving licence?</th><td><label><input type="radio" name="drive" value="y"> Yes</label></td><td><label><input type="radio" name="drive" value="n"> No</label></td></tr>
+    <tr><td>Have you worked for us before?</td></tr>
+    <tr><td><label><input type="radio" name="prev" value="y"> Yes</label> <label><input type="radio" name="prev" value="n"> No</label></td></tr>
+    <tr><td>Can you travel?</td><td><label><input type="radio" name="travel" value="y"> Yes</label> <label><input type="radio" name="travel" value="n"> No</label></td><td>Can you relocate?</td><td><label><input type="radio" name="reloc" value="y"> Yes</label> <label><input type="radio" name="reloc" value="n"> No</label></td></tr>
+  </tbody></table>
+  <div class="field" data-case="lone-radios"><label><input type="radio" name="lone" value="y"> Yes</label> <label><input type="radio" name="lone" value="n"> No</label></div>
+
+  <!-- G. custom radios / checkboxes named by their own text -->
+  <div class="field" data-case="radio-cards"><div id="cards_l" class="label">Preferred contract</div><div class="cards" role="radiogroup" aria-labelledby="cards_l"><div class="card" role="radio" aria-checked="false" tabindex="0">Permanent</div><div class="card" role="radio" aria-checked="false" tabindex="-1">Fixed term</div></div></div>
+  <div class="field" data-case="checkbox-cards"><div id="boxes_l" class="label">Which regions can you work in?</div><div class="cards" role="group" aria-labelledby="boxes_l"><div class="card" role="checkbox" aria-checked="false" tabindex="0">Europe</div><div class="card" role="checkbox" aria-checked="false" tabindex="0">Americas</div></div></div>
+  <div class="form-group" data-case="single-checkbox"><label>Contact consent</label><div role="checkbox" aria-checked="false" tabindex="0" style="display:inline-block;border:2px solid #999;padding:4px 10px">Yes, contact me</div></div>
+
+  <button type="submit" id="send">Submit application</button>
+</form>
+<footer data-case="footer-feedback"><span id="fb">Was this page helpful?</span> <div class="yn" role="group" aria-labelledby="fb"><button type="button" id="fb_yes" aria-pressed="false">Yes</button><button type="button" id="fb_no" aria-pressed="false">No</button></div></footer>
+<script src="common.js"></script>
+<script>
+(() => {
+  // the two popups the scenarios drive (the Radix-style select and the rest are static markup)
+  const state = {};
+  window.__state = () => ({ ...state });
+  const trigger = document.getElementById('rx_fruit'), list = document.getElementById('rx_list'), backing = trigger.parentElement.querySelector('select');
+  const setOpen = (open) => { list.hidden = !open; trigger.setAttribute('aria-expanded', String(open)); trigger.dataset.state = open ? 'open' : 'closed'; };
+  trigger.addEventListener('click', () => setOpen(list.hidden));
+  list.addEventListener('click', (e) => {
+    const li = e.target.closest('li'); if (!li) return;
+    trigger.firstElementChild.textContent = li.textContent; trigger.removeAttribute('data-placeholder'); backing.value = li.dataset.value; state.fruit = li.dataset.value; setOpen(false);
+  });
+  // a combobox whose own text stays empty: the chosen office is shown by a sibling element (no adapter can read it from the combobox)
+  const blind = document.getElementById('bl_sel'), blindList = document.getElementById('bl_list'), shown = document.getElementById('bl_shown');
+  const blindOpen = (open) => { blindList.hidden = !open; blind.setAttribute('aria-expanded', String(open)); };
+  blind.addEventListener('click', () => blindOpen(blindList.hidden));
+  blindList.addEventListener('click', (e) => { const li = e.target.closest('li'); if (!li) return; shown.textContent = li.textContent; state.office = li.dataset.value; blindOpen(false); });
+  for (const group of document.querySelectorAll('.yn')) for (const b of group.querySelectorAll('button')) b.addEventListener('click', () => {
+    group.querySelectorAll('button').forEach((x) => x.setAttribute('aria-pressed', String(x === b))); state[group.getAttribute('aria-labelledby')] = b.textContent;
+  });
+})();
+</script>
+</body>
+</html>

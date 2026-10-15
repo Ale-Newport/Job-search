@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Contact details - Acme Robotics</title>
+<link rel="stylesheet" href="/_base.css">
+<script src="/_guard.js"></script>
+</head>
+<body>
+<header class="site"><span class="brand">Acme Robotics</span></header>
+<main>
+<h1>Contact details</h1>
+<form id="contact_form" action="#" novalidate>
+  <div class="field"><label for="email">Email <span class="asterisk">*</span></label>
+    <input type="email" id="email" name="email" required></div>
+  <!-- A country selector (hidden backing input carries "(+44)") plus a NATIONAL-number-only masked input, like many ATS. -->
+  <div class="field phone-widget">
+    <label for="phone_national">Mobile phone number <span class="asterisk">*</span></label>
+    <span class="dial">United Kingdom (+44)</span>
+    <input type="hidden" name="phone_country" value="United Kingdom (+44)">
+    <input type="tel" id="phone_national" name="phone_national" inputmode="numeric" placeholder="7XXX XXXXXX" required>
+  </div>
+  <p><button type="submit" id="submit_app" data-submit>Continue</button></p>
+</form>
+</main>
+<script>
+// Input mask: keeps at most 10 national digits, formatted "XXXX XXXXXX". Anything else the field receives is reformatted.
+window.__maskInputs = [];
+const input = document.getElementById('phone_national');
+input.addEventListener('input', () => {
+  window.__maskInputs.push(input.value);
+  const digits = input.value.replace(/\D/g, '').slice(0, 10);
+  input.value = digits.length > 4 ? digits.slice(0, 4) + ' ' + digits.slice(4) : digits;
+});
+document.getElementById('contact_form').addEventListener('submit', (event) => { event.preventDefault(); });
+</script>
+</body>
+</html>

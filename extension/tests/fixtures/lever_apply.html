@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Acme Robotics - Backend Engineer, Fleet Services</title>
+<meta property="og:site_name" content="Acme Robotics">
+<link rel="stylesheet" href="/_base.css">
+<style>
+  ul.application-form { list-style: none; padding: 0; }
+  .application-question { margin: 18px 0; }
+  .application-label { font-weight: 600; margin-bottom: 4px; }
+  .application-label .required { color: #b00020; margin-left: 4px; }
+  .application-field input[type=text], .application-field input[type=email], .application-field input[type=tel],
+  .application-field select, .application-field textarea { width: 100%; max-width: 480px; padding: 8px; box-sizing: border-box; font: inherit; }
+</style>
+<script src="/_guard.js"></script>
+</head>
+<body>
+<header class="site"><span class="brand">Acme Robotics</span></header>
+<main>
+<div class="posting-headline"><h1>Backend Engineer, Fleet Services</h1>
+  <div class="posting-categories"><span>London, United Kingdom</span> / <span>Engineering</span> / <span>Full-time</span></div></div>
+<div class="posting-description"><p>Acme Robotics builds warehouse robots that help small businesses ship orders faster.
+  The Fleet Services team writes the backend that schedules robots, tracks batteries and reports on throughput.
+  You will build and operate services in Python, work with product and hardware teams and review code with a small,
+  friendly group of engineers who value careful design.</p></div>
+
+<form id="lever_form" action="#" novalidate>
+<ul class="application-form">
+  <li class="application-question resume"><label><div class="application-label">Resume/CV <span class="required">&#10033;</span></div>
+    <div class="application-field"><input type="file" name="resume" id="resume" required></div></label></li>
+  <li class="application-question"><label><div class="application-label"><div class="text">Full name</div><span class="required">&#10033;</span></div>
+    <div class="application-field"><input type="text" name="name" id="name" required></div></label></li>
+  <li class="application-question"><label><div class="application-label">Email <span class="required">&#10033;</span></div>
+    <div class="application-field"><input type="email" name="email" id="email" required></div></label></li>
+  <li class="application-question"><label><div class="application-label">Phone</div>
+    <div class="application-field"><input type="tel" name="phone" id="phone"></div></label></li>
+  <li class="application-question"><label><div class="application-label">Current company</div>
+    <div class="application-field"><input type="text" name="org" id="org"></div></label></li>
+  <li class="application-question"><label><div class="application-label">LinkedIn URL</div>
+    <div class="application-field"><input type="text" name="urls[LinkedIn]" id="linkedin"></div></label></li>
+  <li class="application-question"><label><div class="application-label">GitHub URL</div>
+    <div class="application-field"><input type="text" name="urls[GitHub]" id="github"></div></label></li>
+  <li class="application-question"><label><div class="application-label">Portfolio URL</div>
+    <div class="application-field"><input type="text" name="urls[Portfolio]" id="portfolio"></div></label></li>
+  <li class="application-question"><label><div class="application-label">Additional information</div>
+    <div class="application-field"><textarea name="comments" id="comments" placeholder="Add a cover letter or anything else you want to share."></textarea></div></label></li>
+  <li class="application-question"><label><div class="application-label">Are you legally authorized to work in the United Kingdom? <span class="required">&#10033;</span></div>
+    <div class="application-field"><select name="cards[work_auth]" id="work_auth" required>
+      <option value="">Select...</option><option value="Yes">Yes</option><option value="No">No</option></select></div></label></li>
+</ul>
+<h2>Survey</h2>
+<ul class="application-form">
+  <li class="application-question"><label><div class="application-label">Gender</div>
+    <div class="application-field"><select name="eeo[gender]" id="eeo_gender"><option value="">Select...</option>
+      <option>Male</option><option>Female</option><option>Decline to self-identify</option></select></div></label></li>
+  <li class="application-question"><label><div class="application-label">Race</div>
+    <div class="application-field"><select name="eeo[race]" id="eeo_race"><option value="">Select...</option>
+      <option>Asian</option><option>Black or African American</option><option>White</option><option>Decline to self-identify</option></select></div></label></li>
+</ul>
+<p><button type="submit" id="submit_app" data-submit>Submit application</button></p>
+</form>
+</main>
+<script>
+document.getElementById('lever_form').addEventListener('submit', (event) => {
+  event.preventDefault();
+  window.submissions = (window.submissions || 0) + 1;
+  document.querySelector('main').innerHTML = '<h1>Application submitted</h1><p>Thanks for applying to Acme Robotics. Your application has been received.</p>';
+});
+</script>
+</body>
+</html>

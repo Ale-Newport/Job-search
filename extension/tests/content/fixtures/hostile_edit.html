@@ -1,0 +1,22 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><title>A page that edits its own fields</title>
+<style>body{font:16px system-ui;padding:24px;max-width:720px}label{display:block;margin:10px 0}</style>
+<h1>Apply: Analyst</h1>
+<form onsubmit="event.preventDefault()">
+<label>Email <input name="email" id="email" type="email"></label>
+<label>Phone <input name="phone" id="phone" type="tel"></label>
+<label>Do you require visa sponsorship?
+  <select name="sponsor" id="sponsor"><option value="">Select</option><option value="yes">Yes</option><option value="no">No</option></select></label>
+<label>Nickname <input name="nickname" id="nickname"></label>
+</form>
+<script>
+// What a hostile page can do without the person: focus a field, set its value through the native setter, raise input / change, blur.
+window.forge = (id, value, blur = true) => {
+  const el = document.getElementById(id);
+  el.focus();
+  const proto = el.tagName === 'SELECT' ? HTMLSelectElement.prototype : HTMLInputElement.prototype;
+  Object.getOwnPropertyDescriptor(proto, 'value').set.call(el, value);
+  el.dispatchEvent(new Event('input', { bubbles: true }));
+  el.dispatchEvent(new Event('change', { bubbles: true }));
+  if (blur) el.blur();
+};
+</script></html>

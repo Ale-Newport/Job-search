@@ -1,0 +1,10 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><title>A very long form</title>
+<body style="font:14px system-ui;padding:12px"><form id="f" onsubmit="return false"></form>
+<script>
+const f = document.getElementById('f');
+for (let i = 1; i <= 250; i++) {
+  const l = document.createElement('label'); l.style.display = 'block';
+  l.append('Question ' + i + ' ', Object.assign(document.createElement('input'), { name: 'q' + i }));
+  f.append(l);
+}
+</script></html>

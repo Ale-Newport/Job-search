@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Documents - Acme Robotics</title>
+<link rel="stylesheet" href="/_base.css">
+<style>.visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+  .dropzone { border: 2px dashed #888; padding: 14px; max-width: 480px; border-radius: 6px; }</style>
+<script src="/_guard.js"></script>
+</head>
+<body>
+<header class="site"><span class="brand">Acme Robotics</span></header>
+<main>
+<h1>Upload your documents</h1>
+<form id="docs_form" action="#" novalidate>
+  <div class="field"><label for="resume">Resume/CV <span class="asterisk">*</span></label>
+    <div class="dropzone"><input type="file" id="resume" name="resume" class="visually-hidden" accept=".pdf,.docx">
+      <button type="button" id="resume_button" onclick="document.getElementById('resume').click()">Attach resume</button>
+      <span id="resume_name" aria-live="polite">No file chosen</span></div></div>
+  <div class="field"><label for="cover_letter">Cover letter</label>
+    <input type="file" id="cover_letter" name="cover_letter" accept=".pdf,.docx"></div>
+  <div class="field"><label for="transcript">Academic transcript</label>
+    <input type="file" id="transcript" name="transcript" accept=".pdf"></div>
+  <div class="field"><label for="work_sample">Work sample (optional)</label>
+    <input type="file" id="work_sample" name="work_sample"></div>
+  <p><button type="submit" id="submit_app" data-submit>Submit application</button></p>
+</form>
+</main>
+<script>
+window.__files = {};
+document.querySelectorAll('input[type=file]').forEach((input) => input.addEventListener('change', () => {
+  const file = input.files[0];
+  window.__files[input.id] = file ? { name: file.name, size: file.size, type: file.type } : null;
+  if (input.id === 'resume') document.getElementById('resume_name').textContent = file ? file.name : 'No file chosen';
+}));
+document.getElementById('docs_form').addEventListener('submit', (event) => event.preventDefault());
+</script>
+</body>
+</html>

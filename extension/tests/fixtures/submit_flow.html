@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Apply - Acme Robotics (short form)</title>
+<meta property="og:site_name" content="Acme Robotics">
+<link rel="stylesheet" href="/_base.css">
+<script src="/_guard.js"></script>
+</head>
+<body>
+<header class="site"><span class="brand">Acme Robotics</span></header>
+<main>
+<h1>Quick apply: Software Engineer</h1>
+<p class="job-description">Acme Robotics builds warehouse robots that help small businesses ship orders faster.
+  This short form has a Submit button that shows a confirmation in the same document (?mode=spa, default) or
+  navigates to a confirmation page (?mode=nav).</p>
+<form id="quick_form" action="#" novalidate>
+  <div class="field"><label for="first_name">First name</label><input type="text" id="first_name" name="first_name"></div>
+  <div class="field"><label for="last_name">Last name</label><input type="text" id="last_name" name="last_name"></div>
+  <div class="field"><label for="email">Email</label><input type="email" id="email" name="email"></div>
+  <p><button type="submit" id="submit_app" data-submit>Submit application</button></p>
+</form>
+</main>
+<script>
+const mode = new URLSearchParams(location.search).get('mode') || 'spa';
+document.getElementById('quick_form').addEventListener('submit', (event) => {
+  event.preventDefault();
+  window.submissions = (window.submissions || 0) + 1;
+  if (mode === 'nav') { location.assign('/confirmation.html'); return; }
+  history.pushState({}, '', '?submitted=1');
+  document.querySelector('main').innerHTML = '<h1>Thank you for applying</h1><p>Your application has been received.</p>';
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,15 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><title>Backend Engineer at Acme</title>
+<link rel="canonical" href="{{MAIN}}/careers/job-a">
+<style>body{font:16px system-ui;padding:24px;max-width:720px}label{display:block;margin:10px 0}</style>
+<h1 id="h">Backend Engineer</h1>
+<form onsubmit="return false"><label>Email <input name="email" type="email"></label><label>Phone <input name="phone"></label></form>
+<script>
+history.replaceState({}, '', '/job_switch.html');
+// the same form, another job: only the identity of the page changes (an SPA that keeps its form between postings)
+window.becomeAnotherJob = () => {
+  history.pushState({}, '', '/careers/job-b');
+  document.querySelector('link[rel=canonical]').href = location.origin + '/careers/job-b';
+  document.getElementById('h').textContent = 'Data Scientist';
+  document.title = 'Data Scientist at Globex';
+};
+</script></html>

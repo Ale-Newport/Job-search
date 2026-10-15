@@ -1,0 +1,13 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><title>More anti-spam honeypots</title>
+<style>body{font:16px system-ui;padding:24px}label{display:block;margin:10px 0}</style>
+<form onsubmit="event.preventDefault()">
+<label>First name <input name="first_name"></label>
+<label>Clipped <input name="hp_clip_path" style="clip-path:inset(100%)"></label>
+<label>Clipped old <input name="hp_clip" style="position:absolute;clip:rect(0,0,0,0)"></label>
+<label>Scaled away <input name="hp_scale" style="transform:scale(0)"></label>
+<label>Zero font <input name="hp_font" style="font-size:0;width:2px;height:2px;border:0;padding:0"></label>
+<label>Zero wrapper <span style="display:block;height:0;overflow:hidden"><input name="hp_wrapper"></span></label>
+<label>Behind everything <input name="hp_behind" style="position:absolute;left:30px;top:30px;z-index:-5;width:200px;height:30px"></label>
+<label>Last name <input name="last_name"></label>
+<label>Email <input name="email" type="email"></label>
+</form></html>

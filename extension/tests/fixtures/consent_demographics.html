@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Equal opportunities and consent - Acme Robotics</title>
+<link rel="stylesheet" href="/_base.css">
+<script src="/_guard.js"></script>
+</head>
+<body>
+<header class="site"><span class="brand">Acme Robotics</span></header>
+<main>
+<h1>Equal opportunities and consent</h1>
+<form id="eeo_form" action="#" novalidate>
+  <h2>Diversity survey (optional)</h2>
+  <div class="field"><label for="pronouns">Preferred pronouns</label>
+    <select id="pronouns" name="pronouns"><option value="">Select...</option><option>she/her/hers</option>
+      <option>he/him/his</option><option>they/them/theirs</option><option>Prefer not to say</option></select></div>
+  <div class="field"><label for="gender">What is your gender?</label>
+    <select id="gender" name="gender"><option value="">Select...</option><option>Man</option><option>Woman</option>
+      <option>Non-binary</option><option>Prefer not to say</option></select></div>
+  <fieldset id="disability_group"><legend>Do you have a disability?</legend>
+    <label class="inline"><input type="radio" name="disability" id="disability_yes" value="yes"> Yes</label>
+    <label class="inline"><input type="radio" name="disability" id="disability_no" value="no"> No</label>
+    <label class="inline"><input type="radio" name="disability" id="disability_na" value="na"> Prefer not to say</label></fieldset>
+  <h2>Consent</h2>
+  <div class="field"><label class="inline"><input type="checkbox" id="terms" name="terms" required>
+    I agree to the terms and conditions. <span class="asterisk">*</span></label></div>
+  <div class="field"><label class="inline"><input type="checkbox" id="marketing" name="marketing">
+    I consent to receive marketing emails from Acme Robotics.</label></div>
+  <fieldset id="transcribe_group"><legend>Do you consent to AI-assisted transcription of your interview?</legend>
+    <label class="inline"><input type="radio" name="transcribe" id="transcribe_yes" value="yes"> Yes, I consent</label>
+    <label class="inline"><input type="radio" name="transcribe" id="transcribe_no" value="no"> No, I do not consent</label></fieldset>
+  <p><button type="submit" id="submit_app" data-submit>Submit application</button></p>
+</form>
+</main>
+<script>document.getElementById('eeo_form').addEventListener('submit', (event) => event.preventDefault());</script>
+</body>
+</html>

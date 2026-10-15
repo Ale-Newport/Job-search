@@ -1,0 +1,5 @@
+{
+  "extName": { "message": "Meridian Assistant" },
+  "extDescription": { "message": "Fills job applications with you, field by field, from your private Meridian profile. Never submits anything." },
+  "actionTitle": { "message": "Meridian Assistant: help with this application" }
+}

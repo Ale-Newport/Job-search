@@ -1,0 +1,16 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><title>Required markers</title>
+<style>body{font:16px system-ui;padding:24px;max-width:720px}label{display:block;margin:12px 0}.req{color:#c00}</style>
+<h1>Application: markers</h1>
+<form onsubmit="event.preventDefault()">
+<label>First Name <span class="req">*</span><input name="first_name" required></label>
+<label>Full name<span class="req">✱</span> <input name="full_name" required></label>
+<label>Phone (required) <input name="phone" required></label>
+<label><span aria-hidden="true">*</span> Email <input name="email" type="email" required></label>
+<fieldset><legend>Are you legally authorized to work in the United Kingdom? <span class="req">*</span></legend>
+  <label><input type="radio" name="auth" value="yes">Yes</label>
+  <label><input type="radio" name="auth" value="no">No</label>
+</fieldset>
+<label>Website <input name="website"></label>
+<button type="submit">Submit application</button>
+</form>
+</html>

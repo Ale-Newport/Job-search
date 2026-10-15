@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>SmartRecruiters-style application (hand-rolled replica)</title>
+<link rel="stylesheet" href="demo.css">
+</head>
+<body>
+<h1>Apply: SmartRecruiters-style web components (hand-rolled replica)</h1>
+<!-- Custom elements with OPEN shadow roots, nested two deep (oc-form > oc-text-field / oc-select / oc-phone / oc-checkbox). Each
+     component keeps its value in a JS property and emits a CustomEvent when its inner control reports a change; the host's own
+     properties are invisible to the extension (isolated world), only the inner native controls are reachable. Written from
+     memory of the vendor's component structure; NOT verified against a live tenant. -->
+<oc-form id="form"></oc-form>
+<script src="common.js"></script>
+<script>
+const css = `:host{display:block;margin:14px 0} label{display:block;font-weight:600;margin-bottom:4px;font:600 15px system-ui} input,select{box-sizing:border-box;width:100%;max-width:420px;padding:8px 10px;font:15px system-ui;border:1px solid #888;border-radius:4px}
+.menu{margin:2px 0 0;padding:4px 0;list-style:none;border:1px solid #888;background:#fff;max-width:420px;position:absolute;z-index:5}.menu[hidden]{display:none}.menu li{padding:6px 10px;cursor:pointer}
+.trigger{box-sizing:border-box;width:100%;max-width:420px;padding:8px 10px;font:15px system-ui;border:1px solid #888;border-radius:4px;background:#fff;cursor:pointer}`;
+let seq = 0;
+class OcTextField extends HTMLElement {
+  connectedCallback() {
+    const root = this.attachShadow({ mode: 'open' }); const id = `oc-f-${++seq}`;
+    root.innerHTML = `<style>${css}</style><label for="${id}"></label><input id="${id}" type="${this.getAttribute('type') || 'text'}" autocomplete="${this.getAttribute('autocomplete') || 'off'}">`;
+    root.querySelector('label').textContent = this.getAttribute('label') || '';
+    const input = root.querySelector('input'); this.value = '';
+    input.addEventListener('input', () => { this.value = input.value; this.dispatchEvent(new CustomEvent('oc-change', { bubbles: true, composed: true, detail: { name: this.getAttribute('name'), value: this.value } })); });
+  }
+}
+class OcSelect extends HTMLElement {
+  connectedCallback() {
+    const root = this.attachShadow({ mode: 'open' }); const id = `oc-s-${++seq}`; const options = (this.getAttribute('options') || '').split('|');
+    root.innerHTML = `<style>${css}</style><label id="${id}-l"></label><div class="trigger" id="${id}" role="combobox" tabindex="0" aria-haspopup="listbox" aria-expanded="false" aria-controls="${id}-lb" aria-labelledby="${id}-l">Select</div>
+      <ul class="menu" id="${id}-lb" role="listbox" hidden></ul>`;
+    root.querySelector('label').textContent = this.getAttribute('label') || ''; this.value = '';
+    const trigger = root.querySelector('.trigger'), menu = root.querySelector('.menu');
+    const set = (open) => { menu.hidden = !open; trigger.setAttribute('aria-expanded', String(open)); };
+    trigger.addEventListener('click', () => { if (menu.hidden) { menu.innerHTML = ''; for (const o of options) { const li = document.createElement('li'); li.setAttribute('role', 'option'); li.textContent = o;
+      li.addEventListener('click', () => { this.value = o; trigger.textContent = o; set(false); this.dispatchEvent(new CustomEvent('oc-change', { bubbles: true, composed: true, detail: { name: this.getAttribute('name'), value: o } })); }); menu.append(li); } } set(menu.hidden); });
+    trigger.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ' || e.key === 'ArrowDown') { e.preventDefault(); if (menu.hidden) trigger.click(); } if (e.key === 'Escape') set(false); });
+  }
+}
+class OcCheckbox extends HTMLElement {
+  connectedCallback() {
+    const root = this.attachShadow({ mode: 'open' }); const id = `oc-c-${++seq}`;
+    root.innerHTML = `<style>${css}</style><label><input type="checkbox" id="${id}" style="width:auto;margin-right:8px"><span></span></label>`;
+    root.querySelector('span').textContent = this.getAttribute('label') || ''; this.checked = false;
+    const input = root.querySelector('input'); input.addEventListener('change', () => { this.checked = input.checked; this.dispatchEvent(new CustomEvent('oc-change', { bubbles: true, composed: true, detail: { name: this.getAttribute('name'), value: this.checked } })); });
+  }
+}
+class OcForm extends HTMLElement {
+  connectedCallback() {
+    const root = this.attachShadow({ mode: 'open' }); this.model = {};
+    root.innerHTML = `<style>${css}</style><form onsubmit="return false">
+      <oc-text-field name="firstName" label="First name" autocomplete="given-name"></oc-text-field>
+      <oc-text-field name="email" label="Email" type="email" autocomplete="email"></oc-text-field>
+      <oc-select name="country" label="Country of residence" options="Germany|Spain|United Kingdom"></oc-select>
+      <oc-text-field name="phone" label="Phone number" type="tel"></oc-text-field>
+      <oc-checkbox name="alerts" label="Send me job alerts"></oc-checkbox></form>`;
+    root.addEventListener('oc-change', e => { this.model[e.detail.name] = e.detail.value; });
+  }
+}
+for (const [n, c] of [['oc-text-field', OcTextField], ['oc-select', OcSelect], ['oc-checkbox', OcCheckbox], ['oc-form', OcForm]]) customElements.define(n, c);
+window.__state = () => ({ ...document.getElementById('form').model });
+</script>
+</body>
+</html>

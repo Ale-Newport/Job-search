@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Headless UI demo application</title>
+<link rel="stylesheet" href="demo.css">
+<style>
+.control { box-sizing: border-box; width: 100%; max-width: 420px; padding: 8px 10px; font: inherit; border: 1px solid #888; border-radius: 4px; background: #fff; text-align: left; }
+.relative { position: relative; max-width: 420px; }
+.chevron { position: absolute; right: 2px; top: 2px; bottom: 2px; width: 30px; border: 0; background: transparent; }
+.menu { z-index: 50; border: 1px solid #888; background: #fff; margin: 4px 0 0; padding: 4px; max-height: 240px; overflow: auto; }
+.option { padding: 6px 8px; cursor: pointer; }
+.option[data-focus] { background: #dde7ff; }
+.cards { display: flex; gap: 10px; }
+.card { border: 2px solid #999; border-radius: 6px; padding: 10px 14px; cursor: pointer; display: flex; flex-direction: column; min-width: 100px; }
+.card[data-checked] { border-color: #173f36; background: #e6f2ee; }
+.box { display: inline-flex; width: 22px; height: 22px; border: 2px solid #555; border-radius: 4px; align-items: center; justify-content: center; vertical-align: middle; }
+.switch { display: inline-flex; padding: 3px 10px; border: 2px solid #555; border-radius: 12px; vertical-align: middle; }
+.inline { display: inline; }
+fieldset { border: 0; padding: 0; margin: 14px 0; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script src="common.js"></script>
+<script type="module" src="headless.js"></script>
+</body>
+</html>

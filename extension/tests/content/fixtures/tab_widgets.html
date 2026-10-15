@@ -1,0 +1,39 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><title>Widgets that own Tab</title>
+<style>body{font:16px system-ui;padding:24px;max-width:720px}label{display:block;margin:12px 0}.CodeMirror{border:1px solid #888;padding:4px}</style>
+<h1>Apply</h1>
+<form onsubmit="event.preventDefault()">
+<label>First name <input name="first"></label>
+<label>Skills <input name="tags" id="tags" autocomplete="off"></label>
+<div id="tagbox"></div>
+<label>Start date <input type="date" name="start" id="start"></label>
+<label>Portfolio snippet
+  <div class="CodeMirror"><textarea name="snippet" id="snippet" rows="3"></textarea></div></label>
+<label>Location <input name="location" id="ac" aria-controls="ac-list" aria-autocomplete="list" autocomplete="off"></label>
+<ul id="ac-list" role="listbox" hidden><li role="option" id="ac-1">London, United Kingdom</li><li role="option" id="ac-2">Madrid, Spain</li></ul>
+<label>Last name <input name="last"></label>
+<button type="button" id="next">Next</button>
+</form>
+<script>
+// a tag input: Tab turns what was typed into a tag and keeps the focus where it is (the page's handler calls preventDefault)
+window.tags = [];
+document.getElementById('tags').addEventListener('keydown', (e) => {
+  if (e.key === 'Tab' && e.target.value.trim()) {
+    window.tags.push(e.target.value.trim());
+    document.getElementById('tagbox').textContent = window.tags.join(', ');
+    e.target.value = '';
+    e.preventDefault();
+  }
+});
+// an autocomplete that never touches aria-expanded: its list is shown on focus and Tab picks the first suggestion
+window.picked = null;
+const ac = document.getElementById('ac');
+ac.addEventListener('focus', () => { document.getElementById('ac-list').hidden = false; });
+ac.addEventListener('blur', () => { setTimeout(() => { document.getElementById('ac-list').hidden = true; }, 50); });
+ac.addEventListener('keydown', (e) => {
+  if (e.key === 'Tab' && !document.getElementById('ac-list').hidden) { window.picked = 'London, United Kingdom'; ac.value = window.picked; }
+});
+// a code editor: Tab indents
+document.getElementById('snippet').addEventListener('keydown', (e) => {
+  if (e.key === 'Tab') { e.preventDefault(); window.indents = (window.indents || 0) + 1; }
+});
+</script></html>

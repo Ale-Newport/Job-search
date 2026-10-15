@@ -1,0 +1,26 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><title>Masked and rejecting inputs</title>
+<style>body{font:16px system-ui;padding:24px;max-width:720px}label{display:block;margin:10px 0}</style>
+<h1>Contact details</h1>
+<form onsubmit="event.preventDefault()">
+<div class="phone-group"><input type="hidden" name="phone_country" value="United Kingdom (+44)">
+  <label>Phone <input type="tel" name="phone" id="phone"></label></div>
+<label>Postcode <input name="postcode" id="postcode"></label>
+<label>Referral code (the site refuses programmatic values) <input name="referral" id="referral"></label>
+<label>Years of experience <input type="number" name="years" id="years" min="0" max="60"></label>
+<label>Available from <input type="date" name="start" id="start"></label>
+<label>Reformatting field <input name="reformat" id="reformat"></label>
+<button type="button">Next</button>
+</form>
+<script>
+// phone mask: formats digits as (555) 123-4567 on every input event, like imask / cleave
+document.getElementById('phone').addEventListener('input', e => {
+  const d = e.target.value.replace(/\D/g, '').slice(0, 10);
+  e.target.value = d.length > 6 ? `(${d.slice(0,3)}) ${d.slice(3,6)}-${d.slice(6)}` : d.length > 3 ? `(${d.slice(0,3)}) ${d.slice(3)}` : d;
+});
+// postcode: upper-cases
+document.getElementById('postcode').addEventListener('input', e => { e.target.value = e.target.value.toUpperCase(); });
+// referral: a controlled input that never accepts programmatic changes (reverts on the next task)
+document.getElementById('referral').addEventListener('input', e => { if (!e.isTrusted) { e.target.value = ''; } });
+// a field that asynchronously reverts what it was given (framework re-render after the fact)
+document.getElementById('reformat').addEventListener('input', e => { if (!e.isTrusted) setTimeout(() => { e.target.value = ''; }, 60); });
+</script></html>

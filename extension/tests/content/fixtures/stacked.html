@@ -1,0 +1,19 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><title>Closely stacked fields</title>
+<style>body{font:16px system-ui;margin:0;padding:0}form{position:absolute;left:40px;width:420px}
+input{display:block;width:100%;box-sizing:border-box;height:34px;margin:0 0 8px 0;padding:6px}label{display:block;font-size:13px}</style>
+<form onsubmit="return false">
+<label>First name<input name="first_name"></label>
+<label>Last name<input name="last_name"></label>
+<label>Email<input name="email" type="email"></label>
+<label>Phone<input name="phone" type="tel"></label>
+<label>City<input name="city"></label>
+</form>
+<div style="height:2000px"></div>
+<script>
+const query = new URLSearchParams(location.search);
+const offset = query.get('top');
+document.querySelector('form').style.top = (offset !== null ? offset : '320') + 'px';
+// `?label=16` larger printed labels (the question's own label is then the bigger thing a chip above the field would sit on); `?gap=16` more air between fields
+if (query.get('label')) { const px = Number(query.get('label')); document.head.insertAdjacentHTML('beforeend', `<style>label{font-size:${px}px;line-height:${Math.round(px * 1.4)}px}</style>`); }
+if (query.get('gap')) document.head.insertAdjacentHTML('beforeend', `<style>input{margin-bottom:${Number(query.get('gap'))}px}</style>`);
+</script></html>

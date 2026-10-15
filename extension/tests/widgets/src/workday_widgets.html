@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Workday-style application (hand-rolled replica)</title>
+<link rel="stylesheet" href="demo.css">
+<style>
+.wd-btn { box-sizing: border-box; width: 100%; max-width: 420px; text-align: left; padding: 8px 10px; font: inherit; border: 1px solid #888; border-radius: 4px; background: #fff; cursor: pointer; }
+[data-automation-widget="wd-popup"] { position: absolute; z-index: 1000; background: #fff; border: 1px solid #888; box-shadow: 0 4px 12px rgba(0,0,0,.2); min-width: 260px; }
+[data-automation-widget="wd-popup"] ul { list-style: none; margin: 0; padding: 4px 0; max-height: 220px; overflow: auto; }
+[data-automation-widget="wd-popup"] li { padding: 6px 12px; cursor: pointer; } [data-automation-widget="wd-popup"] li[aria-selected="true"] { background: #e6f2ee; }
+abbr { color: #b00020; text-decoration: none; margin-left: 2px; }
+</style>
+</head>
+<body>
+<h1>My Information (Workday-style replica)</h1>
+<!-- Hand-rolled from the public structure of Workday's candidate experience: data-automation-id attributes, <button aria-haspopup="listbox">
+     dropdowns whose popup is a <ul role="listbox"> inside a wd-popup portal appended to <body>, options as <li role="option"> wrapping
+     <div data-automation-label>. Part B repeats the same popup behaviour on a <div role="combobox"> trigger (what the scanner can see).
+     Written from memory of the vendor markup; NOT verified against a live tenant. -->
+<form id="wd" data-automation-id="applyFlowMyInfoPage" onsubmit="return false">
+  <div class="field" data-automation-id="formField-legalNameSection_firstName"><label for="name--legalName--firstName">Given Name(s)<abbr title="required">*</abbr></label>
+    <input id="name--legalName--firstName" name="firstName" data-automation-id="legalNameSection_firstName" type="text" aria-required="true"></div>
+  <div class="field" data-automation-id="formField-legalNameSection_lastName"><label for="name--legalName--lastName">Family Name<abbr title="required">*</abbr></label>
+    <input id="name--legalName--lastName" name="lastName" data-automation-id="legalNameSection_lastName" type="text" aria-required="true"></div>
+
+  <h2>Part A: the vendor's own markup (button dropdowns)</h2>
+  <div class="field" data-automation-id="formField-sourceDropdown"><label id="source-label" for="source--source">How Did You Hear About Us?<abbr>*</abbr></label>
+    <button type="button" id="source--source" name="source" class="wd-btn" aria-haspopup="listbox" aria-expanded="false" aria-labelledby="source-label" data-automation-id="sourceDropdown" data-options="LinkedIn|Company website|Referral|Job board" value="">Select One</button></div>
+  <div class="field" data-automation-id="formField-country"><label id="country-label" for="country--country">Country<abbr>*</abbr></label>
+    <button type="button" id="country--country" name="country" class="wd-btn" aria-haspopup="listbox" aria-expanded="false" aria-labelledby="country-label" data-automation-id="countryDropdown" data-options="Germany|Spain|United Kingdom|United States of America" value="">Select One</button></div>
+
+  <h2>Part B: the same popup on a combobox trigger (scanner-visible)</h2>
+  <div class="field" data-automation-id="formField-phone-device-type"><label id="device-label">Phone Device Type<abbr>*</abbr></label>
+    <div id="phone--device" class="wd-btn" role="combobox" tabindex="0" aria-haspopup="listbox" aria-expanded="false" aria-labelledby="device-label" data-automation-id="phone-device-type" data-options="Mobile|Home|Work">Select One</div></div>
+  <div class="field" data-automation-id="formField-county"><label id="county-label">County<abbr>*</abbr></label>
+    <div id="county" class="wd-btn" role="combobox" tabindex="0" aria-haspopup="listbox" aria-expanded="false" aria-labelledby="county-label" data-automation-id="countyDropdown" data-options="Berkshire|Essex|Kent|Surrey|Yorkshire" data-rerender="1">Select One</div></div>
+
+  <div class="field" data-automation-id="formField-contact-preference"><label id="contact-label">Preferred contact method<abbr>*</abbr></label>
+    <div id="contact" class="wd-btn" role="combobox" tabindex="0" aria-haspopup="listbox" aria-expanded="false" aria-labelledby="contact-label" data-automation-id="contactPreference" data-options="Email|Mobile|Post" data-no-controls="1">Select One</div></div>
+  <div class="field" data-automation-id="formField-callback"><label id="callback-label">Best time for a call<abbr>*</abbr></label>
+    <div id="callback" class="wd-btn" role="combobox" tabindex="0" aria-haspopup="listbox" aria-expanded="false" aria-labelledby="callback-label" data-automation-id="callbackSlot" data-options="Morning|Afternoon|Evening" data-ignore-clicks-ms="350">Select One</div></div>
+
+  <div class="field" data-automation-id="formField-nationality"><label id="nat-label" for="nat">Nationality<abbr>*</abbr></label>
+    <div class="wd-btn" style="display:flex;gap:6px"><span id="nat-shown">Select One</span><input id="nat" role="combobox" aria-haspopup="listbox" aria-expanded="false" aria-labelledby="nat-label" autocomplete="off"
+      style="border:0;flex:1;min-width:60px;padding:0;font:inherit;max-width:none" data-options="Germany|Spain|United Kingdom|United States of America" data-no-controls="1" data-shown="nat-shown"></div></div>
+
+  <div class="field" data-automation-id="formField-phone-number"><label for="phoneNumber--phoneNumber">Phone Number<abbr>*</abbr></label>
+    <input id="phoneNumber--phoneNumber" name="phone" data-automation-id="phone-number" type="text"></div>
+  <button type="submit" data-automation-id="bottom-navigation-next-button">Save and Continue</button>
+</form>
+<script src="common.js"></script>
+<script>
+(() => {
+  const state = {};
+  window.__state = () => ({ ...state });
+  let popup = null, owner = null, timer = 0, openedAt = 0;
+  const close = (refocus) => { clearInterval(timer); if (popup) { popup.remove(); popup = null; } if (owner) { owner.setAttribute('aria-expanded', 'false'); if (refocus) owner.focus(); owner = null; } };
+  const text = el => el.tagName === 'BUTTON' ? el.textContent : el.textContent;
+  const display = (button) => (button.dataset.shown ? document.getElementById(button.dataset.shown) : button);
+  const render = (button) => {
+    const ul = popup.querySelector('ul'); ul.innerHTML = '';
+    const current = button.dataset.selected;
+    const query = button.tagName === 'INPUT' ? button.value.toLowerCase() : '';
+    button.dataset.options.split('|').filter(label => !query || label.toLowerCase().includes(query)).forEach((label, i) => {
+      const li = document.createElement('li'); li.setAttribute('role', 'option'); li.id = `${button.id}-opt-${i}`; li.tabIndex = -1;
+      li.setAttribute('aria-selected', String(label === current));
+      li.innerHTML = '<div data-automation-id="promptOption"></div>'; li.firstChild.textContent = label; li.firstChild.setAttribute('data-automation-label', label);
+      li.addEventListener('click', () => {
+        if (button.dataset.ignoreClicksMs && performance.now() - openedAt < Number(button.dataset.ignoreClicksMs)) return;   // the open animation swallows early clicks
+        button.dataset.selected = label; display(button).textContent = label; if (button.tagName === 'BUTTON') button.value = label.toLowerCase().replace(/ /g, '_'); if (button.tagName === 'INPUT') button.value = '';
+        state[button.id] = label; close(true);
+      });
+      ul.append(li);
+    });
+  };
+  const open = (button) => {
+    if (owner === button) return;
+    close(false); owner = button; button.setAttribute('aria-expanded', 'true');
+    popup = document.createElement('div'); popup.setAttribute('data-automation-widget', 'wd-popup');
+    popup.innerHTML = '<ul role="listbox" tabindex="-1"></ul>';
+    popup.querySelector('ul').setAttribute('aria-label', button.id);
+    if (!button.dataset.noControls) button.setAttribute('aria-controls', `${button.id}-listbox`);
+    popup.querySelector('ul').id = `${button.id}-listbox`; openedAt = performance.now();
+    const r = button.getBoundingClientRect(); popup.style.left = `${r.left + scrollX}px`; popup.style.top = `${r.bottom + scrollY}px`;
+    document.body.append(popup); render(button);
+    if (button.dataset.rerender) timer = setInterval(() => { if (popup) render(button); }, 120);  // options re-created while open
+  };
+  for (const b of document.querySelectorAll('[aria-haspopup=listbox]')) {
+    b.addEventListener('click', () => (owner === b ? close(false) : open(b)));
+    b.addEventListener('keydown', e => { if (['Enter', ' ', 'ArrowDown'].includes(e.key)) { e.preventDefault(); open(b); } if (e.key === 'Escape') close(true); });
+  }
+  document.getElementById('nat').addEventListener('input', e => { if (!popup || owner !== e.target) open(e.target); else render(e.target); });
+  document.addEventListener('mousedown', e => { if (popup && !popup.contains(e.target) && e.target !== owner) close(false); });
+  for (const el of document.querySelectorAll('input')) el.addEventListener('input', () => { state[el.name] = el.value; });
+})();
+</script>
+</body>
+</html>

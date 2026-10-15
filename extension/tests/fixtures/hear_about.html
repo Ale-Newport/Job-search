@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Product Engineer - Acme Robotics</title>
+<meta property="og:site_name" content="Acme Robotics">
+<link rel="stylesheet" href="/_base.css">
+<script type="application/ld+json">
+{"@context": "https://schema.org/", "@type": "JobPosting", "title": "Product Engineer",
+ "description": "<p>Acme Robotics builds warehouse robots that help small businesses ship orders faster. The product team turns what operators tell us into the next release.</p>",
+ "hiringOrganization": {"@type": "Organization", "name": "Acme Robotics"},
+ "jobLocation": {"@type": "Place", "address": {"@type": "PostalAddress", "addressLocality": "London", "addressCountry": "GB"}}}
+</script>
+<script src="/_guard.js"></script>
+</head>
+<body>
+<header class="site"><span class="brand">Acme Robotics</span></header>
+<main>
+<h1>Product Engineer</h1>
+<p class="job-description">Acme Robotics builds warehouse robots that help small businesses ship orders faster. The product
+  team turns what operators tell us into the next release. This form asks, in several wordings, how you found the job.</p>
+<form id="hear_form" action="#" novalidate>
+  <div class="field"><label for="first_name">First name</label><input type="text" id="first_name" name="first_name"></div>
+  <div class="field"><label for="hear_select">How did you hear about us? <span class="asterisk">*</span></label>
+    <select id="hear_select" name="hear_select" required>
+      <option value="">Please select</option><option>LinkedIn</option><option>Indeed</option><option>Company website</option>
+      <option>Employee referral</option><option>University careers service</option><option>Other</option></select></div>
+  <div class="field"><label for="hear_text">How did you hear about us? Please tell us more.</label>
+    <input type="text" id="hear_text" name="hear_text"></div>
+  <fieldset id="hear_group"><legend>Where did you hear about this opportunity?</legend>
+    <label class="inline"><input type="radio" name="hear_group" id="hear_linkedin" value="LinkedIn"> LinkedIn</label>
+    <label class="inline"><input type="radio" name="hear_group" id="hear_indeed" value="Indeed"> Indeed</label>
+    <label class="inline"><input type="radio" name="hear_group" id="hear_referral" value="Employee referral"> Employee referral</label>
+    <label class="inline"><input type="radio" name="hear_group" id="hear_other" value="Other"> Other</label></fieldset>
+  <div class="field"><label for="hear_board">Which job board or website did you find this job on?</label>
+    <input type="text" id="hear_board" name="hear_board"></div>
+  <p><button type="submit" id="submit_app" data-submit>Submit application</button></p>
+</form>
+</main>
+<script>
+document.getElementById('hear_form').addEventListener('submit', (event) => { event.preventDefault(); window.submissions = (window.submissions || 0) + 1; });
+</script>
+</body>
+</html>

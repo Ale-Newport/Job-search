@@ -1,0 +1,20 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><title>A select whose options arrive late</title>
+<style>body{font:16px system-ui;padding:24px;max-width:720px}label{display:block;margin:12px 0}</style>
+<h1>Apply</h1>
+<form onsubmit="event.preventDefault()">
+<label>First name <input name="first"></label>
+<label>Region <select name="region" id="region"><option value="">Select...</option></select></label>
+<label>Email <input name="email" type="email"></label>
+</form>
+<script>
+// ?late=<ms>: the region list is loaded by the page after that long (a country picked elsewhere decides it); ?late=manual: when
+// the page calls window.loadRegions() (a test decides when the options arrive)
+window.loadRegions = () => {
+  const select = document.getElementById('region');
+  for (const [value, text] of [['north', 'North'], ['south', 'South'], ['east', 'East']]) {
+    const o = document.createElement('option'); o.value = value; o.textContent = text; select.append(o);
+  }
+};
+const late = new URLSearchParams(location.search).get('late') || '3000';
+if (late !== 'manual') setTimeout(window.loadRegions, Number(late));
+</script></html>

@@ -1,0 +1,50 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><title>Custom comboboxes</title>
+<style>body{font:16px system-ui;padding:24px;max-width:720px}label{display:block;margin:10px 0}
+.box{position:relative}[role=listbox]{border:1px solid #888;background:#fff;position:absolute;z-index:9;margin:0;padding:4px;list-style:none;min-width:240px}
+[role=option]{padding:6px;cursor:pointer}</style>
+<h1>Custom comboboxes</h1>
+<form onsubmit="event.preventDefault()">
+<label>Name <input name="name"></label>
+<div class="box"><label for="notice">Notice period</label>
+  <input id="notice" role="combobox" aria-haspopup="listbox" aria-expanded="false" aria-controls="notice-list" readonly placeholder="Select..."></div>
+<div class="box"><label for="loc">Where are you currently located?</label>
+  <input id="loc" role="combobox" aria-haspopup="listbox" aria-expanded="false" aria-controls="loc-list" placeholder="Start typing..."></div>
+<div class="box"><label for="level">Seniority</label>
+  <input id="level" role="combobox" aria-haspopup="listbox" aria-expanded="false" aria-controls="level-list" readonly placeholder="Select..."></div>
+<label>Phone <input name="phone"></label>
+<button type="button">Next</button>
+</form>
+<script>
+window.selected = {};
+const DATA = {
+  notice: ['Immediately', '1 week', '2 weeks', '1 month', '2 months', '3 months'],
+  loc: ['London, Greater London, England, United Kingdom', 'London, Ontario, Canada', 'Madrid, Spain'],
+  level: ['Junior', 'Mid-level', 'Senior'],
+};
+function wire(id, { onMouseDown = true, delay = 120, filterOnType = false } = {}) {
+  const input = document.getElementById(id);
+  let list = null;
+  const close = () => { if (list) { list.remove(); list = null; } input.setAttribute('aria-expanded', 'false'); };
+  const open = (query) => {
+    close();
+    input.setAttribute('aria-expanded', 'true');
+    setTimeout(() => {                       // options arrive asynchronously, like a remote search
+      if (input.getAttribute('aria-expanded') !== 'true') return;
+      list = document.createElement('ul'); list.id = id + '-list'; list.setAttribute('role', 'listbox');
+      const q = (query || '').toLowerCase();
+      for (const text of DATA[id].filter(t => !filterOnType || !q || t.toLowerCase().startsWith(q))) {
+        const li = document.createElement('li'); li.setAttribute('role', 'option'); li.textContent = text;
+        li.addEventListener('mousedown', e => e.preventDefault());
+        li.addEventListener('click', () => { input.value = text; window.selected[id] = text; close(); });
+        list.append(li);
+      }
+      input.parentElement.append(list);
+    }, delay);
+  };
+  input.addEventListener('mousedown', () => { if (onMouseDown && input.getAttribute('aria-expanded') !== 'true') open(''); });
+  input.addEventListener('input', () => open(input.value));
+  input.addEventListener('keydown', e => { if (e.key === 'Escape') close(); if (e.key === 'ArrowDown' && input.getAttribute('aria-expanded') !== 'true') open(''); });
+  input.addEventListener('blur', () => setTimeout(close, 150));
+}
+wire('notice'); wire('loc', { onMouseDown: false, filterOnType: true }); wire('level', { delay: 0 });
+</script></html>

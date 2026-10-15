@@ -1,0 +1,11 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><title>Uploads fixture</title>
+<style>body{font:16px system-ui;padding:24px;max-width:720px}label{display:block;margin:10px 0}.row{margin:14px 0}</style>
+<h1>Apply: Data Engineer</h1>
+<form onsubmit="event.preventDefault();window.submissions=(window.submissions||0)+1">
+<label>First name <input name="first_name"></label>
+<div class="row"><label for="resume">Resume/CV <span>*</span></label><input type="file" id="resume" name="job_application[resume]" accept=".pdf,.doc,.docx"></div>
+<div class="row"><label for="cover_letter">Cover Letter</label><input type="file" id="cover_letter" name="job_application[cover_letter]"></div>
+<div class="row"><label for="sample">Writing sample</label><input type="file" id="sample" name="sample"></div>
+<label>Email <input name="email" type="email"></label>
+<button type="submit">Submit application</button>
+</form></html>

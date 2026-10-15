@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Meridian UI preview rig</title>
+<link rel="stylesheet" href="rig.css">
+</head>
+<body>
+<header class="hdr"><h1>Acme Robotics</h1><p>Senior Software Engineer · London, UK</p></header>
+<main>
+  <form id="app" autocomplete="off">
+    <label>First name <input id="f-first" type="text"></label>
+    <label>Last name <input id="f-last" type="text"></label>
+    <label>Email <input id="f-email" type="email"></label>
+    <label>Why do you want to work here? <textarea id="f-why" rows="4"></textarea></label>
+    <label>Country <select id="f-country"><option>United Kingdom</option><option>Spain</option></select></label>
+    <button type="button" id="f-submit">Submit application</button>
+  </form>
+</main>
+<input class="fx" id="fx-top" type="text" aria-label="Top field">
+<input class="fx" id="fx-mid" type="text" aria-label="Middle field">
+<input class="fx" id="fx-bottom" type="text" aria-label="Bottom field">
+<input class="fx" id="fx-right" type="text" aria-label="Right field">
+<input class="fx" id="fx-pair-a" type="text" aria-label="Focused field">
+<input class="fx" id="fx-pair-b" type="text" aria-label="Next field right below">
+<input class="fx" id="fx-small" type="checkbox" aria-label="Small control">
+<input class="fx" id="fx-edge" type="text" aria-label="Field at the top edge">
+<textarea class="fx" id="fx-tall" aria-label="Tall field"></textarea>
+<label class="fxo" id="fx-opt-yes"><input type="radio" name="fx-g" aria-label="Yes">Yes</label>
+<label class="fxo" id="fx-opt-no"><input type="radio" name="fx-g" aria-label="No">No</label>
+<label class="fxo" id="fx-opt-a"><input type="checkbox" aria-label="English">English</label>
+<label class="fxo" id="fx-opt-b"><input type="checkbox" aria-label="Spanish">Spanish</label>
+<!-- choice groups whose controls are 14 px circles and whose printed options run on past them (UXR-02): the chip's anchor is the controls,
+     the options (control + label) are what must stay readable -->
+<input class="fx" id="fxg-prev" type="text" aria-label="Field above the groups">
+<div class="fxg" id="fxg-h" role="group" aria-label="Sponsorship, in a row">
+  <span class="fxg-opt" id="fxg-h-o1"><input type="radio" name="fxg-h" id="fxg-h-i1" aria-label="Yes">Yes, I will need sponsorship</span>
+  <span class="fxg-opt" id="fxg-h-o2"><input type="radio" name="fxg-h" id="fxg-h-i2" aria-label="No">No</span>
+</div>
+<div class="fxg fxg-col" id="fxg-v" role="group" aria-label="Languages, one per line">
+  <span class="fxg-opt" id="fxg-v-o1"><input type="checkbox" id="fxg-v-i1" aria-label="English">English</span>
+  <span class="fxg-opt" id="fxg-v-o2"><input type="checkbox" id="fxg-v-i2" aria-label="Spanish">Spanish</span>
+  <span class="fxg-opt" id="fxg-v-o3"><input type="checkbox" id="fxg-v-i3" aria-label="German">German, fluent in meetings</span>
+</div>
+<div class="fxg fxg-touch" id="fxg-t" role="group" aria-label="Touch-sized options">
+  <span class="fxg-opt" id="fxg-t-o1"><input type="radio" name="fxg-t" id="fxg-t-i1" aria-label="Yes">Yes</span>
+  <span class="fxg-opt" id="fxg-t-o2"><input type="radio" name="fxg-t" id="fxg-t-i2" aria-label="No">No</span>
+</div>
+<input class="fx" id="fxg-next" type="text" aria-label="Field below the groups">
+<!-- a pane of the form that scrolls by itself (a dialog, a drawer): the field inside it moves, the window does not (UXR-09) -->
+<div id="fx-scroller" aria-label="Scrolling pane">
+  <input class="fxs" id="fx-scroll-a" type="text" aria-label="Field in the pane">
+  <div class="fxs-spacer"></div>
+  <input class="fxs" id="fx-scroll-b" type="text" aria-label="Field at the end of the pane">
+</div>
+<textarea class="fx" id="fx-text" aria-label="Long answer"></textarea>
+<dialog id="modal"><form method="dialog"><label>Modal field <input id="m-field" type="text"></label><button>Close</button></form></dialog>
+<script src="rig-loader.js"></script>
+</body>
+</html>

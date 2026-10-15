@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Apply - Acme Robotics (web component)</title>
+<link rel="stylesheet" href="/_base.css">
+<script src="/_guard.js"></script>
+</head>
+<body>
+<header class="site"><span class="brand">Acme Robotics</span></header>
+<main>
+<h1>Software Engineer application</h1>
+<p class="job-description">Acme Robotics builds warehouse robots that help small businesses ship orders faster.
+  The form below lives inside an open shadow root created by a custom element.</p>
+<apply-widget></apply-widget>
+</main>
+<script>
+customElements.define('apply-widget', class extends HTMLElement {
+  constructor() {
+    super();
+    const root = this.attachShadow({ mode: 'open' });
+    root.innerHTML = `
+      <style>label{display:block;font-weight:600;margin:12px 0 4px}input{padding:8px;width:100%;max-width:420px;box-sizing:border-box}</style>
+      <form id="shadow_form" novalidate>
+        <label for="first_name">First name</label><input type="text" id="first_name" name="first_name">
+        <label for="email">Email</label><input type="email" id="email" name="email">
+        <label for="phone">Phone</label><input type="tel" id="phone" name="phone">
+        <p><button type="submit" id="submit_app" data-submit>Submit application</button></p>
+      </form>`;
+    root.getElementById('shadow_form').addEventListener('submit', (event) => event.preventDefault());
+  }
+});
+</script>
+</body>
+</html>

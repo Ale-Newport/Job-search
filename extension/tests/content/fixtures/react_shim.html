@@ -1,0 +1,58 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><title>Controlled form (React-like value tracking)</title>
+<style>body{font:16px system-ui;padding:24px;max-width:720px}label{display:block;margin:10px 0}</style>
+<h1>Controlled inputs</h1>
+<div id="root"></div><output id="mirror"></output>
+<script>
+// A tiny framework that behaves like React for inputs: it installs React's value tracker on the node (an own `value`
+// property that records every instance-level assignment) and only accepts an `input` event as a change when the node's
+// value differs from the tracked one. Assigning el.value then dispatching `input` is therefore IGNORED (the classic trap);
+// the native prototype setter is accepted. The state is the single source of truth: the DOM is rewritten from it.
+const state = { first_name: '', email: '', country: '', auth: '', agree: false, bio: '' };
+window.__state = () => JSON.parse(JSON.stringify(state));
+const protoGet = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').get;
+const protoSet = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set;
+const areaGet = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').get;
+const areaSet = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set;
+function track(node, getter, setter) {
+  let tracked = String(getter.call(node));
+  Object.defineProperty(node, 'value', { configurable: true, get() { return getter.call(this); }, set(v) { tracked = String(v); setter.call(this, v); } });
+  return { changed() { const now = String(getter.call(node)); if (now === tracked) return false; tracked = now; return true; } };
+}
+function sync() {
+  for (const el of document.querySelectorAll('[data-bind]')) {
+    const key = el.dataset.bind;
+    if (el.type === 'checkbox') el.checked = state[key];
+    else if (el.type === 'radio') el.checked = state[key] === el.value;
+    else if (el.value !== state[key]) el.value = state[key];   // instance setter keeps the tracker in sync, like React
+  }
+  document.getElementById('mirror').textContent = JSON.stringify(state);
+}
+document.getElementById('root').innerHTML = `
+  <label>First name <input data-bind="first_name" name="first_name"></label>
+  <label>Email <input data-bind="email" name="email" type="email"></label>
+  <label>Country <select data-bind="country" name="country"><option value="">Select</option><option value="gb">United Kingdom</option><option value="es">Spain</option></select></label>
+  <fieldset><legend>Authorised to work in the UK?</legend>
+    <label><input type="radio" data-bind="auth" name="auth" value="yes">Yes</label>
+    <label><input type="radio" data-bind="auth" name="auth" value="no">No</label></fieldset>
+  <label><input type="checkbox" data-bind="agree" name="newsletter">Send me job alerts</label>
+  <label>Short bio <textarea data-bind="bio" name="bio"></textarea></label>
+  <button type="button">Next</button>`;
+for (const el of document.querySelectorAll('[data-bind]')) {
+  const key = el.dataset.bind;
+  let tracker = null;
+  if (el instanceof HTMLInputElement && el.type !== 'checkbox' && el.type !== 'radio') tracker = track(el, protoGet, protoSet);
+  if (el instanceof HTMLTextAreaElement) tracker = track(el, areaGet, areaSet);
+  const handler = (e) => {
+    if (el.type === 'checkbox') { if (e.type !== 'change') return; state[key] = el.checked; }
+    else if (el.type === 'radio') { if (e.type !== 'change') return; if (el.checked) state[key] = el.value; }
+    else if (el instanceof HTMLSelectElement) { if (e.type !== 'change') return; state[key] = el.value; }
+    else {
+      if (e.type !== 'input') return;
+      if (tracker && tracker.changed()) state[key] = el.value;   // a controlled input re-renders from state either way
+    }
+    sync();
+  };
+  el.addEventListener('input', handler); el.addEventListener('change', handler);
+}
+sync();
+</script></html>

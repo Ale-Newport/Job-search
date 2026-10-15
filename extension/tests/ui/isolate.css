@@ -1,0 +1,7 @@
+/* A page that defines the same custom properties as the assistant, restyles every top-layer backdrop and sets inheritable
+   typography everywhere: none of it may reach the assistant. */
+:root { --tone: #ff0000; --tone-bg: #ff0000; --bg: #ff00ff; --ink: #ff00ff; --muted: #ff00ff; --line: #ff00ff; --raised: #ff00ff; --font: "Comic Sans MS", cursive; --focus: #ff00ff; --link: #ff00ff; --btn-bg: #ff00ff; --btn-ink: #ffff00; --c-verified: #ff00ff; --shadow: 0 0 40px 20px #ff00ff; }
+::backdrop { background: rgba(255, 0, 0, 0.55) !important; backdrop-filter: blur(6px) !important; }
+html { font: italic 700 31px/3 "Times New Roman", serif !important; letter-spacing: 3px !important; word-spacing: 12px !important; text-transform: capitalize !important; text-indent: 24px !important; text-shadow: 2px 2px 0 #f0f !important; text-align: center !important; white-space: pre-wrap !important; cursor: crosshair !important; font-variant: small-caps !important; hyphens: auto !important; color: #0f0 !important; accent-color: #f0f !important; color-scheme: dark !important; }
+[data-meridian-assistant]::part(chip), [data-meridian-assistant]::part(panel), [data-meridian-assistant]::part(mark) { background: #f0f !important; }
+body { color-scheme: dark; }

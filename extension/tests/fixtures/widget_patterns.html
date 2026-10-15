@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Widget patterns - Acme Robotics</title>
+<link rel="stylesheet" href="/_base.css">
+<style>.dropzone { border: 2px dashed #888; padding: 18px; max-width: 480px; border-radius: 6px; min-height: 48px; }
+  .yn button { margin-right: 8px; }</style>
+<script src="/_guard.js"></script>
+</head>
+<body>
+<!-- The three controls only the extension asks the scanner to recognise ({widgets: true}, observation.js): a file input hidden inside a
+     plain dropzone, a <button aria-haspopup="listbox"> dropdown and a pair of Yes/No buttons. The fixtures_scan scenario holds the scan of
+     this page in both modes (the golden file), so a caller that stops passing the option, or a scanner that recognises these in the
+     wrong mode, is seen at once. -->
+<header class="site"><span class="brand">Acme Robotics</span></header>
+<main>
+<h1>Apply: widget patterns</h1>
+<form id="widgets_form" action="#" novalidate>
+  <div class="field"><label id="dz_label" for="dz_resume">Resume/CV <span class="asterisk">*</span></label>
+    <div class="dropzone" id="dz"><input type="file" id="dz_resume" name="attachment_1" style="display:none" aria-labelledby="dz_label">
+      <span>Drop your resume here</span></div></div>
+  <div class="field"><span id="team_label">Preferred team</span>
+    <button type="button" id="team" aria-haspopup="listbox" aria-labelledby="team_label">Select a team</button></div>
+  <div class="field"><span id="remote_label" class="q">Are you comfortable working remotely?</span>
+    <div class="yn" id="remote_pair" role="group" aria-labelledby="remote_label"><button type="button" id="remote_yes" aria-pressed="false">Yes</button><button type="button" id="remote_no" aria-pressed="false">No</button></div></div>
+  <p><button type="submit" id="submit_app" data-submit>Submit application</button></p>
+</form>
+</main>
+<script>document.getElementById('widgets_form').addEventListener('submit', (event) => event.preventDefault());</script>
+</body>
+</html>

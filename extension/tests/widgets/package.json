@@ -1,0 +1,31 @@
+{
+  "name": "meridian-assistant-widget-fixtures",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Sources of the real-widget demo pages used by extension/tests/widgets. The generated pages and bundles are committed under fixtures/; node_modules never is.",
+  "type": "module",
+  "scripts": {
+    "build": "node build-fixtures.mjs"
+  },
+  "devDependencies": {
+    "@emotion/react": "11.14.0",
+    "@emotion/styled": "11.14.1",
+    "@headlessui/react": "2.2.10",
+    "@mui/material": "5.18.0",
+    "downshift": "9.4.0",
+    "formik": "2.4.9",
+    "intl-tel-input": "29.5.4",
+    "jquery": "3.7.1",
+    "quill": "2.0.3",
+    "react": "18.3.1",
+    "react-datepicker": "9.1.0",
+    "react-dom": "18.3.1",
+    "react-dropzone": "20.1.3",
+    "react-hook-form": "7.90.0",
+    "react-phone-number-input": "3.4.18",
+    "react-select": "5.10.2",
+    "react-window": "1.8.11",
+    "select2": "4.0.13",
+    "vue": "3.5.44"
+  }
+}

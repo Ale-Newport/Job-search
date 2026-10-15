@@ -1,0 +1,18 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><title>Forms with aria-hidden duplicates</title>
+<style>body{font:16px system-ui;padding:24px}label{display:block;margin:14px 0}</style>
+<h1>Backend Engineer</h1>
+<form id="live" onsubmit="return false">
+  <label>First name <input name="first_name"></label>
+  <label>Email <input name="email" type="email"></label>
+</form>
+<!-- a visible-to-the-eye but aria-hidden duplicate of the same form (mobile/desktop twins, modal clones) -->
+<div aria-hidden="true"><form onsubmit="return false">
+  <label>First name <input name="dup_first_name"></label>
+  <label>Email <input name="dup_email" type="email"></label>
+</form></div>
+<dup-widget aria-hidden="true"></dup-widget>
+<div inert><label>Inert name <input name="inert_name"></label></div>
+<script>
+class Dup extends HTMLElement { connectedCallback() { this.attachShadow({ mode: 'open' }).innerHTML = '<label>Shadow twin <input name="shadow_dup"></label>'; } }
+customElements.define('dup-widget', Dup);
+</script></html>

@@ -1,0 +1,5 @@
+/* A deliberately hostile page stylesheet: none of it may change how the assistant UI renders or behaves. */
+* { color: red !important; font-size: 41px !important; text-transform: uppercase !important; letter-spacing: 9px !important; line-height: 3 !important; }
+[data-meridian-assistant] { display: none !important; opacity: 0 !important; transform: scale(5) !important; filter: blur(9px) !important; }
+div, span, button, svg, a { all: unset !important; display: none !important; }
+body { zoom: 1.3; }

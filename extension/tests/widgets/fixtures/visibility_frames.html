@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Frames a person can and cannot see</title>
+<style>
+body { margin: 0; padding: 12px 20px; font: 14px system-ui; min-height: 2600px; position: relative; }
+iframe { border: 1px solid #888; display: block; margin: 8px 0; }
+#cover { position: absolute; background: #fff; z-index: 9; }
+</style>
+</head>
+<body>
+<h1>Frames</h1>
+<iframe id="f_ok" width="320" height="80" srcdoc="<form><label>Phone <input type=tel></label></form>"></iframe>
+<iframe id="f_opacity" width="320" height="80" style="opacity:0" srcdoc="<form><label>Phone <input type=tel></label></form>"></iframe>
+<div style="opacity:0"><iframe id="f_in_opacity" width="320" height="80" srcdoc="<form><input type=tel></form>"></iframe></div>
+<iframe id="f_no_pointer" width="320" height="80" style="pointer-events:none" srcdoc="<form><input type=tel></form>"></iframe>
+<iframe id="f_tiny" width="1" height="1" srcdoc="<form><input type=tel></form>"></iframe>
+<iframe id="f_small" width="20" height="20" srcdoc="<form><input type=tel></form>"></iframe>
+<iframe id="f_hidden" width="320" height="80" style="visibility:hidden" srcdoc="<form><input type=tel></form>"></iframe>
+<iframe id="f_none" width="320" height="80" style="display:none" srcdoc="<form><input type=tel></form>"></iframe>
+<div style="width:300px;height:20px;overflow:hidden"><iframe id="f_clipped_away" width="320" height="80" style="margin-top:60px" srcdoc="<form><input type=tel></form>"></iframe></div>
+<iframe id="f_far_right" width="320" height="80" style="position:absolute;left:7000px;top:200px" srcdoc="<form><input type=tel></form>"></iframe>
+<iframe id="f_fixed_below" width="320" height="80" style="position:fixed;left:10px;bottom:-300px" srcdoc="<form><input type=tel></form>"></iframe>
+<iframe id="f_covered" width="320" height="80" srcdoc="<form><input type=tel></form>"></iframe>
+<div id="cover"></div>
+<iframe id="f_far_below" width="320" height="80" style="position:absolute;left:20px;top:2200px" srcdoc="<form><input type=tel></form>"></iframe>
+<script>
+// the cover sits exactly over #f_covered
+const r = document.getElementById('f_covered').getBoundingClientRect();
+const c = document.getElementById('cover');
+c.style.left = (r.left + scrollX) + 'px'; c.style.top = (r.top + scrollY) + 'px'; c.style.width = r.width + 'px'; c.style.height = r.height + 'px';
+</script>
+</body>
+</html>

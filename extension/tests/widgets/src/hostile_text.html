@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Hostile text: whitespace runs and enormous labels</title>
+<link rel="stylesheet" href="demo.css">
+</head>
+<body>
+<h1>Hostile text</h1>
+<form id="ht" onsubmit="return false" novalidate>
+  <div class="field"><label for="ok_name">Full name</label><input type="text" id="ok_name" name="full_name"></div>
+  <fieldset id="redos_radio"><legend style="white-space:pre"></legend>
+    <label><input type="radio" name="r_redos" value="a"> Alpha</label> <label><input type="radio" name="r_redos" value="b"> Beta</label></fieldset>
+  <fieldset id="redos_boxes"><legend style="white-space:pre"></legend>
+    <label><input type="checkbox" name="b_redos" value="a"> One</label> <label><input type="checkbox" name="b_redos" value="b"> Two</label></fieldset>
+  <div class="field"><input type="text" id="huge_label" name="huge" aria-label=""></div>
+  <div class="field"><label for="huge_desc">Short label</label><input type="text" id="huge_desc" name="hd" aria-describedby="huge_desc_text"><span id="huge_desc_text"></span></div>
+  <div class="field"><label for="spaced_section">Spaced section</label><input type="text" id="spaced_section" name="sp"></div>
+  <div id="many"></div>
+  <fieldset id="consent"><legend id="consent_text"></legend>
+    <label><input type="checkbox" name="consent" value="y"> I agree</label></fieldset>
+</form>
+<script src="common.js"></script>
+<script>
+const spaces = (n) => ' '.repeat(n);
+for (const id of ['redos_radio', 'redos_boxes']) document.querySelector('#' + id + ' legend').textContent = 'a' + spaces(19900) + 'x';
+document.getElementById('huge_label').setAttribute('aria-label', 'word '.repeat(4000).trim());
+document.getElementById('huge_desc_text').textContent = 'detail '.repeat(5000);
+// a long consent paragraph: the actual question is at its END
+document.getElementById('consent_text').textContent = ('Lorem ipsum dolor sit amet. '.repeat(400)) + 'DO YOU CONSENT TO BACKGROUND CHECKS?';
+// 80 fields with 18,000 characters of aria-label and a 20,000 character description each: well over a megabyte in all
+const many = document.getElementById('many');
+document.body.append(Object.assign(document.createElement('span'), { id: 'shared_desc', textContent: 'shared detail '.repeat(1500) }));
+for (let i = 0; i < 80; i++) {
+  const f = document.createElement('div'); f.className = 'field';
+  const input = document.createElement('input'); input.type = 'text'; input.name = 'many_' + i; input.id = 'many_' + i;
+  input.setAttribute('aria-label', ('Question ' + i + ' ').padEnd(18000, 'blah '));
+  input.setAttribute('aria-describedby', 'shared_desc');
+  f.append(input); many.append(f);
+}
+</script>
+</body>
+</html>

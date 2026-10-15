@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Eligibility - Acme Robotics</title>
+<meta property="og:site_name" content="Acme Robotics">
+<link rel="stylesheet" href="/_base.css">
+<script type="application/ld+json">
+{"@context": "https://schema.org/", "@type": "JobPosting", "title": "Software Engineer, Robotics Platform",
+ "description": "<p>Acme Robotics builds warehouse robots that help small businesses ship orders faster.</p>",
+ "hiringOrganization": {"@type": "Organization", "name": "Acme Robotics"},
+ "jobLocation": {"@type": "Place", "address": {"@type": "PostalAddress", "addressLocality": "London", "addressCountry": "GB"}}}
+</script>
+<script src="/_guard.js"></script>
+</head>
+<body>
+<header class="site"><span class="brand">Acme Robotics</span></header>
+<main>
+<h1>Eligibility questions</h1>
+<p class="job-description">Software Engineer, Robotics Platform at Acme Robotics, London, United Kingdom.</p>
+<form id="conditional_form" action="#" novalidate>
+  <fieldset id="sponsor_group"><legend>Will you now or in the future require visa sponsorship? <span class="asterisk">*</span></legend>
+    <label class="inline"><input type="radio" name="sponsor" id="sponsor_yes" value="yes" required> Yes</label>
+    <label class="inline"><input type="radio" name="sponsor" id="sponsor_no" value="no"> No</label></fieldset>
+  <!-- Revealed only after the parent question has been answered (any answer), like most ATS "follow-up" questions. -->
+  <div id="follow_up" hidden>
+    <div class="field"><label for="visa_detail">If you answered Yes, please describe your visa situation</label>
+      <input type="text" id="visa_detail" name="visa_detail"></div>
+  </div>
+  <div class="field"><label for="email">Email <span class="asterisk">*</span></label>
+    <input type="email" id="email" name="email" required></div>
+  <p><button type="submit" id="submit_app" data-submit>Continue</button></p>
+</form>
+</main>
+<script>
+const reveal = () => { document.getElementById('follow_up').hidden = false; };
+document.querySelectorAll('input[name=sponsor]').forEach((radio) => radio.addEventListener('change', reveal));
+document.getElementById('conditional_form').addEventListener('submit', (event) => event.preventDefault());
+</script>
+</body>
+</html>

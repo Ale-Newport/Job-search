@@ -1,0 +1,26 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><title>Choices fixture</title>
+<style>body{font:16px system-ui;padding:24px;max-width:720px}label{display:block;margin:10px 0}fieldset{margin:16px 0}</style>
+<h1>Application: choice controls</h1>
+<form id="f" onsubmit="event.preventDefault();window.submissions=(window.submissions||0)+1">
+<label>Full name <input name="full_name"></label>
+<label>Do you require visa sponsorship?
+  <select name="sponsor" id="sponsor"><option value="">Select</option><option value="yes">Yes</option><option value="no">No</option></select></label>
+<div id="cond" hidden><label>Please describe your visa situation <input name="visa_detail"></label></div>
+<fieldset><legend>Preferred work mode</legend>
+  <label><input type="radio" name="mode" value="remote">Remote</label>
+  <label><input type="radio" name="mode" value="hybrid">Hybrid</label>
+  <label><input type="radio" name="mode" value="onsite">On-site</label></fieldset>
+<fieldset><legend>Which languages do you speak?</legend>
+  <label><input type="checkbox" name="lang" value="en">English</label>
+  <label><input type="checkbox" name="lang" value="es">Spanish</label>
+  <label><input type="checkbox" name="lang" value="fr">French</label></fieldset>
+<label>Skills <select name="skills" multiple size="3"><option value="py">Python</option><option value="ts">TypeScript</option><option value="go">Go</option></select></label>
+<label><input type="checkbox" name="alerts">Subscribe to job alerts</label>
+<label>Nickname <input name="nickname"></label>
+<button type="submit">Submit application</button>
+</form>
+<script>
+window.events = [];
+for (const n of ['input','change']) document.addEventListener(n, e => { if (e.target.name) events.push(n + ':' + e.target.name + ':' + e.isTrusted); }, true);
+document.getElementById('sponsor').addEventListener('change', e => { document.getElementById('cond').hidden = e.target.value !== 'yes'; });
+</script></html>

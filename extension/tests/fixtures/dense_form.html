@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Quick apply - Acme Robotics</title>
+<style>
+  /* A form with NO room around its fields: rows are as tall as the assistant's own one-line hint, so any place the hint can go covers
+     part of a neighbouring question. The click-through scenario needs exactly that (a layout where the hint cannot stay off every
+     field) to prove that the part of a field a hint covers still takes the person's click. */
+  body { margin: 0; padding: 8px; font: 13px/1.2 system-ui, sans-serif; }
+  .quick { width: 320px; }
+  .row { display: block; height: 40px; margin: 0; padding: 0; box-sizing: border-box; }
+  .row label { display: block; height: 12px; font-size: 11px; line-height: 12px; }
+  .row input { display: block; box-sizing: border-box; width: 100%; height: 26px; margin: 0; padding: 0 6px; }
+</style>
+<script src="/_guard.js"></script>
+</head>
+<body>
+<main>
+<form id="quick_form" class="quick" action="#" novalidate>
+  <div class="row"><label for="first_name">First Name</label><input type="text" id="first_name" name="first_name" autocomplete="given-name"></div>
+  <div class="row"><label for="last_name">Last Name</label><input type="text" id="last_name" name="last_name" autocomplete="family-name"></div>
+  <div class="row"><label for="email">Email</label><input type="email" id="email" name="email" autocomplete="email"></div>
+  <div class="row"><label for="phone">Phone</label><input type="tel" id="phone" name="phone" autocomplete="tel"></div>
+  <div class="row"><label for="linkedin">LinkedIn Profile</label><input type="text" id="linkedin" name="linkedin"></div>
+  <div class="row"><label for="github">GitHub</label><input type="text" id="github" name="github"></div>
+  <div class="row"><label for="portfolio">Portfolio / personal website</label><input type="text" id="portfolio" name="portfolio"></div>
+  <div class="row"><label for="degree">Highest completed degree</label><input type="text" id="degree" name="degree"></div>
+  <div class="row"><label for="employer">Most recent employer</label><input type="text" id="employer" name="employer"></div>
+</form>
+</main>
+<script>document.getElementById('quick_form').addEventListener('submit', (event) => event.preventDefault());</script>
+</body>
+</html>

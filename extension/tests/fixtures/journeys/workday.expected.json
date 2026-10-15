@@ -1,0 +1,12 @@
+{
+ "top": {
+  "contact_name": "Alex Morgan"
+ },
+ "frame:workday_frame.html": {
+  "legal_first": "Alex",
+  "legal_last": "Morgan",
+  "phone_number": "+44 7700 900123",
+  "wd_linkedin": "https://www.linkedin.com/in/alex-morgan-example",
+  "wd_resume": "Alex-Morgan-CV.pdf"
+ }
+}

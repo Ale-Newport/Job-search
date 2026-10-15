@@ -1,0 +1,18 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><title>Rich-text answer with a list</title>
+<style>body{font:16px system-ui;padding:24px}label{display:block;margin:14px 0}
+#note{border:1px solid #888;min-height:80px;padding:6px}</style>
+<h1>Backend Engineer</h1>
+<form onsubmit="return false">
+  <label>First name <input name="first_name"></label>
+  <div><span id="notelabel">Cover note</span>
+    <div id="note" role="textbox" aria-multiline="true" aria-labelledby="notelabel" contenteditable="true"><ul><li id="item">first point</li></ul><p id="para">plain paragraph</p></div></div>
+  <label>Email <input name="email" type="email"></label>
+</form>
+<script>
+window.indents = 0;
+document.getElementById('note').addEventListener('keydown', (e) => {
+  if (e.key === 'Tab' && e.target.closest && window.getSelection().anchorNode && window.getSelection().anchorNode.parentElement.closest('li')) {
+    e.preventDefault(); window.indents++;   // the editor's own list indent
+  }
+});
+</script></html>

@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Workable-style application (hand-rolled replica)</title>
+<link rel="stylesheet" href="demo.css">
+<style>
+.select__trigger { box-sizing: border-box; width: 100%; max-width: 420px; padding: 8px 10px; border: 1px solid #888; border-radius: 4px; background: #fff; cursor: pointer; }
+.select__list { list-style: none; margin: 2px 0 0; padding: 4px 0; max-width: 420px; border: 1px solid #888; background: #fff; position: absolute; z-index: 5; } .select__list[hidden] { display: none; }
+.select__list li { padding: 6px 10px; cursor: pointer; } .select__list li[aria-selected=true] { background: #e6f2ee; }
+.cards { display: flex; gap: 8px; } .card { border: 2px solid #999; border-radius: 6px; padding: 8px 18px; cursor: pointer; } .card[aria-checked=true] { border-color: #173f36; background: #e6f2ee; }
+.yesno button { padding: 8px 18px; margin-right: 6px; border: 2px solid #999; background: #fff; border-radius: 6px; cursor: pointer; } .yesno button[aria-pressed=true] { border-color: #173f36; background: #e6f2ee; }
+</style>
+</head>
+<body>
+<h1>Apply: Workable-style form (hand-rolled replica)</h1>
+<!-- From memory of apply.workable.com's structure (data-ui attributes, labelled inputs, a custom listbox select with a hidden backing
+     input, div role=radio cards, aria-pressed Yes/No buttons, a counter textarea). NOT verified against a live account. -->
+<form id="wk" data-ui="application-form" onsubmit="return false">
+  <div class="field" data-ui="firstname-field"><label id="firstname-label" for="firstname">First name <span class="req">*</span></label><input id="firstname" name="firstname" data-ui="firstname" type="text" autocomplete="given-name" aria-required="true"></div>
+  <div class="field" data-ui="email-field"><label id="email-label" for="email">Email <span class="req">*</span></label><input id="email" name="email" data-ui="email" type="email" autocomplete="email" aria-required="true"></div>
+  <div class="field" data-ui="QA_8821"><label id="qa-label">Do you have the right to work in the United Kingdom? <span class="req">*</span></label>
+    <div class="select"><div class="select__trigger" id="qa-trigger" role="combobox" tabindex="0" aria-haspopup="listbox" aria-expanded="false" aria-labelledby="qa-label" aria-owns="qa-list" aria-controls="qa-list">Select an option</div>
+    <ul class="select__list" id="qa-list" role="listbox" aria-labelledby="qa-label" hidden>
+      <li role="option" aria-selected="false" data-value="yes">Yes</li><li role="option" aria-selected="false" data-value="yes-sponsor">Yes, with sponsorship</li><li role="option" aria-selected="false" data-value="no">No</li></ul>
+    <input type="hidden" name="QA_8821" value=""></div></div>
+  <div class="field" data-ui="QA_9100"><div id="mode-label" class="label">Preferred working mode</div>
+    <div class="cards" role="radiogroup" aria-labelledby="mode-label" id="mode">
+      <div class="card" role="radio" aria-checked="false" tabindex="0" data-value="remote">Remote</div><div class="card" role="radio" aria-checked="false" tabindex="-1" data-value="hybrid">Hybrid</div><div class="card" role="radio" aria-checked="false" tabindex="-1" data-value="office">On-site</div></div></div>
+  <div class="field" data-ui="QA_9101"><div id="relocate-label" class="label">Are you willing to relocate?</div>
+    <div class="yesno" role="group" aria-labelledby="relocate-label"><button type="button" aria-pressed="false" data-value="yes">Yes</button><button type="button" aria-pressed="false" data-value="no">No</button></div></div>
+  <div class="field" data-ui="summary"><label for="summary">Summary (max 200)</label><textarea id="summary" name="summary" data-ui="summary-input" maxlength="200"></textarea><div class="counter" id="summary-count">0 / 200</div></div>
+  <button type="submit">Submit application</button>
+</form>
+<script src="common.js"></script>
+<script>
+(() => {
+  const state = {};
+  window.__state = () => ({ ...state });
+  const trigger = document.getElementById('qa-trigger'), list = document.getElementById('qa-list'), hidden = document.querySelector('input[name=QA_8821]');
+  const setOpen = o => { list.hidden = !o; trigger.setAttribute('aria-expanded', String(o)); };
+  trigger.addEventListener('click', () => setOpen(list.hidden));
+  trigger.addEventListener('keydown', e => { if (['Enter', ' ', 'ArrowDown'].includes(e.key)) { e.preventDefault(); setOpen(true); } if (e.key === 'Escape') setOpen(false); });
+  list.addEventListener('click', e => { const li = e.target.closest('li'); if (!li) return;
+    list.querySelectorAll('li').forEach(x => x.setAttribute('aria-selected', String(x === li))); trigger.textContent = li.textContent; hidden.value = li.dataset.value; state.QA_8821 = li.dataset.value; setOpen(false); });
+  document.addEventListener('mousedown', e => { if (!list.hidden && !list.contains(e.target) && e.target !== trigger) setOpen(false); });
+  for (const card of document.querySelectorAll('.card')) {
+    const pick = () => { document.querySelectorAll('.card').forEach(c => { c.setAttribute('aria-checked', String(c === card)); c.tabIndex = c === card ? 0 : -1; }); state.mode = card.dataset.value; };
+    card.addEventListener('click', pick); card.addEventListener('keydown', e => { if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); pick(); } });
+  }
+  for (const b of document.querySelectorAll('.yesno button')) b.addEventListener('click', () => { document.querySelectorAll('.yesno button').forEach(x => x.setAttribute('aria-pressed', String(x === b))); state.relocate = b.dataset.value; });
+  const summary = document.getElementById('summary');
+  summary.addEventListener('input', () => { state.summary = summary.value; document.getElementById('summary-count').textContent = `${summary.value.length} / 200`; });
+  for (const id of ['firstname', 'email']) document.getElementById(id).addEventListener('input', e => { state[id] = e.target.value; });
+})();
+</script>
+</body>
+</html>

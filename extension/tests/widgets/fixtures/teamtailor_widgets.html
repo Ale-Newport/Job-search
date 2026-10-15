@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Teamtailor-style application (hand-rolled replica)</title>
+<link rel="stylesheet" href="demo.css">
+<style>.dropzone { position: relative; border: 2px dashed #888; border-radius: 8px; padding: 24px; max-width: 420px; text-align: center; cursor: pointer; } .answers label { display: block; margin: 4px 0; font-weight: 400; }</style>
+</head>
+<body>
+<h1>Apply: Teamtailor-style form (hand-rolled replica)</h1>
+<!-- From memory of Teamtailor career-site forms: Rails-style names (candidate[first_name]), native selects and radios, and a Dropzone.js
+     file area whose real <input type=file class="dz-hidden-input"> is visibility:hidden and 0x0 (the visible part is a div). NOT verified
+     against a live career site. -->
+<form id="tt" action="#" onsubmit="return false">
+  <div class="field"><label class="label" for="candidate_first_name">First name</label><input id="candidate_first_name" name="candidate[first_name]" type="text" autocomplete="given-name" required></div>
+  <div class="field"><label class="label" for="candidate_last_name">Last name</label><input id="candidate_last_name" name="candidate[last_name]" type="text" autocomplete="family-name" required></div>
+  <div class="field"><label class="label" for="candidate_phone">Phone</label><input id="candidate_phone" name="candidate[phone]" type="tel" autocomplete="tel"></div>
+  <div class="field"><label class="label" for="candidate_language">Preferred language</label><select id="candidate_language" name="candidate[language]"><option value="">Choose...</option><option value="en">English</option><option value="sv">Swedish</option></select></div>
+  <fieldset class="field answers"><legend class="label">Do you have a driving licence?</legend><label><input type="radio" name="answers[1][value]" value="yes"> Yes</label><label><input type="radio" name="answers[1][value]" value="no"> No</label></fieldset>
+  <div class="field"><div class="label" id="cv-label">Resume</div>
+    <div class="dropzone dz-clickable" aria-labelledby="cv-label" id="cv"><div class="dz-message">Drop your resume here or click to browse</div>
+      <input type="file" class="dz-hidden-input" name="candidate[resume]" accept=".pdf,.doc,.docx" style="visibility: hidden; position: absolute; top: 0px; left: 0px; height: 0px; width: 0px;"></div></div>
+  <div class="field"><label class="label" for="candidate_cover">Cover letter (optional)</label><textarea id="candidate_cover" name="candidate[cover_letter]"></textarea></div>
+  <button type="submit">Send application</button>
+</form>
+<script src="common.js"></script>
+<script>
+(() => {
+  const state = {};
+  window.__state = () => ({ ...state });
+  for (const el of document.querySelectorAll('input[type=text],input[type=tel],textarea,select')) el.addEventListener('input', () => { state[el.name] = el.value; });
+  for (const el of document.querySelectorAll('select')) el.addEventListener('change', () => { state[el.name] = el.value; });
+  for (const r of document.querySelectorAll('input[type=radio]')) r.addEventListener('change', () => { state[r.name] = r.value; });
+  const file = document.querySelector('.dz-hidden-input');
+  file.addEventListener('change', () => { state.resume = [...file.files].map(f => f.name); document.querySelector('.dz-message').textContent = state.resume.join(', '); });
+  document.getElementById('cv').addEventListener('click', () => file.click());
+})();
+</script>
+</body>
+</html>

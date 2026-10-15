@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>react-select 5 demo application</title>
+<link rel="stylesheet" href="demo.css">
+</head>
+<body>
+<div id="root"></div>
+<script>
+// ?pagescroll=1: the page scrolls inside a container (single-page apps do), not the window
+if (/[?&]pagescroll=1/.test(location.search)) {
+  document.body.style.cssText += ";overflow:hidden;padding:0;height:100vh";
+  document.getElementById("root").style.cssText = "height:100vh;overflow:auto;padding:24px 32px 480px;box-sizing:border-box";
+}
+</script>
+<script src="common.js"></script>
+<script type="module" src="react_select.js"></script>
+</body>
+</html>

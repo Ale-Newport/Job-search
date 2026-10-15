@@ -1,0 +1,16 @@
+{
+ "top": {
+  "name": "Alex Morgan",
+  "email": "alex.morgan@example.test",
+  "resume": "Alex-Morgan-CV.pdf",
+  "linkedin": "https://www.linkedin.com/in/alex-morgan-example",
+  "notice": "1 month",
+  "location": "London, Greater London, England, United Kingdom",
+  "sponsor_yes": "false",
+  "sponsor_no": "true",
+  "salary": "55000",
+  "ai": {
+   "$contains": "I built a route planner for warehouse robots using Python and graph search algorithms."
+  }
+ }
+}

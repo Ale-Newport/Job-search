@@ -1,0 +1,35 @@
+{
+ "top": {
+  "first_name": "Alex",
+  "last_name": "Morgan",
+  "email": "alex.morgan@example.test",
+  "phone": "+44 7700 900123",
+  "resume": "Alex-Morgan-CV.pdf",
+  "cover_letter": "",
+  "linkedin": "https://www.linkedin.com/in/alex-morgan-example",
+  "github": "https://github.com/alex-morgan-example",
+  "portfolio": "https://alexmorgan.example.test",
+  "degree": "Master's degree",
+  "employer": "Brightwave Labs",
+  "colour": "",
+  "authorised": "Yes",
+  "sponsorship": "0",
+  "salary": "55000",
+  "start_date": "2026-11-02",
+  "source": "Please select",
+  "lang_en": true,
+  "lang_es": true,
+  "lang_fr": false,
+  "lang_de": false,
+  "why": {
+   "$contains": "I built a route planner for warehouse robots using Python and graph search algorithms."
+  },
+  "gender": "Please select",
+  "ethnicity": "Please select",
+  "disability": null,
+  "veteran": "Please select",
+  "gdpr_consent": false,
+  "privacy_notice": false,
+  "g-recaptcha-response": ""
+ }
+}

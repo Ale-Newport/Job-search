@@ -1,0 +1,40 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><title>Choices a person types into</title>
+<style>body{font:16px system-ui;padding:24px;max-width:720px}.row{margin:12px 0}[role=listbox]{margin:4px 0;padding:0 0 0 18px}</style>
+<h1>Apply</h1>
+<form onsubmit="event.preventDefault()">
+<div class="row"><label for="skills">Your skills</label><select id="skills" name="skills" multiple><option value="py" selected>Python</option><option value="go">Go</option></select>
+  <input id="tagin" name="tagin" aria-label="Type a skill and press Enter"></div>
+<div class="row"><label for="cb">City</label><div id="cb" role="combobox" tabindex="0" aria-label="City" aria-expanded="false"><span id="cbv">Select...</span></div></div>
+<div class="row"><label for="lb">Seniority</label><div id="lb" role="combobox" tabindex="0" aria-label="Seniority" aria-haspopup="listbox" aria-controls="lbl" aria-expanded="false"><span id="lbv">Beta</span></div>
+  <ul id="lbl" role="listbox" aria-label="Seniority options"><li role="option" id="o1">Alpha</li><li role="option" id="o2" aria-selected="true">Beta</li></ul></div>
+<div class="row"><label for="cr">Team</label><div id="cr" role="combobox" tabindex="0" aria-label="Team" aria-haspopup="listbox" aria-controls="crl" aria-expanded="false"><span id="crv">Select...</span></div>
+  <ul id="crl" role="listbox" aria-label="Team options"><li role="option">Platform</li><li role="option">Data</li></ul></div>
+<div class="row"><label for="country">Country</label><select id="country" name="country"><option value="">Select</option><option value="gb">United Kingdom</option><option value="es">Spain</option></select></div>
+<div class="row"><label for="state">Region</label><select id="state" name="state"><option value="">Select</option></select></div>
+<div class="row"><label for="other">Other</label><input id="other" name="other"></div>
+</form>
+<script>
+// a tag input that builds a selected <option> out of what the person typed (creatable / tag selects do this)
+document.getElementById('tagin').addEventListener('keydown', (e) => {
+  if (e.key !== 'Enter') return;
+  e.preventDefault();
+  const s = document.getElementById('skills'), o = document.createElement('option');
+  o.value = e.target.value; o.textContent = e.target.value; o.selected = true; s.appendChild(o); e.target.value = '';
+  s.dispatchEvent(new Event('change', { bubbles: true }));
+});
+// divs that echo what is typed into them (a combobox that is no list at all, and a creatable one over a list)
+for (const [id, shown] of [['cb', 'cbv'], ['cr', 'crv']]) {
+  document.getElementById(id).addEventListener('keydown', (e) => {
+    if (e.key.length !== 1) return;
+    const v = document.getElementById(shown);
+    if (v.textContent === 'Select...') v.textContent = '';
+    v.textContent += e.key;
+  });
+}
+// a region list that fills after the country was chosen (the page's own, unselected options)
+document.getElementById('country').addEventListener('change', () => {
+  const st = document.getElementById('state');
+  for (const [v, t] of [['ca', 'California'], ['tx', 'Texas']]) { const o = document.createElement('option'); o.value = v; o.textContent = t; st.appendChild(o); }
+});
+</script>
+</html>

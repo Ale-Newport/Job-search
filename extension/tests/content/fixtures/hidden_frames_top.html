@@ -1,0 +1,16 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><title>Application with frames nobody can see</title>
+<style>body{font:16px system-ui;padding:24px;max-width:900px}label{display:block;margin:10px 0}iframe{display:block;width:760px;height:150px;border:1px solid #ccc;margin:10px 0}</style>
+<h1>Apply: Platform Engineer</h1>
+<form id="top" onsubmit="event.preventDefault()">
+<label>First name <input name="first_name"></label>
+<iframe id="seen" title="Contact details" src="{{ALT}}/frames_child.html?v=seen"></iframe>
+<iframe id="transparent" title="t" src="{{ALT}}/frames_child.html?v=transparent" style="opacity:0"></iframe>
+<iframe id="tiny" title="x" src="{{ALT}}/frames_child.html?v=tiny" style="width:1px;height:1px;border:0"></iframe>
+<iframe id="inert" title="i" src="{{ALT}}/frames_child.html?v=inert" style="pointer-events:none"></iframe>
+<iframe id="away" title="a" src="{{ALT}}/frames_child.html?v=away" style="position:fixed;left:7000px;top:10px"></iframe>
+<div style="position:relative"><iframe id="covered" title="c" src="{{ALT}}/frames_child.html?v=covered" style="margin:0"></iframe>
+  <div id="cover" style="position:absolute;left:0;top:0;width:100%;height:100%;background:#fff"></div></div>
+<iframe id="srcdoc" title="d" style="opacity:0" srcdoc="<label>Email <input name=email></label><label>Phone <input name=phone></label><label>Website <input name=website></label>"></iframe>
+<label>Cover note <textarea name="cover" rows="2"></textarea></label>
+<button type="submit">Submit application</button>
+</form></html>

@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Preferences - Acme Robotics</title>
+<link rel="stylesheet" href="/_base.css">
+<script src="/_guard.js"></script>
+</head>
+<body>
+<header class="site"><span class="brand">Acme Robotics</span></header>
+<main>
+<h1>Application preferences</h1>
+<form id="choices_form" action="#" novalidate>
+  <div class="field"><label for="country">Country of residence <span class="asterisk">*</span></label>
+    <select id="country" name="country" required>
+      <option value="">Select...</option><option value="ES">Spain</option><option value="GB">United Kingdom</option>
+      <option value="FR">France</option></select></div>
+  <fieldset id="relocate_group"><legend>Are you willing to relocate?</legend>
+    <label class="inline"><input type="radio" name="relocate" id="relocate_yes" value="yes"> Yes</label>
+    <label class="inline"><input type="radio" name="relocate" id="relocate_no" value="no"> No</label></fieldset>
+  <fieldset id="auth_group"><legend>Do you have the right to work in the UK? <span class="asterisk">*</span></legend>
+    <label class="inline"><input type="radio" name="auth" id="auth_yes" value="yes" required> Yes</label>
+    <label class="inline"><input type="radio" name="auth" id="auth_no" value="no"> No</label></fieldset>
+  <fieldset id="languages_group"><legend>Languages you speak</legend>
+    <label class="inline"><input type="checkbox" name="lang" id="lang_en" value="English"> English</label>
+    <label class="inline"><input type="checkbox" name="lang" id="lang_es" value="Spanish"> Spanish</label>
+    <label class="inline"><input type="checkbox" name="lang" id="lang_fr" value="French"> French</label>
+    <label class="inline"><input type="checkbox" name="lang" id="lang_de" value="German"> German</label></fieldset>
+  <div class="field"><label for="languages_multi">Which languages do you speak fluently? (select all that apply)</label>
+    <select id="languages_multi" name="languages_multi" multiple size="4">
+      <option>English</option><option>Spanish</option><option>French</option><option>German</option></select></div>
+  <div class="field"><label for="workplace">Workplace preference</label>
+    <select id="workplace" name="workplace"><option value="">Select...</option><option>On-site</option>
+      <option>Hybrid</option><option>Remote</option></select></div>
+  <p><button type="submit" id="submit_app" data-submit>Save preferences</button></p>
+</form>
+</main>
+<script>document.getElementById('choices_form').addEventListener('submit', (event) => event.preventDefault());</script>
+</body>
+</html>

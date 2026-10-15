@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Fields the assistant never touches, and look-alikes it may</title>
+<link rel="stylesheet" href="demo.css">
+</head>
+<body>
+<h1>Sensitive fields</h1>
+<form id="sf" onsubmit="return false" novalidate>
+  <div class="field"><label for="ok_phone">Mobile phone</label><input type="tel" id="ok_phone" name="phone"></div>
+  <div class="field"><label for="ok_swift">Years of experience with Swift</label><input type="text" id="ok_swift" name="swift_years"></div>
+  <div class="field"><label for="ok_pin">PIN code</label><input type="text" id="ok_pin" name="postal_code" autocomplete="postal-code"></div>
+  <div class="field"><label for="ok_essay">Why do you want to work here?</label><textarea id="ok_essay" name="why"></textarea></div>
+  <div class="field"><div id="ok_ssb_l" class="label">Do you currently receive Social Security benefits?</div>
+    <div role="radiogroup" aria-labelledby="ok_ssb_l"><label><input type="radio" id="ok_ssb_y" name="social_security_benefits" value="y"> Yes</label> <label><input type="radio" id="ok_ssb_n" name="social_security_benefits" value="n"> No</label></div></div>
+  <div class="field"><label for="ok_passport_have">Do you hold a valid passport?</label><select id="ok_passport_have" name="has_passport"><option value=""></option><option>Yes</option><option>No</option></select></div>
+  <div class="field"><label for="ok_name">Full name</label><input type="text" id="ok_name" name="full_name" autocomplete="name"></div>
+
+  <!-- never touched -->
+  <div class="field"><label for="x_cc">Card number</label><input type="text" id="x_cc" name="cc" autocomplete="cc-number"></div>
+  <div class="field"><label for="x_cvv">Security code</label><input type="text" id="x_cvv" name="field_1" autocomplete="cc-csc"></div>
+  <div class="field"><label for="x_exp_m">Expiry month</label><select id="x_exp_m" name="exp_m" autocomplete="cc-exp-month"><option value=""></option><option value="01">01</option></select></div>
+  <div class="field"><label for="x_otp">Enter the code</label><input type="text" id="x_otp" name="code" autocomplete="one-time-code" inputmode="numeric"></div>
+  <div class="field"><label for="x_otp2">Verification code</label><input type="text" id="x_otp2" name="vcode"></div>
+  <div class="field"><label for="x_pw">Create a password</label><input type="text" id="x_pw" name="pw" autocomplete="new-password"></div>
+  <div class="field"><label for="x_pw2">Confirm</label><input type="text" id="x_pw2" name="confirm" autocomplete="current-password"></div>
+  <div class="field"><label for="x_ssn">Social Security Number</label><input type="text" id="x_ssn" name="ssn_field"></div>
+  <div class="field"><label for="x_ni">National Insurance number</label><input type="text" id="x_ni" name="ni"></div>
+  <div class="field"><label for="x_iban">IBAN</label><input type="text" id="x_iban" name="iban"></div>
+  <div class="field"><label for="x_routing">Routing number</label><input type="text" id="x_routing" name="rt"></div>
+  <div class="field"><label for="x_bank">Bank account number</label><input type="text" id="x_bank" name="acct"></div>
+  <div class="field"><label for="x_passport">Passport number</label><input type="text" id="x_passport" name="pp"></div>
+  <div class="field"><label for="x_tax">Tax ID</label><input type="text" id="x_tax" name="tin"></div>
+  <div class="field"><label for="x_dni">Número de documento de identidad (DNI/NIE)</label><input type="text" id="x_dni" name="doc"></div>
+  <div class="field"><label for="x_maiden">Mother's maiden name</label><input type="text" id="x_maiden" name="mmn"></div>
+  <div class="field"><label for="x_secq">Security question answer</label><input type="text" id="x_secq" name="sq"></div>
+  <div class="field"><label for="x_named">Reference</label><input type="text" id="x_named" name="cardNumber"></div>
+  <div class="field"><label for="cvv">Reference 2</label><input type="text" id="cvv" name="ref2"></div>
+  <div class="field"><label for="x_ph">Reference 3</label><input type="text" id="x_ph" name="ref3" placeholder="Enter your SSN"></div>
+  <div class="field"><label for="x_file_bank">Bank statement</label><input type="file" id="x_file_bank" name="bank_details"></div>
+</form>
+<script src="common.js"></script>
+</body>
+</html>

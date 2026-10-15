@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>iCIMS-style application (hand-rolled replica)</title>
+<link rel="stylesheet" href="demo.css">
+<style>
+.iCIMS_TableRow { display: table-row; } .iCIMS_TableCell { display: table-cell; padding: 6px 12px 6px 0; vertical-align: top; } .iCIMS_Table { display: table; }
+.iCIMS_TextField, .iCIMS_DropDown { width: 300px; box-sizing: border-box; padding: 6px; } .iCIMS_Required { color: #b00020; }
+.iCIMS_InfoMsg { font-size: 12px; color: #555; } .iCIMS_ErrorMsg { color: #b00020; font-size: 12px; }
+</style>
+</head>
+<body>
+<div class="iCIMS_MainWrapper">
+<h1>Candidate profile (iCIMS-style replica)</h1>
+<!-- From memory of iCIMS career-portal pages: table layout, iCIMS_* classes, labels with a "Required" marker in the cell, native selects
+     wired with jQuery-style change handlers, a dependent select filled asynchronously after its parent changes, validation on blur
+     and a hidden file input behind a visible label button. NOT verified against a live portal. -->
+<form id="icims" onsubmit="return false">
+<div class="iCIMS_Table">
+  <div class="iCIMS_TableRow"><div class="iCIMS_TableCell"><label for="first_name">First Name <span class="iCIMS_Required">*</span></label></div>
+    <div class="iCIMS_TableCell"><input type="text" class="iCIMS_TextField" id="first_name" name="first_name"><div class="iCIMS_ErrorMsg" id="first_name_err"></div></div></div>
+  <div class="iCIMS_TableRow"><div class="iCIMS_TableCell"><label for="last_name">Last Name <span class="iCIMS_Required">*</span></label></div>
+    <div class="iCIMS_TableCell"><input type="text" class="iCIMS_TextField" id="last_name" name="last_name"></div></div>
+  <div class="iCIMS_TableRow"><div class="iCIMS_TableCell"><label for="country">Country <span class="iCIMS_Required">*</span></label></div>
+    <div class="iCIMS_TableCell"><select class="iCIMS_DropDown" id="country" name="country"><option value="">Select...</option><option value="GB">United Kingdom</option><option value="ES">Spain</option></select></div></div>
+  <div class="iCIMS_TableRow"><div class="iCIMS_TableCell"><label for="state">County / Region <span class="iCIMS_Required">*</span></label></div>
+    <div class="iCIMS_TableCell"><select class="iCIMS_DropDown" id="state" name="state" disabled><option value="">Select a country first</option></select></div></div>
+  <div class="iCIMS_TableRow"><div class="iCIMS_TableCell"><label>Are you at least 18 years old? <span class="iCIMS_Required">*</span></label></div>
+    <div class="iCIMS_TableCell"><label><input type="radio" class="iCIMS_Radio" name="adult" value="Y"> Yes</label> <label><input type="radio" class="iCIMS_Radio" name="adult" value="N"> No</label></div></div>
+  <div class="iCIMS_TableRow"><div class="iCIMS_TableCell"><label>Resume</label></div>
+    <div class="iCIMS_TableCell"><label class="iCIMS_Button" for="resume_file" style="border:1px solid #888;padding:6px 12px;cursor:pointer;display:inline-block">Browse...</label><input type="file" id="resume_file" name="resume" style="position:absolute;left:-9999px;width:1px;height:1px;opacity:0" accept=".pdf,.doc,.docx"><span id="resume_name"></span></div></div>
+</div>
+<button type="submit" class="iCIMS_PrimaryButton">Submit</button>
+</form>
+</div>
+<script src="common.js"></script>
+<script>
+(() => {
+  const state = {};
+  window.__state = () => ({ ...state });
+  const $ = (id) => document.getElementById(id);
+  // jQuery-style: handlers are attached once per selector and read the DOM when the event arrives
+  $('country').addEventListener('change', () => {
+    state.country = $('country').value; const st = $('state'); st.disabled = true; st.innerHTML = '<option value="">Loading...</option>';
+    setTimeout(() => {                      // the AJAX answer with the dependent options
+      const data = { GB: [['ENG', 'England'], ['SCT', 'Scotland'], ['WLS', 'Wales']], ES: [['MD', 'Madrid'], ['CT', 'Catalonia']] }[$('country').value] || [];
+      st.innerHTML = '<option value="">Select...</option>' + data.map(([v, t]) => `<option value="${v}">${t}</option>`).join(''); st.disabled = !data.length;
+    }, 350);
+  });
+  $('state').addEventListener('change', () => { state.state = $('state').value; });
+  for (const id of ['first_name', 'last_name']) {
+    $(id).addEventListener('input', () => { state[id] = $(id).value; });
+    $(id).addEventListener('blur', () => { const e = $(`${id}_err`); if (e) e.textContent = $(id).value ? '' : 'This field is required'; });
+  }
+  for (const r of document.querySelectorAll('input[name=adult]')) r.addEventListener('change', () => { state.adult = r.value; });
+  $('resume_file').addEventListener('change', () => { state.resume = [...$('resume_file').files].map(f => f.name); $('resume_name').textContent = state.resume.join(', '); });
+})();
+</script>
+</body>
+</html>

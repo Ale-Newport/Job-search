@@ -1,0 +1,22 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><title>Real React form</title>
+<script src="/vendor/react.development.js"></script><script src="/vendor/react-dom.development.js"></script>
+<body><div id=root></div>
+<script>
+const h = React.createElement;
+function App(){
+  const [first,setFirst]=React.useState(''); const [email,setEmail]=React.useState(''); const [country,setCountry]=React.useState('');
+  const [auth,setAuth]=React.useState(''); const [agree,setAgree]=React.useState(false); const [bio,setBio]=React.useState('');
+  window.__state = () => ({first,email,country,auth,agree,bio});
+  return h('form',null,
+    h('label',null,'First name ',h('input',{name:'first_name',value:first,onChange:e=>setFirst(e.target.value)})),
+    h('label',null,'Email ',h('input',{name:'email',type:'email',value:email,onChange:e=>setEmail(e.target.value)})),
+    h('label',null,'Country ',h('select',{name:'country',value:country,onChange:e=>setCountry(e.target.value)},
+      h('option',{value:''},'Select'),h('option',{value:'gb'},'United Kingdom'))),
+    h('fieldset',null,h('legend',null,'Authorised to work?'),
+      ['yes','no'].map(v => h('label',{key:v},h('input',{type:'radio',name:'auth',value:v,checked:auth===v,onChange:()=>setAuth(v)}),v))),
+    h('label',null,h('input',{type:'checkbox',name:'alerts',checked:agree,onChange:e=>setAgree(e.target.checked)}),'Job alerts'),
+    h('label',null,'Short bio ',h('textarea',{name:'bio',value:bio,onChange:e=>setBio(e.target.value)})),
+    h('button',{type:'button'},'Next'));
+}
+ReactDOM.createRoot(document.getElementById('root')).render(h(App));
+</script></html>

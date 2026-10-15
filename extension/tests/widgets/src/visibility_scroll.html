@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Visibility that depends on the scroll position and on what is open</title>
+<link rel="stylesheet" href="demo.css">
+<style>
+body { max-width: none; min-height: 3400px; position: relative; }
+.field input[type=text] { max-width: 300px; }
+.cover { position: absolute; background: #fff; z-index: 5; }
+#veil { position: fixed; left: 0; top: 0; right: 0; bottom: 0; background: rgba(0,0,0,.6); z-index: 200; }
+</style>
+</head>
+<body>
+<h1>Scroll and layers</h1>
+<form id="sv" onsubmit="return false" novalidate>
+  <div class="field"><label for="ok_near">Near the top</label><input type="text" id="ok_near" name="near"></div>
+  <div class="field"><label for="ok_behind">Behind layers (page)</label><input type="text" id="ok_behind" name="behind"></div>
+  <!-- far below the fold: the hit test is not possible until a scroll brings them into view -->
+  <div style="position:absolute;left:20px;top:2000px;width:320px"><label for="far_covered">Hidden under an opaque layer</label><input type="text" id="far_covered" name="fc"></div>
+  <div class="cover" id="far_cover" style="left:10px;top:1990px;width:340px;height:90px"></div>
+  <div style="position:absolute;left:20px;top:2600px;width:320px"><label for="far_ok">Plainly visible below</label><input type="text" id="far_ok" name="fo"></div>
+  <div style="position:absolute;left:20px;top:3000px;width:320px"><label for="far_late">Gets covered later</label><input type="text" id="far_late" name="fl"></div>
+  <button type="button" id="open_modal">Open the modal</button>
+  <button type="button" id="open_veil">Show a veil</button>
+</form>
+<dialog id="dlg"><form method="dialog" onsubmit="return false"><label for="dlg_field">Inside the dialog</label><input type="text" id="dlg_field" name="inside"><button id="close_modal" type="button">Close</button></form></dialog>
+<div id="veil" hidden></div>
+<script src="common.js"></script>
+<script>
+document.getElementById('open_modal').addEventListener('click', () => document.getElementById('dlg').showModal());
+document.getElementById('close_modal').addEventListener('click', () => document.getElementById('dlg').close());
+document.getElementById('open_veil').addEventListener('click', () => { document.getElementById('veil').hidden = false; });
+</script>
+</body>
+</html>

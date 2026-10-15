@@ -1,0 +1,10 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><title>A file input below the fold, under a cover that takes no click</title>
+<style>body{font:16px system-ui;padding:24px;max-width:720px}.row{margin:12px 0}.rel{position:relative;width:320px;height:34px}.rel input{position:absolute;left:0;top:0}</style>
+<h1>Apply</h1>
+<form onsubmit="event.preventDefault()">
+<div class="row"><label for="first">First name</label><div class="rel"><input id="first" name="first_name"></div></div>
+<div style="height:2200px"></div>
+<div class="row"><label for="cv">Resume/CV</label><div class="rel" id="w_cv"><input id="cv" name="cv" type="file"><div id="cover_cv" style="position:absolute;left:0;top:0;width:100%;height:100%;background:#fff;pointer-events:none;z-index:5"></div></div></div>
+<div class="row"><label for="email">Email</label><div class="rel"><input id="email" name="email" type="email"></div></div>
+</form>
+</html>

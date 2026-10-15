@@ -1,0 +1,18 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><title>A form that is replaced as a whole</title>
+<style>body{font:16px system-ui;padding:24px}label{display:block;margin:12px 0}</style>
+<h1>Apply</h1>
+<div id="root"></div>
+<script>
+// A framework re-mount: the whole form is thrown away and rebuilt (new elements, same markup). ?focus=1 puts the focus back into the
+// new first field right away, like an app that restores focus after a re-render.
+function mount(first) {
+  const root = document.getElementById('root');
+  root.innerHTML = `<form onsubmit="return false"><label>First name <input name="first_name"></label>
+    <label>Last name <input name="last_name"></label><label>Email <input name="email" type="email"></label>
+    <button type="button" id="next">Next</button></form>`;
+  window.mounts = (window.mounts || 0) + 1;
+  if (first) root.querySelector('[name=first_name]').focus();
+}
+mount(false);
+window.remount = (refocus) => mount(refocus);
+</script></html>

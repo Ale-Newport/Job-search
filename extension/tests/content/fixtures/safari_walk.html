@@ -1,0 +1,18 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><title>Plain controls between questions</title>
+<style>body{font:16px system-ui;padding:24px;max-width:720px}label{display:block;margin:10px 0}fieldset{margin:14px 0}</style>
+<h1>Apply</h1>
+<form onsubmit="event.preventDefault()">
+<label>First name <input name="first"></label>
+<label>Reference <input name="ref" value="R-1" readonly></label>
+<fieldset><legend>Which languages do you speak?</legend>
+  <label><input type="checkbox" name="lang" value="en">English</label>
+  <label><input type="checkbox" name="lang" value="es">Spanish</label></fieldset>
+<label>Country <select name="country"><option value="">Select</option><option value="gb">United Kingdom</option><option value="es">Spain</option></select></label>
+<label>Reference two <input name="ref2" value="R-2" readonly></label>
+<label>Notes <input name="notes"></label>
+<label>Badge number <input name="badge" value="B-7" readonly></label>
+<fieldset><legend>Are you willing to relocate?</legend>
+  <label><input type="radio" name="relocate" value="yes">Yes</label>
+  <label><input type="radio" name="relocate" value="no">No</label></fieldset>
+<button type="button" id="next">Next</button>
+</form></html>

@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Apply - Acme Robotics (React form)</title>
+<meta property="og:site_name" content="Acme Robotics">
+<link rel="stylesheet" href="/_base.css">
+<script src="/_guard.js"></script>
+<script src="/vendor/react.production.min.js"></script>
+<script src="/vendor/react-dom.production.min.js"></script>
+</head>
+<body>
+<header class="site"><span class="brand">Acme Robotics</span></header>
+<main>
+<h1>Software Engineer application</h1>
+<p class="job-description">Acme Robotics builds warehouse robots that help small businesses ship orders faster.
+  This form is rendered by React with controlled inputs: writing a value without the matching input event is ignored.</p>
+<div id="root"></div>
+</main>
+<script>
+const h = React.createElement;
+function App() {
+  const [form, setForm] = React.useState({ first: '', last: '', email: '', country: '', work: '', terms: false, resume: '' });
+  const set = (key) => (event) => {
+    const el = event.target;
+    setForm((prev) => ({ ...prev, [key]: el.type === 'checkbox' ? el.checked : el.type === 'file' ? (el.files[0] ? el.files[0].name + ':' + el.files[0].size : '') : el.value }));
+  };
+  window.__state = () => form;     // read by the tests: what React actually holds
+  const field = (id, text, props) => h('div', { className: 'field' }, h('label', { htmlFor: id }, text), h('input', { id, ...props }));
+  return h('form', { id: 'react_form', onSubmit: (event) => { event.preventDefault(); window.submissions = (window.submissions || 0) + 1; } },
+    field('first', 'First name', { type: 'text', name: 'first_name', value: form.first, onChange: set('first') }),
+    field('last', 'Last name', { type: 'text', name: 'last_name', value: form.last, onChange: set('last') }),
+    field('email', 'Email', { type: 'email', name: 'email', value: form.email, onChange: set('email') }),
+    h('div', { className: 'field' }, h('label', { htmlFor: 'country' }, 'Country of residence'),
+      h('select', { id: 'country', name: 'country', value: form.country, onChange: set('country') },
+        h('option', { value: '' }, 'Select...'), h('option', { value: 'ES' }, 'Spain'), h('option', { value: 'GB' }, 'United Kingdom'),
+        h('option', { value: 'FR' }, 'France'))),
+    h('fieldset', { id: 'work_group' }, h('legend', null, 'Are you legally authorized to work in the United Kingdom?'),
+      ['Yes', 'No'].map((value) => h('label', { key: value, className: 'inline' },
+        h('input', { type: 'radio', name: 'work', id: 'work_' + value.toLowerCase(), value, checked: form.work === value,
+          onChange: () => setForm((prev) => ({ ...prev, work: value })) }), ' ' + value))),
+    h('div', { className: 'field' }, h('label', { className: 'inline' },
+      h('input', { type: 'checkbox', id: 'terms', name: 'terms', checked: form.terms, onChange: set('terms') }),
+      ' I agree to the terms and conditions')),
+    h('div', { className: 'field' }, h('label', { htmlFor: 'cv' }, 'Resume/CV'),
+      h('input', { type: 'file', id: 'cv', name: 'resume', onChange: set('resume') })),
+    h('p', null, h('button', { type: 'submit', id: 'submit_app', 'data-submit': true }, 'Submit application')));
+}
+ReactDOM.createRoot(document.getElementById('root')).render(h(App));
+</script>
+</body>
+</html>

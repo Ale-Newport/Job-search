@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Apply - Acme Robotics (step 1 of 3)</title>
+<meta property="og:site_name" content="Acme Robotics">
+<link rel="stylesheet" href="/_base.css">
+<script src="/_guard.js"></script>
+</head>
+<body>
+<header class="site"><span class="brand">Acme Robotics</span></header>
+<main>
+<h1>Software Engineer application</h1>
+<p class="job-description">Acme Robotics builds warehouse robots that help small businesses ship orders faster.
+  This application is a single-page wizard: the document never reloads, only the URL and the step change.</p>
+<div id="progress" aria-live="polite">Step 1 of 3</div>
+<form id="wizard" action="#" novalidate><div id="step"></div></form>
+</main>
+<script>
+const steps = [
+  { title: 'Personal details', html: `
+    <h2>Personal details</h2>
+    <div class="field"><label for="first_name">First name</label><input type="text" id="first_name" name="first_name"></div>
+    <div class="field"><label for="last_name">Last name</label><input type="text" id="last_name" name="last_name"></div>
+    <p><button type="button" id="continue" data-next>Continue</button></p>` },
+  { title: 'Contact details', html: `
+    <h2>Contact details</h2>
+    <div class="field"><label for="email">Email</label><input type="email" id="email" name="email"></div>
+    <div class="field"><label for="phone">Phone</label><input type="tel" id="phone" name="phone"></div>
+    <div class="field"><label for="linkedin">LinkedIn Profile</label><input type="text" id="linkedin" name="linkedin"></div>
+    <p><button type="button" id="back">Back</button> <button type="button" id="continue" data-next>Continue</button></p>` },
+  { title: 'Review', html: `
+    <h2>Review</h2><p>Check your details, then submit.</p>
+    <p><button type="button" id="back">Back</button> <button type="submit" id="submit_app" data-submit>Submit application</button></p>` },
+];
+let index = 0;
+function render(i, push) {
+  index = i;
+  document.getElementById('step').innerHTML = steps[i].html;
+  document.getElementById('progress').textContent = `Step ${i + 1} of 3`;
+  document.title = `Apply - Acme Robotics (step ${i + 1} of 3)`;
+  if (push) history.pushState({ step: i }, '', `?step=${i + 1}`);
+  document.getElementById('continue')?.addEventListener('click', () => render(index + 1, true));
+  document.getElementById('back')?.addEventListener('click', () => render(index - 1, true));
+}
+window.addEventListener('popstate', (event) => render(event.state?.step ?? 0, false));
+document.getElementById('wizard').addEventListener('submit', (event) => {
+  event.preventDefault();
+  window.submissions = (window.submissions || 0) + 1;
+  document.querySelector('main').innerHTML = '<h1>Thank you for applying</h1><p>Application received.</p>';
+});
+render(Number(new URLSearchParams(location.search).get('step') || 1) - 1, false);
+</script>
+</body>
+</html>

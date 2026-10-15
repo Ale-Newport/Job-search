@@ -1,0 +1,53 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><title>A hostile page</title>
+<style>body{font:16px system-ui;padding:24px;max-width:760px}label{display:block;margin:10px 0}</style>
+<h1>Apply</h1>
+<!-- Every `hazard.*` function arms ONE kind of hostile behaviour; the scenarios press real keys afterwards and assert that nothing the
+     assistant does ever surfaces as an error of the page. Errors are collected in window.__errors (error + unhandledrejection). -->
+<form id="f" onsubmit="event.preventDefault()">
+<label>First name <input name="first"></label>
+<label>Last name <input name="last"></label>
+<label>Email <input name="email" type="email"></label>
+<label>Country <select name="country"><option value="">Select</option><option value="gb">United Kingdom</option><option value="es">Spain</option></select></label>
+<fieldset><legend>Which languages do you speak?</legend><label><input type="checkbox" name="lang" value="en">English</label><label><input type="checkbox" name="lang" value="es">Spanish</label></fieldset>
+<label>Phone <input name="phone"></label>
+<div id="slot"></div>
+<button type="submit" id="send">Submit application</button>
+</form>
+<script>
+window.__errors = [];
+window.addEventListener('error', (e) => window.__errors.push('error: ' + (e.message || e.error)));
+window.addEventListener('unhandledrejection', (e) => window.__errors.push('rejection: ' + (e.reason && e.reason.message || e.reason)));
+const $ = (name) => document.querySelector('[name="' + name + '"]');
+const boom = (what) => { throw new Error('hostile ' + what); };
+window.hazard = {
+  // the page removes the control the person is on, at the worst moment (before the assistant's own listeners see the event)
+  removeOn(type, name, target) { (target === 'window' ? window : document).addEventListener(type, (e) => { const el = $(name); if (el && (type !== 'focusin' || e.target === el)) el.remove(); }, true); },
+  removeFormOn(type, name) { document.addEventListener(type, (e) => { if (e.target === $(name)) document.getElementById('f').remove(); }, true); },
+  wipeBodyOn(type, name) { document.addEventListener(type, (e) => { if (e.target === $(name)) document.body.replaceChildren(); }, true); },
+  wipeBody() { document.body.replaceChildren(); },
+  // an element whose every property the assistant could read misbehaves (a page-defined getter, a hostile proxy-like node)
+  throwing(name, props) {
+    const el = $(name);
+    for (const p of props) {
+      const base = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, p) || Object.getOwnPropertyDescriptor(Element.prototype, p) || Object.getOwnPropertyDescriptor(HTMLElement.prototype, p) || Object.getOwnPropertyDescriptor(Node.prototype, p);
+      const fn = typeof (el[p]) === 'function';
+      Object.defineProperty(el, p, fn ? { configurable: true, value() { boom(p); } } : { configurable: true, get() { boom(p); }, set() { boom(p); } });
+    }
+  },
+  throwingGlobals(list) {
+    for (const [owner, p] of list) {
+      const target = owner === 'window' ? window : owner === 'document' ? document : eval(owner);
+      const desc = Object.getOwnPropertyDescriptor(target, p) || {};
+      Object.defineProperty(target, p, typeof target[p] === 'function' ? { configurable: true, value() { boom(p); } } : { configurable: true, get() { boom(p); } });
+    }
+  },
+  // frames that come and go
+  frame(src) { const f = document.createElement('iframe'); f.id = 'hf'; f.style.cssText = 'width:600px;height:120px'; if (src) f.src = src; document.getElementById('slot').append(f); return f; },
+  frameWithThrowingProps() { const f = hazard.frame('{{MAIN}}/frames_child.html'); for (const p of ['src', 'contentDocument', 'contentWindow', 'getBoundingClientRect']) Object.defineProperty(f, p, typeof f[p] === 'function' ? { configurable: true, value() { boom(p); } } : { configurable: true, get() { boom(p); } }); return f; },
+  removeFrame() { const f = document.getElementById('hf'); if (f) f.remove(); },
+  // window.parent / window.frames replaced by something that throws on every touch
+  hostileParent() { const p = new Proxy({}, { get() { boom('parent.get'); }, has() { boom('parent.has'); }, getPrototypeOf() { boom('parent.proto'); } }); Object.defineProperty(window, 'parent', { configurable: true, get() { return p; } }); Object.defineProperty(window, 'frames', { configurable: true, get() { return p; } }); },
+  // a page that rewrites itself with document.write after load (legacy wizards, some A/B-testing tools)
+  docWrite() { document.open(); document.write('<!doctype html><html lang="en"><title>Rewritten</title><body><h1>Apply</h1><form onsubmit="return false"><label>Nickname <input name="nick"></label><label>Phone <input name="phone2"></label></form></body></html>'); document.close(); },
+};
+</script></html>

@@ -1,0 +1,49 @@
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body { font: 15px/1.5 Georgia, serif; min-height: 100vh; }
+body.light { background: #ffffff; color: #1d1d1f; }
+body.dark { background: #16181d; color: #e6e6e6; }
+body.busy-bg { background: repeating-linear-gradient(45deg, #fde68a, #fde68a 20px, #bfdbfe 20px, #bfdbfe 40px); color: #111; }
+.hdr { padding: 14px 16px; border-bottom: 1px solid rgba(127, 127, 127, .35); }
+.hdr h1 { margin: 0; font-size: 18px; }
+.hdr p { margin: 2px 0 0; opacity: .8; font-size: 13px; }
+main { padding: 12px 16px 120px; max-width: 520px; }
+label { display: block; margin: 0 0 12px; font-size: 13px; }
+input, textarea, select, button { font: 14px system-ui, sans-serif; display: block; width: 100%; margin-top: 4px; padding: 6px 8px; }
+input, textarea, select { border: 1px solid #888; border-radius: 6px; background: #fff; color: #111; }
+.fx { position: fixed; height: 34px; margin: 0; }
+#fx-top { top: 72px; left: 16px; width: min(320px, calc(100vw - 32px)); }
+#fx-mid { top: calc(50% - 17px); left: 16px; width: min(320px, calc(100vw - 32px)); }
+#fx-bottom { bottom: 24px; left: 16px; width: min(320px, calc(100vw - 32px)); }
+#fx-right { top: 38%; right: 8px; left: auto; width: min(150px, calc(100vw - 16px)); }
+#fx-tall { top: 8px; bottom: 8px; left: 16px; width: min(240px, calc(100vw - 32px)); height: auto; }
+#fx-text { top: 96px; left: 16px; width: min(440px, calc(100vw - 32px)); height: 120px; }
+dialog { padding: 16px; border-radius: 10px; width: min(360px, 90vw); }
+#fx-pair-a { top: 230px; left: 16px; width: min(320px, calc(100vw - 32px)); }
+#fx-pair-b { top: 284px; left: 16px; width: min(320px, calc(100vw - 32px)); }
+#fx-small { top: 40%; left: 40px; width: 14px; height: 14px; padding: 0; }
+body.ancestors { transform: translateZ(0); overflow: hidden; }
+.cover { position: fixed; inset: 0; z-index: 2147483647; background: rgba(200, 40, 40, .25); transform: scale(1); }
+#fx-edge { top: 0; left: 16px; width: min(320px, calc(100vw - 32px)); height: 34px; }
+/* choice controls the recommended-option outlines are drawn on */
+.fxo { position: fixed; left: 620px; display: flex; align-items: center; gap: 6px; width: 92px; height: 28px; margin: 0; padding: 0 6px; font-size: 13px; }
+.fxo input { display: inline-block; width: auto; margin: 0; padding: 0; }
+#fx-opt-yes { top: 120px; }
+#fx-opt-no { top: 152px; }
+#fx-opt-a { top: 220px; }
+#fx-opt-b { top: 252px; }
+/* choice groups: small controls, long printed options (UXR-02) */
+.fxg { position: fixed; left: 16px; display: flex; align-items: center; gap: 28px; margin: 0; font-size: 13px; }
+.fxg input { display: inline-block; width: 14px; height: 14px; margin: 0 6px 0 0; padding: 0; }
+.fxg-opt { display: inline-flex; align-items: center; margin: 0; white-space: nowrap; }
+.fxg-col { flex-direction: column; align-items: flex-start; gap: 6px; }
+.fxg-touch .fxg-opt { height: 44px; padding-inline-end: 6px; }
+#fxg-prev { top: 250px; left: 16px; width: 300px; }
+#fxg-h { top: 330px; }
+#fxg-v { top: 330px; left: 420px; }
+#fxg-t { top: 440px; }
+#fxg-next { top: 372px; left: 16px; width: 300px; }
+/* a scrolling pane, off to the side of the other fixtures */
+#fx-scroller { position: fixed; top: 300px; left: 640px; width: 300px; height: 180px; overflow: auto; border: 1px solid #888; background: #fff; }
+.fxs { display: block; margin: 12px 8px; width: calc(100% - 16px); height: 34px; }
+.fxs-spacer { height: 500px; }

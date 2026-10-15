@@ -1,0 +1,24 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><title>Apply in a dialog</title>
+<style>
+body{font:16px system-ui;margin:0;background:#ddd;height:900px}
+/* a dialog that does NOT fill the viewport and scrolls inside itself: the browser's own Tab scrolls it, the assistant's walk must too */
+#dlg{position:fixed;left:200px;top:120px;width:560px;height:420px;overflow:auto;border:1px solid #888;background:#fff;padding:0 16px 16px}
+#dlg h2{margin:16px 0 8px}
+#dlg label{display:block;margin:0 0 22px}
+#dlg input{display:block;width:90%;height:28px;margin-top:4px}
+</style>
+<div id="dlg" role="dialog" aria-label="Apply">
+<h2>Apply: Platform Engineer</h2>
+<form id="f" onsubmit="event.preventDefault()">
+<label>First name <input name="first"></label>
+<label>Last name <input name="last"></label>
+<label>Email <input name="email" type="email"></label>
+<label>Phone <input name="phone"></label>
+<label>LinkedIn <input name="linkedin"></label>
+<label>GitHub <input name="github"></label>
+<label>Portfolio <input name="portfolio"></label>
+<label>Expected salary <input name="salary"></label>
+<button type="submit" id="send">Submit application</button>
+</form>
+</div>
+</html>

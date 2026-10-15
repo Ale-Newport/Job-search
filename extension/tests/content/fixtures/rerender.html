@@ -1,0 +1,23 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><title>Fields that blur-validate and re-render</title>
+<style>body{font:16px system-ui;padding:24px}label{display:block;margin:14px 0}</style>
+<h1>Backend Engineer</h1>
+<form id="f" onsubmit="return false">
+  <label>First name <input name="first_name" data-rerender></label>
+  <label>Last name <input name="last_name" data-rerender></label>
+  <label>Email <input name="email" type="email"></label>
+</form>
+<script>
+// Frameworks that key a field by its validation state re-create the element on blur: same attributes and value, a NEW node.
+window.swaps = 0;
+document.getElementById('f').addEventListener('focusout', (e) => {
+  const old = e.target;
+  if (!old.hasAttribute || !old.hasAttribute('data-rerender')) return;
+  setTimeout(() => {
+    if (!old.isConnected) return;
+    const fresh = old.cloneNode(false);
+    fresh.value = old.value;
+    old.replaceWith(fresh);
+    window.swaps++;
+  }, 30);
+});
+</script></html>

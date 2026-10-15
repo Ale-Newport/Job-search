@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Lever-style application (hand-rolled replica)</title>
+<link rel="stylesheet" href="demo.css">
+<style>.application-question { list-style: none; margin: 14px 0; } ul.app { padding: 0; } .application-label { font-weight: 600; } .dropdown-container { position: absolute; border: 1px solid #888; background: #fff; z-index: 4; min-width: 300px; } .dropdown-container[hidden] { display: none; } .dropdown-location { padding: 6px 10px; cursor: pointer; } .application-answer-alternative { margin-left: 6px; }</style>
+</head>
+<body>
+<h1>Apply: Lever-style form (hand-rolled replica)</h1>
+<!-- From memory of jobs.lever.co application pages: <li class="application-question"> blocks with a label wrapping .application-label and
+     .application-field, native inputs, radio and checkbox lists named cards[uuid][fieldN], and the location autocomplete (text input +
+     hidden selectedLocation + a .dropdown-container of results loaded asynchronously). NOT verified against a live posting. -->
+<form id="lv" onsubmit="return false"><ul class="app">
+  <li class="application-question"><label><div class="application-label">Full name<span class="required">✱</span></div><div class="application-field"><input type="text" name="name" required></div></label></li>
+  <li class="application-question"><label><div class="application-label">Email<span class="required">✱</span></div><div class="application-field"><input type="email" name="email" required></div></label></li>
+  <li class="application-question"><label><div class="application-label">Current location</div><div class="application-field">
+    <input type="text" name="location" class="location-input" autocomplete="off" placeholder="Start typing..."><input type="hidden" name="selectedLocation" id="selectedLocation">
+    <div class="dropdown-container" id="loc-results" hidden></div></div></label></li>
+  <li class="application-question"><label><div class="application-label">Are you legally authorized to work in the UK?<span class="required">✱</span></div></label>
+    <ul data-qa="multiple-choice"><li><label><input type="radio" name="cards[1b2c][field0]" value="Yes"><span class="application-answer-alternative">Yes</span></label></li><li><label><input type="radio" name="cards[1b2c][field0]" value="No"><span class="application-answer-alternative">No</span></label></li></ul></li>
+  <li class="application-question"><label><div class="application-label">Which of these languages do you work in?</div></label>
+    <ul data-qa="checkboxes"><li><label><input type="checkbox" name="cards[3d4e][field1]" value="English"><span class="application-answer-alternative">English</span></label></li><li><label><input type="checkbox" name="cards[3d4e][field1]" value="Spanish"><span class="application-answer-alternative">Spanish</span></label></li><li><label><input type="checkbox" name="cards[3d4e][field1]" value="German"><span class="application-answer-alternative">German</span></label></li></ul></li>
+  <li class="application-question"><label><div class="application-label">Additional information</div><div class="application-field"><textarea name="comments"></textarea></div></label></li>
+</ul><button type="submit">Submit application</button></form>
+<script src="common.js"></script>
+<script>
+(() => {
+  const input = document.querySelector('.location-input'), box = document.getElementById('loc-results'), sel = document.getElementById('selectedLocation');
+  const CITIES = ['London, UK', 'London, Ontario, Canada', 'Madrid, Spain', 'Manchester, UK'];
+  let timer = 0;
+  input.addEventListener('input', () => {
+    clearTimeout(timer); sel.value = '';
+    timer = setTimeout(() => {              // asynchronous results, like Lever's location service
+      const q = input.value.toLowerCase(); box.innerHTML = '';
+      for (const c of CITIES.filter(c => c.toLowerCase().startsWith(q) && q)) {
+        const d = document.createElement('div'); d.className = 'dropdown-location'; d.setAttribute('role', 'option'); d.textContent = c;
+        d.addEventListener('mousedown', e => e.preventDefault());
+        d.addEventListener('click', () => { input.value = c; sel.value = JSON.stringify({ name: c }); box.hidden = true; });
+        box.append(d);
+      }
+      box.hidden = !box.children.length;
+    }, 250);
+  });
+  input.addEventListener('blur', () => setTimeout(() => { box.hidden = true; }, 100));
+  window.__state = () => ({ location: input.value, selectedLocation: sel.value });
+})();
+</script>
+</body>
+</html>

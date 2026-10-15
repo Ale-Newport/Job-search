@@ -1,0 +1,17 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><title>Form inside a scrolling modal</title>
+<style>body{font:16px system-ui;margin:0;padding:24px}label{display:block;margin:10px 0}
+#modal{position:fixed;left:60px;top:80px;width:620px;height:300px;border:2px solid #444;background:#fff;display:flex;flex-direction:column}
+#head{height:44px;background:#dde;padding:10px;box-sizing:border-box;flex:none}
+#body{overflow:auto;flex:1;min-height:0;padding:0 12px}
+#cover{position:fixed;left:60px;top:80px;width:620px;height:300px;background:#fff;z-index:50;display:none}
+.spacer{height:260px}</style>
+<div id="modal"><div id="head">Application</div>
+<form id="body" onsubmit="event.preventDefault()">
+<label>First name <input name="first_name"></label>
+<label>Last name <input name="last_name"></label>
+<div class="spacer">Please read the notes below before you continue.</div>
+<label>Email <input name="email" type="email"></label>
+<label>Phone <input name="phone"></label>
+<div class="spacer"></div>
+</form></div>
+<div id="cover">A banner that covers the form</div></html>

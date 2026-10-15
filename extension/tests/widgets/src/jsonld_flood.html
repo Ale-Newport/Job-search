@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Engineer - Acme Robotics</title>
+<link rel="stylesheet" href="demo.css">
+</head>
+<body>
+<main>
+<h1>Engineer</h1>
+<div class="posting-description"><p>We build robots for warehouses and we are hiring a platform engineer who cares about reliability. We build robots for warehouses.</p>
+  <div id="notes" contenteditable="plaintext-only" style="min-height:30px"></div></div>
+<form id="jf" onsubmit="return false"><div class="field"><label for="n">Full name</label><input type="text" id="n" name="full_name"></div></form>
+</main>
+<script>
+// eight JSON-LD scripts of 190,000 characters each: 1.5 MB, more than the bridge accepts in a whole request
+for (let i = 0; i < 8; i++) {
+  const s = document.createElement('script'); s.type = 'application/ld+json';
+  s.textContent = JSON.stringify({ '@context': 'https://schema.org', '@type': 'Thing', name: 'x' + i, pad: 'y'.repeat(190000) });
+  document.head.append(s);
+}
+document.getElementById('notes').textContent = 'MY_PRIVATE_NOTE typed by the person';
+</script>
+<script src="common.js"></script>
+</body>
+</html>

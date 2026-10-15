@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Visibility patterns (hostile and legitimate)</title>
+<link rel="stylesheet" href="demo.css">
+<style>
+body { max-width: none; min-height: 3200px; position: relative; }
+.field { max-width: 420px; }
+.field input[type=text], .field input[type=email], .field input[type=tel] { max-width: 300px; }
+.hint { color: #555; }
+#banner { position: fixed; left: 0; right: 0; bottom: 0; height: 90px; background: #123; color: #fff; z-index: 100; padding: 8px 20px; box-sizing: border-box; }
+#sticky { position: sticky; top: 0; height: 30px; line-height: 30px; background: #fff; border-bottom: 1px solid #ccc; z-index: 20; }
+.cover { position: absolute; left: 0; top: 0; right: 0; bottom: 0; background: #fff; z-index: 5; }
+.btn { display: inline-block; position: relative; border: 1px solid #888; padding: 6px 10px; cursor: pointer; }
+</style>
+</head>
+<body>
+<div id="sticky">Sticky bar</div>
+<h1>Visibility patterns</h1>
+<!-- Every block says what a person sees. hp_* controls are NOT visible to a person (never assist fields), ok_* controls are. -->
+<form id="vp" onsubmit="return false" novalidate>
+
+  <div class="field"><label for="ok_first">First name</label><input type="text" id="ok_first" name="first_name"></div>
+  <div class="field"><label for="ok_last">Last name</label><input type="text" id="ok_last" name="last_name"></div>
+  <div class="field"><label for="ok_email">Email address</label><input type="email" id="ok_email" name="email"></div>
+
+  <!-- ===== hostile: invisible to a person ===== -->
+  <div style="position:relative;height:30px;width:300px"><input type="checkbox" id="hp_box_covered" name="chk_hp"><div class="cover" style="width:60px;height:30px;right:auto"></div></div>
+
+  <div style="position:relative;height:40px;width:300px"><input type="file" id="hp_file_covered" name="resume"><div class="cover"></div></div>
+
+  <div style="position:relative;height:30px;width:300px"><input type="radio" class="sr-only" id="hp_radio_covered" name="vis_r"><label for="hp_radio_covered">Hidden option (label covered)</label><div class="cover"></div></div>
+
+  <div class="field" style="opacity:0"><label for="hp_opacity_parent">Phone number (parent opacity 0)</label><input type="tel" id="hp_opacity_parent" name="phone1"></div>
+
+  <div class="field"><label for="hp_covered">LinkedIn profile (covered by an opaque layer)</label><input type="text" id="hp_covered" name="li1"><div class="cover"></div></div>
+
+  <div class="field"><label for="hp_image">Twitter (covered by a picture)</label><input type="text" id="hp_image" name="tw1">
+    <img alt="" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" style="position:absolute;left:0;top:0;width:100%;height:100%;z-index:3"></div>
+
+  <div class="field"><label for="hp_pointer_none">Nickname (pointer-events none)</label><input type="text" id="hp_pointer_none" name="nick1" style="pointer-events:none"></div>
+
+  <div style="position:absolute;left:100vw;top:400px"><label for="hp_right_vw">Last name (left: 100vw)</label><input type="text" id="hp_right_vw" name="lname_hp"></div>
+
+  <div style="position:absolute;left:6000px;top:300px"><label for="hp_right">GitHub (far right of the page)</label><input type="text" id="hp_right" name="gh1"></div>
+
+  <div class="field"><label for="hp_ghost">Personal website (ghost: transparent text, no box)</label><input type="text" id="hp_ghost" name="web1" style="color:transparent;background:transparent;border:0;outline:0;caret-color:transparent"></div>
+
+  <div class="field" style="background:#fff"><label for="hp_same_colour">Portfolio (white text on white)</label><input type="text" id="hp_same_colour" name="pf1" style="color:#fff;background:#fff;border:0;outline:0"></div>
+
+  <div class="field" style="clip-path:inset(100%)"><label for="hp_clip_anc">Second email (an ancestor clipped away)</label><input type="email" id="hp_clip_anc" name="em2"></div>
+
+  <div class="field" style="filter:opacity(0)"><label for="hp_filter">Full name (filter opacity 0)</label><input type="text" id="hp_filter" name="fn1"></div>
+
+  <div style="height:10px;width:300px;overflow:hidden;position:relative"><input type="text" id="hp_wrap" name="w1" aria-label="Email (10px wrapper)" style="position:absolute;top:30px"></div>
+
+  <div style="position:fixed;bottom:-300px;left:20px"><label for="hp_fixed_below">Full name (fixed below the viewport)</label><input type="text" id="hp_fixed_below" name="fn_hp"></div>
+
+  <div class="field"><label for="hp_font0">Notes (font size 0)</label><input type="text" id="hp_font0" name="notes0" style="font-size:0;width:200px;height:28px"></div>
+
+  <div class="field"><div id="tiny_scroller" style="height:14px;width:300px;overflow:auto"><div style="height:60px"></div><input type="text" id="hp_tiny_scroller" name="ts1" aria-label="Employer (in a 14px scroll box)"></div></div>
+
+  <div style="position:fixed;right:30px;bottom:120px;width:300px;height:36px"><input type="text" id="hp_fixed_covered" name="fc1" aria-label="Fixed field under a fixed cover" style="width:100%;height:100%"></div>
+  <div style="position:fixed;right:20px;bottom:110px;width:340px;height:60px;background:#eee;z-index:60"></div>
+
+  <!-- ===== legitimate: a person sees and can click these ===== -->
+  <div class="field"><label class="btn">Attach resume<input type="file" id="ok_file_button" name="resume" style="position:absolute;left:0;top:0;width:100%;height:100%;opacity:0"></label></div>
+
+  <div class="field"><label for="ok_file_native">Cover letter</label><input type="file" id="ok_file_native" name="cover_letter"></div>
+
+  <div class="field"><label class="cb"><input type="checkbox" class="sr-only" id="ok_sr_checkbox" name="rtw"> <span style="display:inline-block;width:16px;height:16px;border:2px solid #888;vertical-align:middle"></span> I have the right to work in the UK</label></div>
+
+  <div class="field"><div id="notice_l" class="label">Notice period</div><div role="radiogroup" aria-labelledby="notice_l">
+    <label><input type="radio" class="sr-only" id="ok_radio_a" name="notice" value="1m"> <span class="btn">One month</span></label>
+    <label><input type="radio" class="sr-only" id="ok_radio_b" name="notice" value="3m"> <span class="btn">Three months</span></label></div></div>
+
+  <div class="field"><div id="scroller" style="width:340px;height:110px;overflow:auto;border:1px solid #888;padding:4px">
+    <div class="field"><label for="ok_scroll_1">Scroll box one</label><input type="text" id="ok_scroll_1" name="sc1"></div>
+    <div class="field"><label for="ok_scroll_2">Scroll box two</label><input type="text" id="ok_scroll_2" name="sc2"></div>
+    <div class="field"><label for="ok_scroll_3">Scroll box three</label><input type="text" id="ok_scroll_3" name="sc3"></div>
+    <div class="field"><label for="ok_scroll_4">Scroll box four</label><input type="text" id="ok_scroll_4" name="sc4"></div></div></div>
+
+  <div class="field" id="fade" style="opacity:0;transition:opacity .2s"><label for="ok_fade">Fades in later</label><input type="text" id="ok_fade" name="fade"></div>
+
+  <div style="position:absolute;left:520px;top:808px;width:320px"><label for="ok_under_banner">Under the cookie banner</label><input type="text" id="ok_under_banner" name="ub1"></div>
+
+  <div style="position:absolute;left:520px;top:2400px;width:320px"><label for="ok_far_below">Far below the fold</label><input type="text" id="ok_far_below" name="far1"></div>
+
+  <button type="submit" id="send">Submit application</button>
+</form>
+<!-- outside any <form>: a change of style here is not a mutation the scanner treats as relevant -->
+<div id="outside" style="position:absolute;left:520px;top:260px;width:320px">
+  <div id="fade_out" style="opacity:0"><label for="ok_fade_out">Fades in outside the form</label><input type="text" id="ok_fade_out" name="fade_out"></div>
+  <div style="position:relative;margin-top:14px"><label for="hp_cover_out">Covered outside the form</label><input type="text" id="hp_cover_out" name="cover_out"><div class="cover" id="cover_out"></div></div>
+</div>
+<div id="banner">We use cookies. <button type="button" id="accept_cookies">Accept</button></div>
+<script src="common.js"></script>
+</body>
+</html>

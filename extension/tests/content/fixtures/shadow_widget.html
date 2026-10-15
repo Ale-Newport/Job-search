@@ -1,0 +1,47 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><title>Web-component application widget (open shadow roots, rendered late)</title>
+<style>body{font:16px system-ui;padding:24px}h1{margin:0 0 12px}</style>
+<h1>Apply to Example Company</h1>
+<apply-widget id="widget"></apply-widget>
+<script>
+// A web-component ATS widget: the host exists at load, the form is rendered INTO ITS OPEN SHADOW ROOT 900 ms later, and the
+// question group lives in a second, nested open shadow root. Nothing of the form is ever in the light DOM.
+window.submissions = 0;
+window.events = [];
+class FieldGroup extends HTMLElement {
+  connectedCallback() {
+    const root = this.attachShadow({ mode: 'open' });
+    root.innerHTML = `<style>label{display:block;margin:12px 0}</style>
+      <label>Email <input name="email" type="email"></label>
+      <label>Phone <input name="phone" type="tel"></label>`;
+    root.addEventListener('change', (e) => window.events.push('group-change:' + e.target.name));
+  }
+}
+customElements.define('field-group', FieldGroup);
+class ApplyWidget extends HTMLElement {
+  connectedCallback() {
+    const root = this.attachShadow({ mode: 'open' });
+    setTimeout(() => {
+      root.innerHTML = `<style>label{display:block;margin:12px 0}form{max-width:480px}</style>
+        <form id="f">
+          <label>First name <input name="first_name"></label>
+          <label>Last name <input name="last_name"></label>
+          <field-group></field-group>
+          <label>Do you need sponsorship?
+            <select name="sponsor"><option value="">Select</option><option value="yes">Yes</option><option value="no">No</option></select>
+          </label>
+          <div id="detail" hidden><label>Describe your visa <input name="visa_detail"></label></div>
+          <label>Anything else <textarea name="notes" rows="3"></textarea></label>
+          <button type="submit">Submit application</button>
+        </form>`;
+      const form = root.getElementById('f');
+      const select = root.querySelector('select');
+      select.addEventListener('change', () => {
+        window.events.push('select-change');
+        root.getElementById('detail').hidden = select.value !== 'yes';
+      });
+      form.addEventListener('submit', (e) => { e.preventDefault(); window.submissions++; });
+    }, 900);
+  }
+}
+customElements.define('apply-widget', ApplyWidget);
+</script></html>

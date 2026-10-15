@@ -1,0 +1,39 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><title>A calendar opens under its date field</title>
+<style>
+body{font:16px system-ui;padding:24px;max-width:720px}
+label{display:block;margin:12px 0}
+.field{position:relative;margin:0 0 28px}
+/* the popper of a date picker: out of the flow, right under the input, over whatever follows (what react-datepicker draws) */
+.popper{position:absolute;left:0;top:100%;z-index:5;display:none}
+.popper.open{display:block}
+.cal{width:260px;height:96px;background:#fff;border:1px solid #888;box-sizing:border-box;padding:6px}
+</style>
+<h1>Application</h1>
+<form onsubmit="event.preventDefault()">
+<div class="field"><label>First name <input name="first_name"></label></div>
+<div class="field" id="f-start">
+  <label for="start">Earliest start date</label>
+  <input id="start" name="start" autocomplete="off">
+  <div class="popper" id="popper"><div class="cal" id="cal" role="dialog" aria-label="Choose date">November 2026</div></div>
+</div>
+<div class="field"><label>Notice period in days <input name="notice"></label></div>
+<div class="field"><label>City <input name="city"></label></div>
+<button type="submit">Submit application</button>
+</form>
+<script>
+// Like react-datepicker: the calendar opens when the input takes the focus, it does NOT close when the input loses it, and it closes on the
+// Tab the input itself sees (`?sticky=1`: a widget that never closes by itself; the page then closes it with closeCalendar()).
+const sticky = new URLSearchParams(location.search).get('sticky') === '1';
+const popper = document.getElementById('popper');
+const input = document.getElementById('start');
+window.calendarOpen = () => popper.classList.contains('open');
+window.closeCalendar = () => popper.classList.remove('open');
+window.tabsSeenByTheWidget = 0;
+input.addEventListener('focus', () => popper.classList.add('open'));
+input.addEventListener('keydown', (e) => {
+  if (e.key === 'Tab') { window.tabsSeenByTheWidget++; if (!sticky) popper.classList.remove('open'); }
+  if (e.key === 'Escape') popper.classList.remove('open');
+});
+document.addEventListener('mousedown', (e) => { if (!popper.contains(e.target) && e.target !== input) popper.classList.remove('open'); });
+</script>
+</html>

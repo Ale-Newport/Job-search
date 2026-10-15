@@ -1,0 +1,23 @@
+{
+  "name": "meridian-assistant-extension",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Meridian Assistant: Chrome and Safari Web Extension for assisted job-application forms",
+  "scripts": {
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "build": "node build.mjs --variant=chrome && node build.mjs --variant=safari",
+    "build:e2e": "node build.mjs --variant=e2e && node build.mjs --variant=e2e-closed && node build.mjs --variant=e2e-top",
+    "build:all": "npm run build && npm run build:e2e",
+    "check": "node scripts/check-prod-build.mjs",
+    "test": "node --import ./tests/unit/register.mjs --test \"tests/unit/*.test.mjs\"",
+    "smoke": "PYTHONDONTWRITEBYTECODE=1 ../.venv/bin/python tests/unit/smoke_chromium.py",
+    "zip": "npm run build && npm run check && node scripts/zip.mjs",
+    "verify": "npm run typecheck && npm run build && npm run check && npm test"
+  },
+  "devDependencies": {
+    "@types/chrome": "^0.3.5",
+    "esbuild": "^0.28.2",
+    "typescript": "~5.9.2"
+  }
+}

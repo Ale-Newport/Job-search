@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Covers that never take a click (hostile and legitimate)</title>
+<link rel="stylesheet" href="demo.css">
+<style>
+body { max-width: none; min-height: 1400px; position: relative; }
+.row { position: relative; width: 340px; margin: 10px 0; }
+.row input[type=text], .row input[type=email], .row input[type=tel] { width: 300px; box-sizing: border-box; }
+.pe-cover { position: absolute; left: 0; top: 0; right: 0; bottom: 0; background: #fff; pointer-events: none; z-index: 5; }
+.pe-after::after { content: ""; position: absolute; left: 0; top: 0; right: 0; bottom: 0; background: #fff; pointer-events: none; z-index: 5; }
+</style>
+</head>
+<body>
+<h1>Covers that never take a click</h1>
+<!-- hp_* controls are NOT visible to a person although a pointer would fall through whatever lies over them; ok_* controls are, whatever lies over them with pointer-events: none -->
+<form id="pc" onsubmit="return false" novalidate>
+
+  <div class="row"><label for="ok_plain">First name</label><input type="text" id="ok_plain" name="first_name"></div>
+
+  <div class="row"><label for="hp_pe_cover">Alpha email</label><input type="email" id="hp_pe_cover" name="pe_a"><div class="pe-cover"></div></div>
+  <div class="row pe-after"><label for="hp_pe_after">Bravo email</label><input type="email" id="hp_pe_after" name="pe_b"></div>
+  <div class="row"><label for="hp_pe_img">Charlie email</label><input type="email" id="hp_pe_img" name="pe_c">
+    <img alt="" src="data:image/gif;base64,R0lGODlhAQABAIAAAP///wAAACwAAAAAAQABAAACAkQBADs=" style="position:absolute;left:0;top:0;width:100%;height:100%;pointer-events:none;z-index:5"></div>
+  <div class="row"><label for="hp_pe_opacity">Delta email</label><input type="email" id="hp_pe_opacity" name="pe_d"><div class="pe-cover" style="opacity:.999"></div></div>
+  <div class="row"><label for="hp_pe_text">Echo email</label><input type="email" id="hp_pe_text" name="pe_e"><p class="pe-cover" style="margin:0">Please wait, loading your application form</p></div>
+  <div class="row"><label for="hp_pe_label">Foxtrot email</label><input type="email" id="hp_pe_label" name="pe_f"><label for="hp_pe_label" class="pe-cover" style="margin:0">Loading</label></div>
+  <div class="row"><label for="hp_pe_file">Golf resume</label><div style="position:relative;height:40px"><input type="file" id="hp_pe_file" name="resume"><div class="pe-cover"></div></div></div>
+  <div class="row"><label for="hp_pe_pop">Hotel email</label><input type="email" id="hp_pe_pop" name="pe_h"></div>
+
+  <div class="row"><label for="ok_pe_float" style="position:absolute;left:8px;top:22px;pointer-events:none;background:transparent;color:#666">India floating email</label><input type="email" id="ok_pe_float" name="ok_pe_f" style="margin-top:18px"></div>
+  <div class="row"><label for="ok_pe_icon">Juliet icon phone</label><input type="tel" id="ok_pe_icon" name="ok_pe_i"><svg width="16" height="16" style="position:absolute;right:30px;bottom:6px;pointer-events:none"><circle cx="8" cy="8" r="7" fill="#369"/></svg></div>
+  <div class="row"><label for="ok_pe_outline">Kilo outlined city</label><div style="position:relative;width:300px"><input type="text" id="ok_pe_outline" name="ok_pe_o" style="width:100%"><fieldset aria-hidden="true" style="position:absolute;inset:-5px 0 0;margin:0;padding:0 8px;border:1px solid #888;border-radius:4px;pointer-events:none"><legend style="visibility:hidden;font-size:12px">City</legend></fieldset></div></div>
+  <div class="row"><label for="ok_pe_shimmer">Lima shimmer surname</label><div style="position:relative;width:300px"><input type="text" id="ok_pe_shimmer" name="ok_pe_s" style="width:100%"><div style="position:absolute;inset:0;background:rgba(255,255,255,.3);pointer-events:none"></div></div></div>
+  <div class="row"><label for="ok_pe_last">Last name</label><input type="text" id="ok_pe_last" name="last_name"></div>
+
+</form>
+<!-- a layer in the top layer that never takes a click, over the "Hotel email" field only -->
+<div id="veil" popover="manual" style="position:fixed;inset:auto;margin:0;border:0;padding:0;background:#fff;pointer-events:none"></div>
+<script>
+const f = document.getElementById('hp_pe_pop').getBoundingClientRect();
+const v = document.getElementById('veil');
+v.style.left = (f.left - 2) + 'px'; v.style.top = (f.top - 2) + 'px'; v.style.width = (f.width + 4) + 'px'; v.style.height = (f.height + 4) + 'px';
+v.showPopover();
+</script>
+</body>
+</html>

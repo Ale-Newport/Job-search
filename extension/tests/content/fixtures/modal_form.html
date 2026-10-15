@@ -1,0 +1,19 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><title>An application inside a modal dialog, with a cookie bar</title>
+<style>
+body{font:16px system-ui;margin:0}
+#modal{position:fixed;left:40px;top:30px;width:460px;background:#fff;border:1px solid #888;padding:16px;box-sizing:border-box;z-index:10}
+label{display:block;margin:10px 0}
+#cookies{position:fixed;left:0;right:0;bottom:0;height:70px;z-index:20}
+#cookies .bar{width:100%;height:100%;background:#eee;border-top:1px solid #888;padding:10px;box-sizing:border-box}
+</style>
+<div id="modal" role="dialog" aria-modal="true" aria-label="Apply for Software Engineer">
+<h1>Apply</h1>
+<form onsubmit="event.preventDefault()">
+<label>First name <input name="first_name"></label>
+<label>Last name <input name="last_name"></label>
+<label>Email <input name="email" type="email"></label>
+<button type="submit">Submit application</button>
+</form>
+</div>
+<div id="cookies"><div class="bar" role="dialog" aria-label="Cookies">We use cookies. <button type="button">OK</button></div></div>
+</html>

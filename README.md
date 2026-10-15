@@ -4,7 +4,7 @@ A private macOS workspace for daily job recommendations, direct application link
 
 **Apply with review** on an opportunity starts a visible browser with persisted per-application section consent. Exact field values and selected files require approval before filling; navigation and final submission require separate approvals. Consent is single-use, tied to the observed DOM and evidence, and does not enable background applications. Unknown answers or unsupported controls require human input. `scripts/configure_europe_review.py --data-dir PATH` sets Europe-only recommendations (including the UK), prioritizes London, preserves the full tracker, and rescans matching evidence. Unknown or broadly labeled EMEA/worldwide locations are excluded from suggestions.
 
-[Guía de inicio en español](docs/INICIO_RAPIDO.es.md) · [Verification and observed limitations](docs/VERIFICATION.md)
+[Guía de inicio en español](docs/INICIO_RAPIDO.es.md) · [Browser assistant guide](docs/EXTENSION.md) · [Verification and observed limitations](docs/VERIFICATION.md)
 
 Meridian runs locally. Tauri 2 hosts the interface and launches a bundled Python service on authenticated loopback. SQLite, documents, browser sessions and logs remain on the Mac. There is no telemetry or project-owned remote server. Cloud AI is optional and requires explicit configuration.
 
@@ -39,6 +39,18 @@ Externally recorded applications use manual tracking and need no CV approval or 
 Closing Chrome or its application tab invalidates the old review. The supervisor reopens recoverable preparation with a bounded retry budget; it never reuses an approval from the closed form. Exhausted recovery shows the reason and allows **Retry Auto Apply**. **Stop attempt** cancels active work. Isolated preparation is bounded to 220 seconds and individual browser operations have shorter limits; submission verification is bounded to one minute. A restart restores preparation from its persisted checkpoint, while an interrupted submission remains uncertain and requires reconciliation. A form genuinely waiting for your answer or approval remains in review.
 
 If the local service exits, Meridian reconnects and restarts it on the next request, with at most three restart attempts per minute. Slow requests have deadlines, and failed changes are never replayed automatically. Closing or minimizing the window can be reversed by opening Meridian from the Dock.
+
+## Browser assistant (Chrome and Safari)
+
+Besides Auto Apply, Meridian ships **Meridian Assistant**, a Chrome and Safari extension that helps you fill an application in your own browser. Click its toolbar icon on a form, click a field, and it shows the suggestion for that field, where it comes from and how far to trust it (verified, check this, AI draft); **Tab** inserts it and moves to the next question. Long questions are drafted in the background from your verified profile plus public research on the company and role, and every draft is labelled for review. It never clicks Next or Submit, never touches passwords, codes, CAPTCHAs or payment fields, never ticks consent boxes, uploads only your approved CV, and never overwrites text you typed. Consent, signatures, optional personal questions and anything unknown stay yours; protected answers (work authorisation, demographics) need Enter, not Tab. Submissions are recorded only when you confirm.
+
+It talks only to Meridian on `127.0.0.1` (ports 47615 to 47624) through a separate loopback listener with its own pairing credential: you connect each browser once by typing a 6-digit code into a window Meridian opens, and you can disconnect it in **Settings → Browser assistant**. Meridian itself, not the extension, reads the employer's public pages, and may send only the company name to a public search engine if it cannot find the company's site (switchable). The one part of your information that can leave the Mac is the text sent to the writing model you configured. Install steps for Chrome (Load unpacked) and Safari, pairing, keys, settings, data flow and known limits are in [docs/EXTENSION.md](docs/EXTENSION.md); the Spanish quick start has its own section. Heuristics understand English and Spanish only, and Safari has not been driven by any automated test.
+
+```sh
+make extension          # build and check extension/dist/{chrome,safari}
+make test-ext-fast      # unit, content-script and panel UI tests
+make test-ext           # everything, including the real-browser end-to-end suite
+```
 
 ## Discovery and ATS support
 

@@ -1,3 +1,36 @@
+# Asistente del navegador (Chrome y Safari): evidencia y límites — 15 de octubre de 2026
+
+El asistente (extensión Chrome/Safari, puente local en `127.0.0.1:47615-47624`, emparejamiento por código, sugerencias campo a campo, investigación de empresa y borradores) está implementado; guía en [EXTENSION.md](EXTENSION.md), diseño en [EXTENSION_DESIGN.md](EXTENSION_DESIGN.md), modelo de amenazas en [SECURITY.md](../SECURITY.md). Los números siguientes **son de la ejecución de cierre del 15 de octubre de 2026** (árbol de trabajo final, sin commit, macOS con Node 26 y el venv del repositorio), medidos esa tarde en un Mac con carga muy alta por otros proyectos (promedios de carga de 15 a 150 durante las pruebas). Sustituyen a las cifras del 14 de octubre; el código puede seguir cambiando y una nueva ejecución puede dar otras cifras.
+
+| Capa | Resultado de la ejecución de cierre (15 de octubre de 2026) |
+|---|---|
+| Ruff (`backend scripts extension/tests extension/scripts`) | sin errores (se retiró una importación sin uso en `scenarios_sec6.py`) |
+| Backend completo (`MERIDIAN_TEST=1 pytest backend/tests --ignore=backend/tests/browser`) | **8162 correctas, 2 omitidas**, 1 aviso de deprecación de Starlette/httpx (12 min 43 s); incluye las 431 de `test_engine_metamorphic.py` |
+| Backend, pruebas de navegador (`backend/tests/browser`) | **157 correctas** (7 min 4 s) |
+| `test_engine_metamorphic.py` aparte | **431 correctas** (1 min 31 s) |
+| ESLint y TypeScript del frontend | sin errores |
+| Pruebas UI del frontend (`frontend/tests/run_ui_suite.py`, cada guion con su propio backend aislado) | **9 de 9 pasos correctos**: ui_smoke, workflow_e2e, onboarding_e2e, recovery_e2e, networking_e2e, extension_chrome, extension_webkit, extension_live, extension_live_webkit (4 min 30 s) |
+| TypeScript de la extensión, `npm --prefix extension test`, `check-prod-build.mjs` | sin errores; **309 de 309**; comprobación de producción correcta (chrome, safari) |
+| Prueba de humo en Chromium (`smoke_chromium.py`) | **119 comprobaciones correctas, 0 fallidas** |
+| Pruebas del script de contenido (`tests/content/run.py`, Chromium y WebKit) | **441 correctas, 0 fallidas** de 441 (12 min 32 s) |
+| Pruebas del panel (`tests/ui/run.py`) | Chromium **y** WebKit: 1194 escenas, 10 234 aserciones, 0 fallos, contraste de texto mínimo 4,86:1 (cada una unos 7 min 30 s) |
+| Matriz de componentes reales (`tests/widgets/run.py`, Chromium) | **252 correctas, 1 XFAIL conocido** (autocompletado de ubicación estilo Lever), 0 fallidas, de 253 |
+| Extremo a extremo en navegador real (101 escenarios, `test_extension_e2e.py`) | Chromium: dos pasadas completas limpias (**101 de 101** y **101 de 101**) y Chrome de marca por CDP (`--recipe chrome`) **101 de 101**. Entre ellas, tres pasadas completas con un solo fallo cada una, distinto cada vez y bajo carga de 30 a 40: `many_assisted_pages_do_not_starve` dos veces (la cota fija de 3 s para el primer chip de la décima página midió 5,9 s y 3,5 s; ahora se escala con el factor de paciencia como el resto de esperas, 9 s por defecto, aún muy por debajo de los ~20 s de la inanición que vigila) y `duplicate_banner_after_record_and_reload` una vez (tiempo de espera de la grabación; pasó en las 5 repeticiones aisladas y en 18 ejecuciones concurrentes con carga de 150, sin causa de producto encontrada) |
+| Rust | `cargo fmt --check` limpio, `cargo check --offline` correcto, `cargo test --offline` **9 correctas** |
+| Empaquetado (sin instalar, sin abrir la app) | `Meridian.app` firmada de 92 MiB; `build_signed_app.py --verify-app ... --expect-safari` y `build_extension.py --verify-sidecar ... --compare-contents` correctos (el sidecar contiene byte por byte `extension/dist/chrome`); el backend congelado, solo y con datos temporales, responde a `/v1/hello`, instala `extensions/chrome/manifest.json` y el proceso de análisis (`--meridian-parse`) devuelve texto |
+
+Lo que **no** está probado, dicho sin adornos:
+
+- **Safari real.** Ninguna prueba automática maneja Safari. Se compila y firma la extensión de Safari, se comprueba su registro en una copia temporal (`make extension-safari`) y el mismo código se ejecuta en WebKit de Playwright (mundo de página, no el mundo aislado de Safari). El orden de foco nativo, la regla de 0,5 s y el flujo de permisos de sitios web de Safari no están verificados.
+- **Empresas reales.** Ninguna prueba contacta un sitio de empleador. Las réplicas de widgets de Workday, SmartRecruiters, Workable, iCIMS, Teamtailor y Lever se escribieron a partir del marcado público y no se han verificado contra inquilinos reales. La investigación de empresa se prueba con sitios de fixture en loopback y con respuestas simuladas; la búsqueda pública del sitio oficial está desactivada en las pruebas.
+- **Borradores con un proveedor real.** Los borradores se prueban con un modelo falso en loopback que cumple el flujo real de redacción y revisión independiente, no con la calidad de un modelo concreto.
+- **Idiomas.** Solo inglés y español.
+- **Primer emparejamiento.** No puede autenticarse por naturaleza; existe además una ventana de milisegundos entre la prueba del saludo y la petición siguiente. Ver SECURITY.md.
+- **Máquina en reposo.** Ninguna de estas ejecuciones se hizo en una máquina sin carga; las esperas del suite de extremo a extremo se multiplican por 3 por defecto (`MERIDIAN_E2E_SLOWDOWN`) por esa razón.
+- **Instalación manual de un usuario.** En los registros que he usado no consta que alguien cargara a mano la extensión desde `~/Library/Application Support/Meridian/extensions/chrome` en Chrome con la app firmada ni que activara la de Safari desde `/Applications`; el empaquetado se comprueba con `scripts/build_signed_app.py` y `scripts/build_extension.py --verify-sidecar`, pero esa pasada manual sigue pendiente.
+
+Ninguna prueba envió una candidatura real: los formularios son fixtures locales, las pruebas comprueban explícitamente que no se pulsa Enviar, que no se escribe en contraseñas ni se marcan consentimientos, y los recorridos solo con teclado se comparan campo a campo con ficheros esperados escritos a partir de los datos sintéticos.
+
 # Entrada Apply y Workday/Citi — 9 de octubre de 2026
 
 Corregida la distinción entre abrir una candidatura y enviarla: enlaces Apply, botones iniciales, Apply Manually, enlaces repetidos y rutas anidadas que cargan después de la cabecera. El Apply final sigue requiriendo aprobación, incluso en una revisión sin campos. El consentimiento por sección muestra la navegación inicial por separado.

@@ -24,6 +24,17 @@ flowchart LR
   DOM --> Policy[Deterministic adapters / semantic fields]
   Policy --> Decision[Laya / Jev confidence gate]
   Policy --> Human[Review / human takeover]
+  Ext[Chrome / Safari extension worker] -->|"hello proof, then Bearer mrd1"| Bridge[Bridge listener 127.0.0.1:47615-47624]
+  Bridge --> Pairing[Pairing and revocation]
+  Bridge --> Sessions[Page sessions, event cursor, long-poll]
+  Sessions --> Resolver[FieldResolver: same answer engine as Auto Apply]
+  Sessions --> Research[ResearchManager: public pages, no model]
+  Sessions --> Drafts[Generation queue: narrative drafts]
+  Resolver --> DB
+  Drafts --> TextAI[Chosen text model]
+  Research --> Net[Employer public pages]
+  Pairing --> DB
+  UI --> Pairing
 ```
 
 ## Storage
@@ -51,6 +62,24 @@ Read-only Gmail OAuth, Microsoft Graph OAuth and IMAP over TLS use Keychain cred
 ## Failure and privacy model
 
 Network errors are surfaced per source/integration and retries use bounded backoff. Child-process failure is isolated from the API and UI. A run checkpoint records progress, never cookies or authentication headers; persisted URLs lose credential parameters and fragments. On restart, recoverable preparation resumes from semantic checkpoints with old approvals invalidated. Pending or uncertain submission requires reconciliation. Facts imported from CVs start unverified; only explicit verification/locking permits automatic use. Sensitive questions require an explicit policy. Text model outputs must cite existing verified fact IDs and remain drafts until reviewed where factual support is uncertain. Local inference is preferred; configured remote providers clearly disclose their data boundary.
+
+## Browser assistant (Chrome and Safari)
+
+A second, separate listener lives in the sidecar's event loop: `BridgeServer` binds the first free port of `127.0.0.1:47615-47624` itself (a port conflict never stops the main API) and serves its own FastAPI app (`extension/app.py`). It is distinct from the desktop API: its own guard, its own credential, its own `{detail, code}` errors, and its requests are not counted as active requests (polling must not block a backup restore). `BridgeGuard` accepts only `Host` `127.0.0.1`/`localhost`, an `Origin` of `chrome-extension://` or `safari-web-extension://` (mutating requests must carry one), JSON bodies of at most 1 MiB, a 30 s deadline (45 s for polls), and answers 503 `restoring` while a backup is restored. The Chrome extension folder is installed to `~/Library/Application Support/Meridian/extensions/chrome` by the sidecar at start, from the build embedded in the signed bundle.
+
+**Pairing** (`pairing.py`, `approval.py`): the extension starts a pairing and shows a six-digit code; Meridian opens a native `osascript` dialog (and an in-app Approve button) and the first decision wins. The token `mrd1.<client_id>.<secret>` is returned once to the polling extension; only `sha256(secret)` is stored in `extension_clients`. Before every request that carries a credential, the extension's worker calls `GET /v1/hello?client&nonce` and verifies an HMAC proof keyed by the stored hash, so a process squatting the port receives no token.
+
+**Sessions** (`session.py`): one session per (paired browser, page) holds the frames the page scanned, the suggestion state of every field, a monotonic event list (cap 500) and the research and draft state. Browsing writes only company, title and host to `extension_sessions`; a job and a bare PREPARING application are created lazily on the first saved answer or an explicit save/record. The worker holds one multiplexed long-poll (`POST /v1/poll`, up to 16 pages, 25 s) instead of one per page; events are `suggestion`, `research`, `knowledge`, `generation_budget`, `drafts_paused` and `tracked`. A Meridian restart expires every session (410) and the extension reopens them.
+
+**Answers** (`suggest.py`, `resolver.py`): the extension sends the observer's descriptors (never typed text). `FieldResolver` reproduces the order of authority of `automation/runner.py` (manual corrections, disclosure policy, `CandidateEngine`, confirmed fallbacks, option mapping) so the assistant and Auto Apply cannot disagree; a parity test guards it. The engine answers a factual question only when it passes the plain-question gate (`intelligence/plain.py`) and otherwise leaves it as `NEEDS_YOU`. `suggest.py` maps the result to a state and an insertion tier (`tab`, `explicit`, `never`); protected, consent and sensitive answers never take the `tab` tier by default.
+
+**Research** (`research.py`): `ResearchManager` runs once per (company, posting) and is deterministic and model-free: identify the company and role, read the job text, verify the official website, then read a fixed set of public pages of that verified domain. All fetches go through one IP-pinned, redirect-revalidating, size- and time-bounded fetcher; everything fetched is untrusted data. An optional last-resort lookup sends only the company name to a public search page.
+
+**Generation** (`generation.py`): narrative questions are drafted in the background by a queue that coalesces identical requests, runs one draft at a time per page in document order, reuses the answer model's own semaphore and budget accounting, never cancels an in-flight provider call, stops on the first configuration or budget error and caps drafts started automatically (per page, browser and hour). Every draft carries the facts it cited and the research it used, and is withdrawn if either changes.
+
+**Desktop UI**: `extension/api.py` serves `/api/extension/*` with the app token (status, approve/deny pairing, disconnect, settings, install helpers, activity feed, bridge restart, open a job in the paired browser) and `frontend/src/extension*.tsx` renders Settings → Browser assistant. Backups delete the paired-browser, pairing, session and audit tables.
+
+**The extension** (`extension/src`): a stateless MV3 service worker holds all bridge traffic, the credential and per-tab activation; content scripts (isolated world) scan the page with `automation/observation.js`, decide Tab synchronously from a prefetched cache, write values through native setters with read-back verification, and draw the chip and panel in a closed shadow root. The same TypeScript builds the Chrome and Safari variants; Safari adds a sandboxed Swift app extension embedded in `Meridian.app/Contents/PlugIns`. See [docs/EXTENSION.md](docs/EXTENSION.md) and [docs/EXTENSION_DESIGN.md](docs/EXTENSION_DESIGN.md).
 
 ## Verification and packaging
 

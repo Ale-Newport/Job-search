@@ -28,6 +28,10 @@ def workspace(tmp_path, monkeypatch):
         yield app, client
 
 
+def db_version_id(app):
+    return app.state.db.one("SELECT id FROM document_versions ORDER BY created_at DESC LIMIT 1")["id"]
+
+
 def steps(client):
     return {item["id"]: item["status"] for item in client.get("/api/onboarding").json()["steps"]}
 
@@ -60,6 +64,10 @@ def test_profile_reviews_limits_and_ai_configuration_invalidate_progress(workspa
         files={"file": ("cv.txt", b"Sample Candidate\nsample@example.test\nSKILLS\nPython", "text/plain")},
     )
     assert imported.status_code == 201
+    # an imported CV is not usable until the user approves it (CPL-06): the step is under way, not complete
+    assert steps(client)["documents"] == "in_progress"
+    version_id = db_version_id(app)
+    assert client.post(f"/api/document-versions/{version_id}/approve").status_code == 200
     assert steps(client)["documents"] == "complete"
     assert steps(client)["profile"] != "complete"
     for fact in client.get("/api/facts").json()["items"]:
@@ -77,6 +85,37 @@ def test_profile_reviews_limits_and_ai_configuration_invalidate_progress(workspa
     assert steps(client)["ai"] == "complete"
     client.put("/api/integrations/openai-compatible", json={"config": {}, "secret": "test-key-only"})
     assert steps(client)["ai"] != "complete"
+
+
+def step_evidence(client, step_id):
+    return next(item for item in client.get("/api/onboarding").json()["steps"] if item["id"] == step_id)
+
+
+def test_documents_step_counts_only_the_users_own_base_cvs(workspace):
+    """The browser assistant offers a CV written for one job to that job only (profile_summary.has_cv counts base CVs): the
+    setup step must not read 'complete' while the panel still says 'approve your CV'."""
+    from jobagent.extension.api import profile_summary
+
+    app, client = workspace
+    db = app.state.db
+    job = client.post("/api/jobs", json={"title": "Engineer", "company": "Acme", "url": "https://acme.example/jobs/1"}).json()
+    db.execute("INSERT INTO documents VALUES('d-job','CV for Acme','cv',?,'t','t')", (job["id"],))
+    db.execute(
+        "INSERT INTO document_versions(id,document_id,version,path,filename,mime_type,content_hash,text,approved,created_at) "
+        "VALUES('v-job','d-job',1,'/x','cv.pdf','application/pdf','h','Sample CV written for Acme',1,'2020-01-01T00:00:00+00:00')")
+    only_job = step_evidence(client, "documents")
+    assert only_job["status"] == "in_progress" and only_job["evidence"]["approved_cvs"] == 0, only_job
+    assert "Approve your CV in Documents" in only_job["detail"]
+    assert profile_summary(db)["has_cv"] is False
+    assert client.post(
+        "/api/documents/import", files={"file": ("cv.txt", b"Sample Candidate\nsample@example.test\nSKILLS\nPython", "text/plain")}
+    ).status_code == 201
+    assert step_evidence(client, "documents")["status"] == "in_progress"  # imported, not approved yet
+    assert profile_summary(db)["has_cv"] is False
+    assert client.post(f"/api/document-versions/{db_version_id(app)}/approve").status_code == 200
+    done = step_evidence(client, "documents")
+    assert done["status"] == "complete" and done["evidence"]["approved_cvs"] == 1, done
+    assert profile_summary(db)["has_cv"] is True
 
 
 def test_saved_mail_configuration_requires_authentication_and_successful_sync(workspace, monkeypatch):

@@ -24,6 +24,7 @@ from starlette.middleware.trustedhost import TrustedHostMiddleware
 from .backup import export_backup, restore_backup
 from .config import APP_NAME, data_directory
 from .db import Database, decode_row, now
+from .extension.server import bridge_enabled
 from .mail import MailService, classify_message, ingest_message, parse_message
 from .security import JsonFormatter, RedactingFilter, SecretStore
 from .text_ai import TextService
@@ -63,10 +64,10 @@ async def notify(title: str, message: str, db=None):
         logger.info("notification_unavailable")
 
 
-def create_app(data_dir: Path | None = None, token: str | None = None, secret_store=None, start_scheduler=True, worker_isolation=True):
+def create_app(data_dir: Path | None = None, token: str | None = None, secret_store=None, start_scheduler=True, worker_isolation=True, bridge=False):
     root = data_dir or data_directory()
     root = Path(root)
-    for child in ("database", "documents", "browser-profile", "cache", "logs", "backups", "models"):
+    for child in ("database", "documents", "browser-profile", "cache", "logs", "backups", "models", "extensions"):
         (root / child).mkdir(parents=True, exist_ok=True, mode=0o700)
     credential = token or os.environ.get("MERIDIAN_API_TOKEN") or secrets.token_urlsafe(32)
     store = secret_store or SecretStore()
@@ -94,6 +95,8 @@ def create_app(data_dir: Path | None = None, token: str | None = None, secret_st
         app.state.automation.text_service = app.state.text_ai
         app.state.laya_runtime = LayaRuntime(root)
         app.state.ollama_runtime = OllamaRuntime(root)
+        if bridge:
+            await start_bridge(app, root)
         scheduler = asyncio.create_task(schedule(app)) if start_scheduler else None
 
         async def start_local_model():
@@ -147,6 +150,7 @@ def create_app(data_dir: Path | None = None, token: str | None = None, secret_st
             text_start.cancel()
             with contextlib.suppress(asyncio.CancelledError):
                 await text_start
+        await stop_bridge(app)
         await app.state.automation.close()
         await app.state.laya_runtime.close()
         await app.state.ollama_runtime.close()
@@ -157,6 +161,9 @@ def create_app(data_dir: Path | None = None, token: str | None = None, secret_st
     app.state.secrets = store
     app.state.mail = MailService(app.state.db, store)
     app.state.text_ai = TextService(app.state.db, store)
+    from .extension.state import install_extension_state
+
+    install_extension_state(app)
     app.state.restoring = False
     app.state.active_requests = 0
     app.add_middleware(TrustedHostMiddleware, allowed_hosts=["127.0.0.1", "localhost", "testserver"])
@@ -223,6 +230,8 @@ def create_app(data_dir: Path | None = None, token: str | None = None, secret_st
     app.include_router(tracking_router, prefix="/api")
     from .networking import router as networking_router
     app.include_router(networking_router, prefix='/api')
+    from .extension.api import router as extension_router
+    app.include_router(extension_router, prefix='/api')
 
     @app.get("/api/health")
     async def health():
@@ -733,6 +742,52 @@ def create_app(data_dir: Path | None = None, token: str | None = None, secret_st
     return app
 
 
+async def start_bridge(app, root):
+    """Install the Chrome extension folder and start the loopback bridge for the browser assistant.
+
+    Neither step may ever prevent Meridian from starting: failures are logged and shown in Settings > Browser assistant."""
+    try:
+        from .extension.assets import install_chrome_extension
+
+        app.state.extension_install = await asyncio.to_thread(install_chrome_extension, root)
+    except Exception as exc:
+        app.state.extension_install = {"installed": False, "reason": "The extension folder could not be prepared"}
+        logger.warning("extension_install_failed %s", type(exc).__name__)
+    try:
+        from .extension.api import prune_audit
+
+        await asyncio.to_thread(prune_audit, app.state.db)
+    except Exception:
+        logger.warning("extension_audit_prune_failed")
+    try:
+        from .extension.app import create_bridge_app
+        from .extension.server import BridgeServer
+
+        server = app.state.bridge = BridgeServer(create_bridge_app(app))
+        if not await server.start():
+            logger.warning("bridge_not_started")
+    except Exception as exc:
+        logger.error("bridge_failed %s: %s", type(exc).__name__, exc)
+
+
+async def stop_bridge(app):
+    """Shutdown order: stop accepting extension requests, close pairing dialogs, then the assistant's own services."""
+    server = getattr(app.state, "bridge", None)
+    if server is not None:
+        with contextlib.suppress(Exception):
+            await server.stop()
+    pairing = getattr(app.state, "extension_pairing", None)
+    if pairing is not None:
+        with contextlib.suppress(Exception):
+            await pairing.close()
+    try:
+        from .extension.state import close_extension_state
+
+        await close_extension_state(app)
+    except Exception:
+        logger.warning("extension_state_close_failed")
+
+
 def daily_discovery_should_enqueue(db, key, *, at=None):
     from datetime import datetime, timezone
     latest = db.one('SELECT state,updated_at FROM automation_tasks WHERE dedupe_key=? ORDER BY created_at DESC LIMIT 1', (key,))
@@ -799,13 +854,17 @@ def run():
     for handler in logging.getLogger().handlers:
         handler.addFilter(RedactingFilter())
         handler.setFormatter(JsonFormatter())
+    # httpx logs every request it makes at INFO, address and query string included: with the root logger at INFO the backend's
+    # log file would list every employer page researched and every company searched for (SEC-13). Warnings and errors stay.
+    for noisy in ("httpx", "httpcore"):
+        logging.getLogger(noisy).setLevel(logging.WARNING)
     if not os.environ.get("MERIDIAN_API_TOKEN"):
         if os.environ.get("MERIDIAN_DEV") == "1":
             os.environ["MERIDIAN_API_TOKEN"] = "meridian-development-token"
         else:
             raise SystemExit("Start Meridian from the desktop app, or use MERIDIAN_DEV=1 for local development")
     uvicorn.run(
-        create_app(),
+        create_app(bridge=bridge_enabled()),
         host="127.0.0.1",
         port=int(os.environ.get("MERIDIAN_PORT", "8765")),
         access_log=False,

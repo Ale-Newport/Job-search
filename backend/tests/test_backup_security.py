@@ -49,5 +49,5 @@ def test_old_backup_migrates_before_replacing_current_workspace(tmp_path):
     old_backup = export_backup(db, tmp_path, "old-backup-test-password")
     Database(db.path)
     restore_backup(db, tmp_path, old_backup.read_bytes(), "old-backup-test-password")
-    assert db.one("SELECT version_num FROM alembic_version")["version_num"] == "0012_application_answer_history"
+    assert db.one("SELECT version_num FROM alembic_version")["version_num"] == "0013_browser_extension"
     assert db.query("SELECT * FROM notification_receipts") == []

@@ -104,6 +104,22 @@ DEFAULT_SETTINGS = {
     "preferred_city": "",
     "rules": [],
     "sensitive_policies": {},
+    # Browser assistant (docs/EXTENSION_DESIGN.md 5.10). ExtensionSettings <-> these keys: extension/api.py.
+    "extension_enabled": True,
+    "extension_language": "auto",
+    "extension_auto_advance": True,
+    "extension_skip_filled": True,
+    "extension_tab_inserts_protected": False,
+    "extension_save_corrections": "ask",
+    "extension_research_enabled": True,
+    "extension_background_drafts": True,
+    "extension_web_lookup": True,
+    "extension_hint_on_ats": True,
+    "extension_pairing_dialog": True,
+    "extension_draft_budget_usd": None,
+    "extension_always_on_sites": [],
+    "extension_research_concurrency": 2,
+    "extension_company_sites": {},
 }
 
 
@@ -439,13 +455,21 @@ def relationship_create(payload: RelationshipPayload, request: Request):
     return required(db, "relationships", identifier)
 
 
+def forget_extension_status(request: Request) -> None:
+    """The browser assistant's ``GET /v1/status`` block (verified facts, has_cv, unapproved_cvs) is cached for a minute. What it
+    says about the user's CVs must follow a change made here at once: the panel is waiting for "approve your CV in Meridian"."""
+    request.app.state.extension_status_cache = None
+
+
 @router.post("/documents/import", status_code=201)
 async def document_import(request: Request, file: UploadFile = File(...)):
     content = await file.read(MAX_IMPORT + 1)
     try:
-        return import_document(get_db(request), request.app.state.data_dir, content, file.filename or "document.txt")
+        imported = import_document(get_db(request), request.app.state.data_dir, content, file.filename or "document.txt")
     except ValueError as exc:
         raise HTTPException(422, str(exc)) from exc
+    forget_extension_status(request)
+    return imported
 
 
 @router.get("/documents")
@@ -473,9 +497,11 @@ def document_reimport(document_id: str, request: Request):
     db = get_db(request)
     required(db, "documents", document_id)
     try:
-        return reimport_document(db, request.app.state.data_dir, document_id)
+        reimported = reimport_document(db, request.app.state.data_dir, document_id)
     except ValueError as exc:
         raise HTTPException(422, str(exc)) from exc
+    forget_extension_status(request)
+    return reimported
 
 
 @router.get("/documents/{document_id}/versions")
@@ -511,6 +537,7 @@ def document_approve(version_id: str, request: Request):
             application = conn.execute('SELECT id,status FROM applications WHERE job_id=?', (document['job_id'],)).fetchone()
             if application and application['status'] not in SUBMITTED_STATUSES:
                 attach_document(db, conn, application['id'], version_id, document['kind'])
+    forget_extension_status(request)
     return required(db, "document_versions", version_id)
 
 
@@ -743,10 +770,33 @@ def prepare_application(db, job_id, mode="review", document_version_id=None, dat
             document_path(db, data_dir, document["id"])
         except ValueError as exc:
             raise HTTPException(422, str(exc)) from exc
+    question = (
+        "Review each proposed section before filling; approve the final submission separately"
+        if section_consent
+        else "Review candidate facts and approve a tailored CV before filling this application"
+        if not document
+        else "Review the selected CV and application answers before submitting"
+    )
     with db.transaction() as conn:
         existing = conn.execute("SELECT * FROM applications WHERE job_id=?", (job_id,)).fetchone()
-        if existing:
+        adopted = existing is not None and assistant_bare_row(conn, existing)
+        if existing and not adopted:
             application_id = existing["id"]
+        elif adopted:
+            # The row the browser assistant wrote first (docs/EXTENSION_DESIGN.md 5.7) is completed the way a fresh row is
+            # (INT-01), keeping its history and whatever answers it saved. Its review task is written in THIS transaction: that
+            # is what stops being "bare", so a second Prepare at the same moment finds it already prepared.
+            application_id = existing["id"]
+            conn.execute("UPDATE applications SET mode=?,updated_at=? WHERE id=?", (payload.mode, stamp, application_id))
+            conn.execute(
+                "INSERT INTO application_events VALUES(?,?,?,?,?,?)",
+                (uid(), application_id, "PREPARING", "Application workspace prepared", "manual", stamp),
+            )
+            conn.execute("UPDATE jobs SET status='SHORTLISTED',updated_at=? WHERE id=?", (stamp, job_id))
+            conn.execute(
+                "INSERT INTO human_tasks(id,application_id,kind,question,created_at,updated_at) VALUES(?,?,?,?,?,?)",
+                (uid(), application_id, "PREPARATION_REVIEW", question, stamp, stamp),
+            )
         else:
             application_id = uid()
             conn.execute(
@@ -771,7 +821,7 @@ def prepare_application(db, job_id, mode="review", document_version_id=None, dat
             conn.execute("UPDATE applications SET section_consent=1,assisted_autofill=?,mode='review' WHERE id=?",
                          (int(assisted_autofill), application_id))
     application = required(db, "applications", application_id)
-    if not existing:
+    if not existing or adopted:
         trusted = db.query("SELECT * FROM facts WHERE verification_status='verified' OR locked=1")
         if trusted and not document and not section_consent:
             # Preparation produces a reviewable draft; saving/uploading needs explicit approval.
@@ -779,22 +829,30 @@ def prepare_application(db, job_id, mode="review", document_version_id=None, dat
             application["draft"] = draft
         else:
             application["draft"] = None
-        question = (
-            "Review each proposed section before filling; approve the final submission separately"
-            if section_consent
-            else "Review candidate facts and approve a tailored CV before filling this application"
-            if not document
-            else "Review the selected CV and application answers before submitting"
-        )
-        db.execute(
-            "INSERT INTO human_tasks(id,application_id,kind,question,created_at,updated_at) VALUES(?,?,?,?,?,?)",
-            (uid(), application_id, "PREPARATION_REVIEW", question, stamp, stamp),
-        )
+        if not adopted:
+            db.execute(
+                "INSERT INTO human_tasks(id,application_id,kind,question,created_at,updated_at) VALUES(?,?,?,?,?,?)",
+                (uid(), application_id, "PREPARATION_REVIEW", question, stamp, stamp),
+            )
         db.event(application_id, "NEEDS_REVIEW", "Documents and candidate evidence require review", "system")
         application["status"] = "NEEDS_REVIEW"
     application["job"] = job
-    application["duplicate"] = bool(existing)
+    application["duplicate"] = bool(existing) and not adopted
     return application
+
+
+def assistant_bare_row(conn, application) -> bool:
+    """Is this application the bare row the browser assistant made and nothing has touched since (INT-01)? Still ``PREPARING``, its
+    history says the assistant wrote it, no review task and no automation run. Anything else (another origin, work attached, a
+    row that was sent) is somebody's work in progress and is left exactly as it is."""
+    if application["status"] != "PREPARING":
+        return False
+    application_id = application["id"]
+    if not conn.execute("SELECT 1 FROM application_events WHERE application_id=? AND origin='extension' LIMIT 1",
+                        (application_id,)).fetchone():
+        return False
+    return not any(conn.execute(f"SELECT 1 FROM {table} WHERE application_id=? LIMIT 1", (application_id,)).fetchone()
+                   for table in ("human_tasks", "automation_runs"))
 
 
 class FeedbackPayload(Payload):
@@ -1177,6 +1235,14 @@ async def application_detail(application_id: str, request: Request):
                 if key in latest:
                     answer[key] = latest[key]
         answer["evidence"] = historical_facts(db, answer["fact_ids"], answer["created_at"])
+    # Browser assistant (docs/EXTENSION_DESIGN.md section 6): the same summary as the tracker row, and the label that
+    # tells an answer saved through the assistant apart from one entered in Meridian or in Auto Apply's browser.
+    from .extension.api import extension_answer_ids, tracker_assistant
+
+    result["assistant"] = tracker_assistant(db, result["job_id"]).get(result["job_id"])
+    assisted = extension_answer_ids(db, application_id)
+    for answer in (*result["answers"], *result["answer_history"]):
+        answer["origin"] = "extension" if answer["id"] in assisted else None
     result["documents"] = [
         decode_row(row)
         for row in db.query(
@@ -1534,6 +1600,7 @@ async def settings_patch(payload: dict, request: Request):
                 "INSERT INTO settings(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",
                 (key, dumps(value)),
             )
+    forget_extension_status(request)  # the browser assistant's status block reads the writing model and its budget
     automation = getattr(request.app.state, "automation", None)
     if automation and "automation_paused" in payload:
         if payload["automation_paused"]:

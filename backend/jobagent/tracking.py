@@ -34,6 +34,14 @@ class RecordApplication(BaseModel):
     notes: str = Field(default="", max_length=20000)
 
 
+# The timeline sentence of the APPLIED event, by who recorded it. The user always confirmed the submission themselves;
+# any other origin (an email) is Meridian identifying it from evidence.
+APPLIED_MESSAGES = {
+    "manual": "Application submitted externally; recorded by you.",
+    "extension": "Application recorded from the browser assistant; confirmed by you.",
+}
+
+
 def record_application(db, job_id, applied_at=None, notes="", origin="manual"):
     stamp = now()
     submitted_at = applied_at or stamp
@@ -60,9 +68,7 @@ def record_application(db, job_id, applied_at=None, notes="", origin="manual"):
                 uid(),
                 identifier,
                 "APPLIED",
-                "Application submitted externally; recorded by you."
-                if origin == "manual"
-                else "Application identified from confirmation email.",
+                APPLIED_MESSAGES.get(origin, "Application identified from confirmation email."),
                 origin,
                 submitted_at,
             ),
@@ -102,9 +108,13 @@ def tracker_rows(db):
         "SELECT id,application_id,subject,received_at,deadline,classification FROM email_messages WHERE application_id IS NOT NULL ORDER BY received_at DESC,rowid DESC"
     ):
         emails.setdefault(row["application_id"], []).append(dict(row))
+    from .extension.api import tracker_assistant
+
+    assistant = tracker_assistant(db)
     result = []
     for raw in rows:
         j = decode_row(raw)
+        j["assistant"] = assistant.get(j["id"])
         related = emails.get(j["application_id"], [])
         j["last_email"] = related[0] if related else None
         j["email_count"] = len(related)

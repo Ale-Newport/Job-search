@@ -54,6 +54,7 @@ class SecretStore:
 class RedactingFilter(logging.Filter):
     def filter(self, record):
         text = record.getMessage()
+        text = re.sub(r"mrd1\.[0-9A-Fa-f-]{8,40}\.[A-Za-z0-9_-]+", "mrd1.[redacted]", text)
         text = re.sub(r"(?i)(bearer\s+)[^\s,]+", r"\1[redacted]", text)
         text = re.sub(
             r"(?i)((?:access_token|refresh_token|api_key|password|authorization)[\s=:]+)[^\s,]+", r"\1[redacted]", text
@@ -75,6 +76,36 @@ class JsonFormatter(logging.Formatter):
         )
 
 
+# Ranges that ``ipaddress.is_global`` still calls global (it follows the IANA table, which does not list these as special) or
+# that wrap an IPv4 address in a way that hides what it is. A destination that may reach a private IPv4 host through a
+# translator, or that is only reserved, is not "the public Internet".
+NON_PUBLIC_V6 = tuple(ipaddress.ip_network(net) for net in (
+    "::/96",            # IPv4-compatible (deprecated): ``::10.0.0.1`` is the private host again on some stacks
+    "64:ff9b::/96",     # NAT64 well-known prefix: a translator turns ``64:ff9b::a00:1`` into 10.0.0.1
+    "64:ff9b:1::/48",   # local-use NAT64
+    "::ffff:0:0:0/96",  # IPv4-translated (SIIT)
+    "fec0::/10",        # deprecated site-local: private by definition
+    "100::/64",         # discard-only
+    "2001:db8::/32",    # documentation
+))
+
+
+def is_public_ip(ip) -> bool:
+    """Is this address on the public Internet? IPv4-mapped IPv6 (``::ffff:a.b.c.d``) is judged by the IPv4 address it
+    wraps, and the IPv6 forms of the private ranges above (``::/96``, NAT64, site-local) are refused outright. A value that
+    is not an address is not public."""
+    try:
+        address = ipaddress.ip_address(str(ip).split("%")[0])
+    except ValueError:
+        return False
+    if isinstance(address, ipaddress.IPv6Address):
+        if address.ipv4_mapped is not None:
+            address = address.ipv4_mapped
+        elif any(address in network for network in NON_PUBLIC_V6):
+            return False
+    return bool(address.is_global and not address.is_multicast)
+
+
 def public_url(url: str, allow_local: bool = False) -> str:
     parsed = urlparse(url)
     if parsed.scheme not in ("https", "http") or not parsed.hostname or parsed.username or parsed.password:
@@ -86,7 +117,7 @@ def public_url(url: str, allow_local: bool = False) -> str:
         addresses = {x[4][0] for x in socket.getaddrinfo(host, parsed.port or 443)}
     except socket.gaierror as exc:
         raise ValueError("Could not resolve the URL hostname") from exc
-    if any(not ipaddress.ip_address(address).is_global for address in addresses):
+    if any(not is_public_ip(address) for address in addresses):
         raise ValueError("Private network and local system URLs are not permitted")
     return url
 

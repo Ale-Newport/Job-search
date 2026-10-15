@@ -70,7 +70,9 @@ def record_ai_probe(db, kind, result):
     )
 
 
-def onboarding_status(db):
+def onboarding_status(db, app_state=None):
+    from .extension.api import base_cv_versions, onboarding_evidence
+
     settings = get_settings(db)
     counts = db.one(
         "SELECT COUNT(*) AS total, SUM(CASE WHEN verification_status='verified' OR locked=1 THEN 1 ELSE 0 END) AS verified, "
@@ -78,6 +80,10 @@ def onboarding_status(db):
     )
     counts = {key: value or 0 for key, value in counts.items()}
     documents = db.one("SELECT COUNT(*) AS n FROM document_versions WHERE length(trim(text))>0")["n"]
+    # An imported CV is not usable (not by Auto Apply, not by the browser assistant) until the user approves it, and a CV
+    # written for one job does not make the user's own CV ready: the count is the one the browser assistant's panel reads
+    # (``profile_summary.has_cv``), so setup and the panel never disagree about whether a CV is approved.
+    approved_cvs = base_cv_versions(db, approved=True)
     profiles = db.one("SELECT COUNT(*) AS n FROM search_profiles WHERE json_array_length(config,'$.roles')>0")["n"]
     browser = read_record(db, "browser_account")
     connected = db.query(
@@ -93,6 +99,7 @@ def onboarding_status(db):
     text_ready = settings.get("text_provider", "none") == "none" or bool(
         text_probe and text_probe.get("success") and text_probe.get("fingerprint") == fingerprint(db, TEXT_AI)
     )
+    assistant = onboarding_evidence(db, app_state)
     boundaries = read_record(db, "boundaries")
     boundaries_ready = bool(boundaries and boundaries.get("fingerprint") == fingerprint(db, BOUNDARIES))
     sources = db.query("SELECT id,name,last_checked,last_error,jobs_found FROM sources WHERE last_checked IS NOT NULL")
@@ -115,9 +122,14 @@ def onboarding_status(db):
     steps = [
         step(
             "documents",
-            documents > 0,
-            f"{documents} readable document versions imported.",
-            evidence={"versions": documents},
+            approved_cvs > 0,
+            f"{documents} readable document versions imported; {approved_cvs} CV approved for use."
+            if approved_cvs
+            else f"{documents} readable document versions imported. Approve your CV in Documents so Meridian can use it."
+            if documents
+            else "No document imported yet.",
+            started=documents > 0,
+            evidence={"versions": documents, "approved_cvs": approved_cvs},
         ),
         step(
             "profile",
@@ -177,6 +189,14 @@ def onboarding_status(db):
             attention=bool(sources) and not successful,
             evidence={"successful_sources": successful},
         ),
+        step(
+            "extension",
+            assistant["complete"],
+            assistant["detail"],
+            started=assistant["started"],
+            attention=assistant["attention"],
+            evidence=assistant["evidence"],
+        ),
     ]
     return {
         "hidden": bool(read_record(db, "hidden")),
@@ -190,7 +210,7 @@ def onboarding_status(db):
 
 @router.get("/onboarding")
 def status(request: Request):
-    return onboarding_status(request.app.state.db)
+    return onboarding_status(request.app.state.db, request.app.state)
 
 
 class Visibility(BaseModel):
@@ -201,7 +221,7 @@ class Visibility(BaseModel):
 @router.patch("/onboarding")
 def visibility(payload: Visibility, request: Request):
     record(request.app.state.db, "hidden", payload.hidden)
-    return onboarding_status(request.app.state.db)
+    return onboarding_status(request.app.state.db, request.app.state)
 
 
 class BrowserConfirmation(BaseModel):
@@ -236,11 +256,11 @@ def browser_account(payload: BrowserConfirmation, request: Request):
                 "evidence": "user_confirmation",
             },
         )
-    return onboarding_status(db)
+    return onboarding_status(db, request.app.state)
 
 
 @router.post("/onboarding/boundaries/confirm")
 def boundaries_confirm(request: Request):
     db = request.app.state.db
     record(db, "boundaries", {"confirmed_at": now(), "fingerprint": fingerprint(db, BOUNDARIES)})
-    return onboarding_status(db)
+    return onboarding_status(db, request.app.state)

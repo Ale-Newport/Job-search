@@ -1,0 +1,18 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><title>Conditional fixture</title>
+<style>body{font:16px system-ui;padding:24px;max-width:720px}label{display:block;margin:10px 0}fieldset{margin:16px 0}</style>
+<h1>Application: conditional questions</h1>
+<form id="f" onsubmit="event.preventDefault()">
+<label>Full name <input name="full_name"></label>
+<label>Do you require visa sponsorship now or in the future?
+  <select name="sponsor" id="sponsor"><option value="">Select</option><option value="yes">Yes</option><option value="no">No</option></select></label>
+<div id="cond" hidden><label>If yes, please describe your visa situation <input name="visa_detail"></label></div>
+<fieldset><legend>Are you legally authorized to work in the United Kingdom?</legend>
+  <label><input type="radio" name="auth" value="yes">Yes</label>
+  <label><input type="radio" name="auth" value="no">No</label></fieldset>
+<div id="cond2" hidden><label>If you answered No, please explain why <input name="auth_detail"></label></div>
+<label>Nickname <input name="nickname"></label>
+</form>
+<script>
+document.getElementById('sponsor').addEventListener('change', e => { document.getElementById('cond').hidden = e.target.value !== 'yes'; });
+for (const r of document.querySelectorAll('[name=auth]')) r.addEventListener('change', e => { document.getElementById('cond2').hidden = e.target.value !== 'no'; });
+</script></html>

@@ -294,9 +294,13 @@ def ingest_job(db, raw: dict, source_id: str | None = None, *, match_context=Non
         existing = conn.execute(
             "SELECT * FROM jobs WHERE canonical_url=? OR identity_key=?", (job["canonical_url"], job["identity_key"])
         ).fetchone()
-        if not existing and len(job["description"]) >= 200:
+        # What a page SAYS about itself (the assistant's rows, ``source='extension'``) is never evidence that it is another posting: a
+        # cloned page that copied a real posting word for word must neither absorb the real posting found later nor be merged into
+        # it. Only an address (canonical URL, ATS identity: the query above) ties a page to a job (SEC-09).
+        if not existing and len(job["description"]) >= 200 and job["source"] != "extension":
             candidates = conn.execute(
-                "SELECT * FROM jobs WHERE lower(company)=lower(?) AND lower(title)=lower(?) AND lower(location)=lower(?) LIMIT 25",
+                "SELECT * FROM jobs WHERE lower(company)=lower(?) AND lower(title)=lower(?) AND lower(location)=lower(?) "
+                "AND COALESCE(source,'')!='extension' LIMIT 25",
                 (job["company"], job["title"], job["location"]),
             ).fetchall()
             for candidate in candidates:

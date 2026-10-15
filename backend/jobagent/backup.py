@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import base64
+import contextlib
 import io
 import json
 import os
@@ -29,12 +30,25 @@ def export_backup(db, data_dir: Path, password: str) -> Path:
     key = derive(password, salt)
     with tempfile.TemporaryDirectory(dir=data_dir / "cache") as temporary:
         snapshot = Path(temporary) / "meridian.sqlite3"
-        with sqlite3.connect(db.path) as source, sqlite3.connect(snapshot) as target:
+        # Close every connection before zipping: the snapshot is in WAL mode, so edits that are still sitting in the
+        # -wal file would silently be missing from the single database file that is archived.
+        with contextlib.closing(sqlite3.connect(db.path)) as source, contextlib.closing(sqlite3.connect(snapshot)) as target:
             source.backup(target)
         # References are harmless, but tokens can never be present in a backup.
-        with sqlite3.connect(snapshot) as clean:
-            clean.execute("DELETE FROM secret_references")
-            clean.execute("UPDATE integrations SET status='disconnected',last_sync=NULL,last_error=NULL")
+        with contextlib.closing(sqlite3.connect(snapshot)) as clean:
+            # SQLite does not erase what DELETE removes: the cells stay in their page (or in a free page) and the whole file
+            # is archived. ``secure_delete`` zeroes them as they go and VACUUM then rebuilds the file without any free
+            # page, so the hash of a paired browser, the pages it visited and the audit lines are not in the bytes.
+            clean.execute("PRAGMA secure_delete=ON")
+            with clean:
+                clean.execute("DELETE FROM secret_references")
+                # Paired browsers hold credentials that must never travel with a backup: every browser pairs again
+                # after a restore. Child tables first (this plain connection does not enforce foreign keys).
+                for table in ("extension_events", "extension_sessions", "extension_pairings", "extension_clients"):
+                    clean.execute(f"DELETE FROM {table}")
+                clean.execute("UPDATE integrations SET status='disconnected',last_sync=NULL,last_error=NULL")
+            clean.execute("VACUUM")  # outside any transaction
+            clean.execute("PRAGMA wal_checkpoint(TRUNCATE)")
         buffer = io.BytesIO()
         with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as archive:
             archive.write(snapshot, "database/meridian.sqlite3")

@@ -19,6 +19,7 @@ from .browser import PROGRESS, is_submit, application_entry_target, application_
 from .engines import make_engine
 from .option_selection import OptionSelector
 from .job_context import enrich_job_context
+from .dialcode import resolve_dial_code
 from .consent import action_key, dropdown_open_target, radio_group, resolution_element, section_plan, selected_resolution_matches
 from .types import AutomationError, Decision, HumanRequired, Operation, Paused, StaleState, UserEdit
 
@@ -179,35 +180,40 @@ class BrowserManager(BrowserSession):
 
         option_selector = OptionSelector(settings, settings.get('_local_option_engine'))
 
+        from ..intelligence.semantics import entry_attribute, form_repeats, refuse_repeated_identity  # (a circular import at the top)
+        labels = {'snapshot': None, 'index': {}}
+
+        def repeats_of(element, question):
+            """What the rest of the form says about a control: the same bare label in another block (the page repeats it), or an
+            earlier block that already takes the applicant's own name / email / phone (``semantics.form_repeats``)."""
+            if labels['snapshot'] is not snapshot:
+                labels['snapshot'], labels['index'] = snapshot, {}
+                for peer in snapshot['elements']:
+                    labels['index'].setdefault(normalize(adapter.question(peer)), []).append(peer)
+            return form_repeats(element, labels['index'].get(normalize(question), []), adapter.question)
+
         async def resolve_raw(element):
             element = resolution_element(element, snapshot['elements'])
             field = adapter.question(element)
             question_id = question_identity(application.get('id'), element, field)
+            repeats = repeats_of(element, field)
+            from ..intelligence.plain import label_core  # (lazy: the intelligence package imports this module)
+            field = label_core(field)  # what the label asks: without an instruction ('Please answer:'), a 'Required' line, a hidden character
             # Context is copied per question. A checkbox group shares one selection
             # result but every distinct question has its own immutable identity.
             element = {**element, 'question_id': question_id,
                        '_related_answers': [dict(a) for a in answers if a.get('question_id') != question_id]}
+            if repeats['repeated'] and entry_attribute(field):
+                element['_repeated_block'] = True  # the 2nd block of a form that repeats 'Start date': an entry, not the applicant
             intelligence = settings.get('_candidate_engine')
-            if intelligence and re.search(r'\bphone country code\b|\btelephone country code\b', normalize(field)):
-                phone = intelligence.answer_question('Phone', {'type': 'tel'}, application)
-                country = intelligence.answer_question('Country of residence', {'type': 'text'}, application)
-                digits = re.sub(r'\D', '', str(phone.get('answer') or ''))
-                options = []
-                if str(phone.get('answer') or '').startswith('+'):
-                    for option in element.get('options', []):
-                        code = re.search(r'\(\+(\d{1,4})\)', option.get('label', ''))
-                        if code and digits.startswith(code[1]):
-                            options.append(option)
-                selected = options[0] if len(options) == 1 else None
-                if not selected and country.get('answer'):
-                    undecorated = [{**o, 'label': re.sub(r'\s*\(\+\d+\)', '', o['label']), 'original': o} for o in options]
-                    match = option_for(str(country['answer']), undecorated, question='Country of residence')
-                    selected = match.get('original') if match else None
-                if selected:
-                    return {**phone, 'answer': selected['label'], 'form_value': selected['label'],
-                            'question': field, 'question_id': question_id,
-                            'fact_ids': list(dict.fromkeys(phone.get('fact_ids', []) + country.get('fact_ids', []))),
-                            'inference_rules': ['verified_phone_prefix_and_observed_country_option']}
+            if intelligence:
+                # 'Phone country code', 'Country Phone Code', 'Dialling code'...: a country's code, never the whole number.
+                # A closed custom dropdown is opened and asked again; a typed field cannot be, and the whole number is
+                # never a dial code: it is left to the user.
+                dial = resolve_dial_code(field, element.get('options', []), intelligence.answer_question, application,
+                                         closed='continue' if element.get('role') == 'combobox' else 'refuse')
+                if dial is not None:
+                    return {**dial, 'question_id': question_id}
             corrections = [f for f in facts if f.get('manual_correction')]
             if corrections:
                 corrected = profile_resolution(field, corrections, element=element, policies={})
@@ -242,7 +248,7 @@ class BrowserManager(BrowserSession):
                 policies['_job_context'] = job
                 cache_key = hashlib.sha256(json.dumps([question_id, intelligence.knowledge.version,
                     job, {k: element.get(k) for k in ('type','multiple','options','description','placeholder',
-                    'max_length','min_length','pattern','section_label','_education_reference','_condition')}],
+                    'max_length','min_length','pattern','section_label','_education_reference','_condition','_repeated_block')}, repeats],
                     sort_keys=True, default=str).encode()).hexdigest()
                 if cache_key not in reasoning_cache:
                     self._answer_diagnostics[question_id] = {'question_id': question_id, 'question': field,
@@ -256,6 +262,7 @@ class BrowserManager(BrowserSession):
                     reasoning_cache[cache_key] = await intelligence.answer(field, element, job)
                 result = dict(reasoning_cache[cache_key])
                 result = intelligence.confirmed_fallback(field, result, facts, policies)
+                result = refuse_repeated_identity(result, field, repeats)  # the applicant's own details: the first block only
                 result.update(question_id=question_id, status='ANSWER_VALIDATED' if result['answer'] is not None or result['leave_blank']
                               else 'ANSWER_FAILED', company_context=job.get('company_context', []))
                 previous = self._answer_diagnostics.get(question_id, {})

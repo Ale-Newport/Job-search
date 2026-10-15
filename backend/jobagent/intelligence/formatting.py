@@ -1,6 +1,7 @@
 from __future__ import annotations
 import calendar
 from datetime import date
+from functools import lru_cache
 from decimal import Decimal, InvalidOperation
 import re
 from urllib.parse import urlparse
@@ -8,12 +9,15 @@ from ..automation.answers import normalize, option_for
 
 EQUIVALENTS = [
     {"first", "first class", "first class honours", "1st", "1", "first 1st", "1st class honours"},
-    {"bachelor", "bachelor s", "bachelor s degree", "bachelors degree", "bsc", "bs", "undergraduate"},
-    {"master", "master s", "master s degree", "masters degree", "msc", "ms", "postgraduate"},
-    {"united kingdom", "uk", "gb", "great britain"},
-    {"spain", "es", "esp"},
-    {"spanish", "spanish citizenship"},
-    {"none", "not applicable", "n a", "0", "no notice", "zero", "0 days"},
+    {"bachelor", "bachelor s", "bachelor s degree", "bachelors degree", "bsc", "bs", "undergraduate",
+     "grado", "grado universitario", "licenciatura", "graduado universitario"},
+    {"master", "master s", "master s degree", "masters degree", "msc", "ms", "postgraduate",
+     "master universitario", "maestria", "posgrado", "postgrado"},
+    {"united kingdom", "uk", "gb", "great britain", "reino unido", "gran bretana"},
+    {"spain", "es", "esp", "espana"},
+    {"spanish", "spanish citizenship", "espanol", "espanola", "nacionalidad espanola", "ciudadania espanola"},
+    {"none", "not applicable", "n a", "0", "no notice", "zero", "0 days", "ninguno", "ninguna", "no aplica", "sin preaviso"},
+    {"other", "otro", "otra", "otros"},
     {
         "fluent",
         "professional working proficiency",
@@ -23,12 +27,21 @@ EQUIVALENTS = [
         "fluent native",
         "fluent or native",
     },
+    {"native", "nativo", "nativa", "lengua materna", "idioma materno"},
     {
         "prefer not to say",
         "decline to answer",
         "i do not wish to answer",
         "prefer not to disclose",
         "i don t wish to answer",
+        "prefiero no decirlo",
+        "prefiero no responder",
+        "prefiero no contestar",
+        "prefiero no indicarlo",
+        "prefiero no especificar",
+        "no deseo responder",
+        "no deseo contestar",
+        "no quiero responder",
     },
 ]
 
@@ -63,14 +76,15 @@ class AnswerFormatResolver:
             return "YYYY-MM"
         # Match the most precise explicit patterns before their substrings.
         for pattern, output in (
-            (r"\bDD\s*/\s*MM\s*/\s*YYYY\b", "DD/MM/YYYY"),
+            (r"\bDD\s*/\s*MM\s*/\s*(?:YYYY|AAAA)\b", "DD/MM/YYYY"),
             (r"\bMM\s*/\s*DD\s*/\s*YYYY\b", "MM/DD/YYYY"),
-            (r"\bYYYY\s*-\s*MM\s*-\s*DD\b|\bISO(?: 8601)?(?: date)?\b", "ISO_DATE"),
-            (r"\bMM\s*/\s*YYYY\b|\bmonth\s*/\s*year\b", "MM/YYYY"),
-            (r"\bMM\s*/\s*YY\b", "MM/YY"),
-            (r"\bYYYY\s*-\s*MM\b", "YYYY-MM"),
+            (r"\b(?:YYYY|AAAA)\s*-\s*MM\s*-\s*DD\b|\bISO(?: 8601)?(?: date)?\b", "ISO_DATE"),
+            (r"\bMM\s*/\s*(?:YYYY|AAAA)\b|\bmonth\s*/\s*year\b|\bmes\s*/\s*a[nñ]o\b", "MM/YYYY"),
+            (r"\bMM\s*/\s*(?:YY|AA)\b", "MM/YY"),
+            (r"\b(?:YYYY|AAAA)\s*-\s*MM\b", "YYYY-MM"),
             (r"\bMonth\s+Year\b", "MONTH_YEAR"),
-            (r"\bYYYY\b|\b(?:graduation|graduating|completion|leaving) year\b|\byear\b.*\b(?:graduat\w*|finish\w*|complet\w*|start\w*)\b", "YYYY"),
+            (r"\bYYYY\b|\bAAAA\b|\b(?:graduation|graduating|completion|leaving) year\b|\byear\b.*\b(?:graduat\w*|finish\w*|complet\w*|start\w*)\b"
+             r"|\ba[nñ]o de (?:graduaci[oó]n|finalizaci[oó]n|fin|egreso)\b|\ba[nñ]o\b.*\b(?:graduar\w*|finaliz\w*|termin\w*|inici\w*)\b", "YYYY"),
             (r"(?:graduation|graduating|completion|start|available).*\bmonth\b(?!.*year)", "MONTH"),
         ):
             if re.search(pattern, text, re.I):
@@ -90,9 +104,9 @@ class AnswerFormatResolver:
             return "URL"
         if kind == "email":
             return "EMAIL"
-        if re.search(r"\bcountry code\b", text, re.I):
+        if re.search(r"\bcountry code\b|\bc[oó]digo de pa[ií]s\b", text, re.I):
             return "COUNTRY_CODE"
-        if kind == "tel" or re.search(r"\bphone|mobile|telephone", text, re.I):
+        if kind == "tel" or re.search(r"\bphone|mobile|telephone|\btel[eé]fono|\bm[oó]vil\b", text, re.I):
             return "PHONE"
         if re.search(r"numeric|decimal|number only|digits only", text, re.I):
             return "PERCENTAGE_NUMBER" if "%" in text or re.search(r"percent", text, re.I) else "DECIMAL"
@@ -194,10 +208,25 @@ format_date = AnswerFormatResolver.date
 validate_format = AnswerFormatResolver.validate
 
 
-def choice(value, options, *, question="", disclosure_concept=None):
+@lru_cache(maxsize=1 << 12)
+def _question_concept(question):
     from ..automation.disclosures import disclosure_profile_key
 
-    concept = disclosure_concept or disclosure_profile_key(question)
+    return disclosure_profile_key(question)
+
+
+def question_concept(question):
+    """The one personal attribute a question asks for (``disclosure_profile_key``), memoised by the question text: an
+    option menu asks it once per option and the answer never depends on anything else."""
+    if type(question) is str and len(question) <= 512:
+        return _question_concept(question)
+    from ..automation.disclosures import disclosure_profile_key
+
+    return disclosure_profile_key(question)
+
+
+def choice(value, options, *, question="", disclosure_concept=None):
+    concept = disclosure_concept or question_concept(question)
     # A hidden machine code cannot establish an option's meaning.
     # Match the displayed label; preserve the original DOM value for execution.
     labelled = [{**o, 'value': o.get('label', ''), '_original': o} for o in options]
@@ -216,15 +245,19 @@ def choice(value, options, *, question="", disclosure_concept=None):
             {"she", "she her", "she her hers"},
             {"they", "they them", "they them theirs"},
         ],
-        "gender": [{"man", "male", "hombre"}, {"woman", "female", "mujer"}, {"non binary", "nonbinary"}],
-        "sex": [{"male", "masculino"}, {"female", "femenino"}],
+        "gender": [{"man", "male", "hombre"}, {"woman", "female", "mujer"},
+                   {"non binary", "nonbinary", "no binario", "no binaria", "no binarie"}],
+        "sex": [{"male", "masculino", "hombre"}, {"female", "femenino", "mujer"}],
         "sexual_orientation": [{"heterosexual", "straight", "heterosexual straight", "straight heterosexual"}],
         "disability": [
-            {'yes', 'disabled', 'i am disabled', 'i have a disability', 'yes i have a disability'},
+            {'yes', 'disabled', 'i am disabled', 'i have a disability', 'yes i have a disability',
+             'si', 'tengo una discapacidad', 'si tengo una discapacidad', 'si tengo discapacidad'},
             {'no', 'not disabled', 'i am not disabled', 'i do not have a disability',
-             'no i do not have a disability', 'i don t have a disability', 'no i don t have a disability'},
+             'no i do not have a disability', 'i don t have a disability', 'no i don t have a disability',
+             'no tengo discapacidad', 'no tengo una discapacidad', 'no tengo ninguna discapacidad'},
         ],
         "ethnicity": [
+            {"white", "blanco", "blanca"}, {"black", "negro", "negra"}, {"asian", "asiatico", "asiatica"}, {"mixed", "mixto", "mixta"},
             {
                 "white other",
                 "other white",
@@ -238,7 +271,12 @@ def choice(value, options, *, question="", disclosure_concept=None):
             }
         ],
     }
-    for group in aliases.get(concept, []):
+    # a refusal to answer is one in either language
+    declines = {"prefer not to say", "prefer not to answer", "i prefer not to say", "i do not wish to answer", "i don t wish to answer",
+                "decline to answer", "decline to self identify", "prefiero no decirlo", "prefiero no responder", "prefiero no contestar",
+                "no deseo responder", "no quiero responder", "prefiero no indicarlo"}
+    for group in [*aliases.get(concept, []), *([declines] if concept in {"gender", "sex", "ethnicity", "sexual_orientation", "religion", "pronouns",
+                                                                           "disability", "veteran"} else [])]:
         if norm in group:
             matches = [o for o in labels if normalize(o["label"]) in group]
             if len(matches) == 1:

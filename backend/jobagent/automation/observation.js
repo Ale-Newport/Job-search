@@ -1,5 +1,12 @@
-() => {
+options => {
   // Fixed application-owned code. Model output never becomes JavaScript or a selector.
+  // `options.widgets` is OFF for the Playwright filler (it calls this without arguments, and its upload/dropdown paths
+  // validate only the proxies they know). The browser extension passes {widgets:true} to also recognise controls the
+  // filler does not drive yet: file inputs hidden inside a plain dropzone, <button aria-haspopup="listbox"> dropdowns
+  // and Yes/No button pairs. Everything else is for every caller; without the option the output differs from the previous
+  // version of this script only in two NAMES: a custom radio / grouped checkbox (role=radio|checkbox without an aria-label)
+  // is named by its own text, and the question of a radio/checkbox group in a table layout is the cell before it.
+  const widgets = !!options && typeof options === 'object' && options.widgets === true;
   const key = '__meridianObservedControlsV1';
   if (!window[key]) window[key] = {
     documentId: crypto.randomUUID?.() || `${performance.timeOrigin}-${Math.random()}`,
@@ -12,7 +19,12 @@
     cache.nodes.set(id, node);
     return id;
   };
-  for (const [id, node] of cache.nodes) if (!node.isConnected) cache.nodes.delete(id);
+  for (const [id, node] of cache.nodes) {
+    // A page-defined `isConnected` getter that throws must not make every later scan of the page fail: such a node is dropped.
+    let connected = false;
+    try { connected = node.isConnected; } catch (error) { connected = false; }
+    if (!connected) cache.nodes.delete(id);
+  }
   const visible = node => {
     if (node.closest('[hidden], [inert], [aria-hidden="true"]')) return false;
     const style = getComputedStyle(node);
@@ -20,12 +32,22 @@
     return style.display !== 'none' && style.visibility !== 'hidden' &&
       Number(style.opacity) !== 0 && rect.width > 0 && rect.height > 0;
   };
-  const label = node => {
-    const labelText = labelNode => {
-      const copy = labelNode.cloneNode(true);
-      copy.querySelectorAll('input,select,textarea,button,svg').forEach(control => control.remove());
-      return copy.textContent.trim();
-    };
+  // Text the person types into a rich-text editor (contenteditable / role=textbox) is an ANSWER, never part of a question: every
+  // text read out of a question container, label or description drops editors first.
+  const editors = '[contenteditable]:not([contenteditable="false"]),[role="textbox"]';
+  const labelText = labelNode => {
+    const copy = labelNode.cloneNode(true);
+    copy.querySelectorAll('input,select,textarea,button,svg,' + editors).forEach(control => control.remove());
+    return copy.textContent.trim();
+  };
+  // The name of a custom radio/checkbox card is its own text ("Hybrid"), not the question of the group it belongs to.
+  const ownChoiceText = node => {
+    if (node.tagName === 'INPUT') return '';
+    const copy = node.cloneNode(true);
+    copy.querySelectorAll('input,select,textarea,button,svg,[aria-hidden="true"]').forEach(n => n.remove());
+    return copy.textContent.replace(/\s+/g, ' ').trim().slice(0, 1000);
+  };
+  const label = (node, own) => {
     const parentGroup = node.closest('[role="radiogroup"],[role="group"],fieldset');
     const groupRefs = ['radio','checkbox'].includes(node.getAttribute('role'))
       ? (parentGroup?.getAttribute('aria-labelledby') || '').split(/\s+/) : [];
@@ -37,8 +59,9 @@
       (['option','treeitem'].includes(node.getAttribute('role')) ? node.innerText : '') ||
       (['submit', 'button'].includes(node.type) ? node.value : '') ||
       (['BUTTON', 'A', 'SUMMARY', 'OPTION'].includes(node.tagName) ? node.innerText : '') ||
+      (own ? ownChoiceText(node) : '') ||
       questionContainerText(node) || node.getAttribute('placeholder') || node.getAttribute('title') ||
-      node.getAttribute('name') || node.id || node.innerText || '').trim();
+      node.getAttribute('name') || node.id || (node.matches(editors) ? '' : node.innerText) || '').trim();
   };
   const phoneBacking = node => {
     if (node.type !== 'tel') return null;
@@ -76,10 +99,32 @@
   const plainCopy = node => {
     if (!node || node.matches('[role="alert"],.field-error,.error-message,[data-applicant-answer],[data-candidate-answer]')) return '';
     const copy = node.cloneNode(true);
-    copy.querySelectorAll('input,textarea,select,button,script,style,svg,[contenteditable="true"],' +
+    copy.querySelectorAll('input,textarea,select,button,script,style,svg,' + editors + ',' +
       '[role="combobox"],[role="listbox"],[role="option"],.select2-container,.select__container,' +
       '[role="alert"],.field-error,.error-message,[data-applicant-answer],[data-candidate-answer]').forEach(n => n.remove());
     return copy.textContent.replace(/\s+/g, ' ').trim();
+  };
+  // Table layouts (iCIMS): the question of a radio/checkbox group is the cell before the answer cell, or the row above it.
+  const cellQuestion = node => {
+    if (!['radio','checkbox'].some(kind => node.type === kind || node.getAttribute('role') === kind) && !(widgets && node.type === 'file')) return '';
+    const isCell = el => /^(?:TD|TH)$/.test(el.tagName) || ['cell','gridcell'].includes(el.getAttribute('role')) ||
+      getComputedStyle(el).display === 'table-cell';
+    const isRow = el => el.tagName === 'TR' || el.getAttribute('role') === 'row' || getComputedStyle(el).display === 'table-row';
+    const controls = 'input,select,textarea,button,[role="radio"],[role="checkbox"],[role="combobox"]';
+    let cell = null;
+    for (let el = node.parentElement, depth = 0; el && depth < 6 && !el.matches('form,body,main,fieldset,[role="radiogroup"],[role="group"]');
+      el = el.parentElement, depth++) if (isCell(el)) { cell = el; break; }
+    const row = cell?.parentElement;
+    if (!cell || !row || !isRow(row)) return '';
+    // nearest preceding cell that only holds text; cells with controls are other options (matrix layouts) or other questions
+    for (let previous = cell.previousElementSibling; previous; previous = previous.previousElementSibling) {
+      if (previous.querySelector(controls)) continue;
+      const text = plainCopy(previous);
+      if (text) return text.slice(0, 500);
+    }
+    // one cell per row: the question is the text-only row above
+    const above = row.children.length === 1 ? row.previousElementSibling : null;
+    return above && isRow(above) && !above.querySelector(controls) ? plainCopy(above).slice(0, 500) : '';
   };
   const groupQuestion = node => {
     const group = node.closest('[role="radiogroup"],[role="group"],fieldset');
@@ -88,7 +133,7 @@
     if (refs) return refs;
     const field = node.closest('.form-group,.form-field,.field');
     const captions = field ? [...field.querySelectorAll(':scope > label')].filter(n => visible(n)) : [];
-    return captions.length === 1 ? plainCopy(captions[0]) : '';
+    return captions.length === 1 ? plainCopy(captions[0]) : cellQuestion(node);
   };
   const meaningfulName = node => (node.name || node.id || '').replace(/([a-z])([A-Z])/g, '$1 $2').replace(/[_-]/g, ' ');
   const descriptionFor = node => {
@@ -105,17 +150,42 @@
     const container = node.closest('.application-question') || node.closest('.application-field')?.parentElement;
     if (!container || container.tagName === 'FORM') return groupQuestion(node);
     const copy = container.cloneNode(true);
-    copy.querySelectorAll('input,textarea,select,button,script,.select2-container').forEach(n => n.remove());
+    copy.querySelectorAll('input,textarea,select,button,script,.select2-container,' + editors).forEach(n => n.remove());
     return copy.textContent.replace(/\s+/g, ' ').trim().slice(0, 20000);
   };
   const required = node => !!node.required || node.getAttribute('aria-required') === 'true' ||
     /(?:^|\s)_required_/.test(questionFor(node)?.className || '');
+  // widgets only: a display:none / visibility:hidden file input inside a plain dropzone (react-dropzone, Dropzone.js, FilePond)
+  // has no <a>/<button>/<label> ancestor; the visible drop area that holds nothing but this file input is its proxy.
+  const dropzoneProxy = node => {
+    if (!widgets || visible(node)) return null;
+    const zone = node.closest('[class*="dropzone" i],[class*="drop-zone" i],[class*="drop_zone" i],[class*="drop-area" i],' +
+      '[class*="droparea" i],[class*="filepond--root" i],[data-testid*="dropzone" i],[data-dropzone],[role="presentation"]');
+    if (!zone || !visible(zone) || zone.closest('form,body,main') === zone) return null;
+    const box = zone.getBoundingClientRect();
+    if (box.width < 24 || box.height < 24) return null;
+    // a wrapper of the whole page or form is not a drop target: it may hold nothing but this one file input
+    return zone.querySelectorAll('input:not([type="hidden"]),select,textarea').length === 1 ? zone : null;
+  };
   const uploadProxy = node => {
     if (node.type !== 'file') return null;
     const ashby = fieldFor(node)?.querySelector('.ashby-application-form-input-file-dropzone-upload');
     const attachment = node.matches('.visually-hidden') && node.parentElement?.querySelector(':scope > button[type="button"]');
     const associated = [...(node.labels || [])].reverse().find(n => visible(n) && n.control === node);
-    return ashby || attachment || associated || (!visible(node) ? node.closest('a,button,label') : null);
+    return ashby || attachment || associated || (!visible(node) ? node.closest('a,button,label') : null) || dropzoneProxy(node);
+  };
+  // widgets only: what a person reads as the name of a file input (its <label>, aria-labelledby, aria-label), not the name/id
+  // hint below that the Playwright filler's engine reads ("job application[resume] resume"); name and id travel in their own fields.
+  const GENERIC_FILE_BUTTON = /^(?:(?:browse|choose|upload|attach|select|add|drop|examinar|seleccionar|adjuntar|subir|elegir|cargar)(?:\s+(?:a|an|your|the|un|el|tu)?\s*(?:files?|documents?|archivos?|documentos?|here|aqu[i\u00ed]))?\s*(?:\.{3}|\u2026)?)?$/i;
+  const declaredFileLabel = node => {
+    if (!widgets || node.type !== 'file') return '';
+    const root = node.getRootNode();
+    const named = (node.getAttribute('aria-labelledby') || '').split(/\s+/).filter(Boolean)
+      .map(id => { const target = root.getElementById?.(id); return target && target !== node ? labelText(target) : ''; }).join(' ');
+    const text = (named.trim() || node.getAttribute('aria-label') || [...(node.labels || [])].map(labelText).join(' '))
+      .replace(/\s+/g, ' ').replace(/\s*[*\u2731]+\s*$/, '').trim();
+    // "Browse...", "Choose file": the caption of the button, not the name of the question (iCIMS keeps that in the cell before)
+    return GENERIC_FILE_BUTTON.test(text) ? cellQuestion(node) : text;
   };
   const fileQuestion = node => {
     if (node.type !== 'file') return '';
@@ -138,6 +208,45 @@
     const name = `${button.getAttribute('aria-label') || ''} ${button.getAttribute('title') || ''}`.trim();
     if (name && !/^(?:open|show|toggle)(?: (?:the )?(?:options|menu|suggestions|dropdown|list))?$/i.test(name)) return null;
     return button;
+  };
+  // widgets only: <button aria-haspopup="listbox"> (Workday, Headless UI Listbox) is a dropdown when it is a labelled control of
+  // a form field: never a menu/navigation/toolbar button, never a submit button, and the name is the question, not the value shown.
+  const listboxButton = node => {
+    if (!widgets || node.tagName !== 'BUTTON' || node.hasAttribute('role') || node.getAttribute('aria-haspopup') !== 'listbox') return null;
+    const type = node.getAttribute('type');
+    if (type ? type.toLowerCase() !== 'button' : !!node.form) return null;
+    if (node.closest('header,footer,nav,aside,search,[role="banner"],[role="contentinfo"],[role="navigation"],' +
+      '[role="toolbar"],[role="menubar"],[role="search"]')) return null;
+    const root = node.getRootNode();
+    // the chevron of a combobox input (tabindex=-1, or sharing its popup) is part of that input, not a field of its own
+    const popup = node.getAttribute('aria-controls');
+    if (node.getAttribute('tabindex') === '-1' || node.parentElement?.querySelector(':scope > input[role="combobox"],:scope > * > input[role="combobox"]') ||
+      (popup && [...root.querySelectorAll('[role="combobox"]')].some(peer => peer !== node && peer.getAttribute('aria-controls') === popup))) return null;
+    // a button that names itself ("label button") shows its value in that name: only the OTHER referenced elements count
+    const named = (node.getAttribute('aria-labelledby') || '').split(/\s+/).filter(Boolean)
+      .map(id => { const target = root.getElementById?.(id); return target && target !== node ? labelText(target) : ''; })
+      .join(' ').replace(/\s+/g, ' ').trim();
+    const legend = node.closest('fieldset')?.querySelector(':scope > legend');
+    const name = named || (node.getAttribute('aria-label') || '').trim() || [...(node.labels || [])].map(labelText).join(' ').trim() ||
+      groupQuestion(node) || (legend ? plainCopy(legend) : '');
+    return name ? {label: name.replace(/\s+/g, ' ').trim()} : null;
+  };
+  // widgets only: two sibling <button aria-pressed> reading exactly Yes/No (or Si/No) in one field are a radio group,
+  // like Ashby's .ashby-application-form-input-yesno buttons.
+  const pressedPair = node => {
+    if (!widgets || node.tagName !== 'BUTTON' || !node.hasAttribute('aria-pressed') || node.getAttribute('role') ||
+      node.matches('.ashby-application-form-input-yesno button')) return null;
+    const parent = node.parentElement;
+    if (!parent || parent.matches('form,body,main,html') ||
+      node.closest('header,footer,nav,aside,[role="banner"],[role="contentinfo"],[role="navigation"],[role="toolbar"],[role="menubar"]')) return null;
+    const answer = button => (button.innerText || button.textContent || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+      .replace(/\s+/g, ' ').trim().toLowerCase();
+    const buttons = [...parent.children].filter(child => child.tagName === 'BUTTON' && child.hasAttribute('aria-pressed') && !child.getAttribute('role'));
+    if (!buttons.includes(node)) return null;
+    const words = buttons.map(answer).sort().join('|');   // exactly two buttons: Yes and No (or Si and No)
+    if (words !== 'no|yes' && words !== 'no|si') return null;
+    return {group: `pair-${identity(parent)}`,
+      value: node.getAttribute('data-option') || node.getAttribute('data-value') || node.getAttribute('value') || node.innerText.trim()};
   };
   const toggleProxy = node => {
     if (node.tagName !== 'INPUT' || !['radio','checkbox'].includes(node.type)) return null;
@@ -187,17 +296,117 @@
   const all = [];
   while (roots.length) {
     const root = roots.shift();
-    all.push(...root.querySelectorAll(selector));
+    // (a loop, not push(...list): a page with more than ~120,000 matching nodes would overflow the argument limit)
+    for (const node of root.querySelectorAll(selector)) all.push(node);
     for (const node of root.querySelectorAll('*')) if (node.shadowRoot) roots.push(node.shadowRoot);
   }
   const elements = [];
+  // Every control of a section asks for the same heading: look it up once per container (a page of one big <section> with a
+  // hundred fields otherwise searches that whole subtree a hundred times).
+  const headings = new Map();
+  const headingOf = container => {
+    if (!headings.has(container)) headings.set(container, container.querySelector('legend,h1,h2,h3,h4,[role="heading"]'));
+    return headings.get(container);
+  };
+  // The heading a control sits under is the NEAREST PRECEDING heading-like block whose section still includes the control, not the
+  // first heading of its container: a <section> with "Personal information" and, further down, "Emergency contact" titles the
+  // fields after the second one with the second. Heading-like: h1-h6, [role=heading], legend, caption, summary, a table header
+  // row, and (only when they stand alone above SEVERAL questions, never as the caption of one) a title/heading/header block or a
+  // bold line (<p><strong>..</strong></p>, <div class="section-title">).
+  const HEADINGISH = 'legend,h1,h2,h3,h4,h5,h6,[role="heading"],caption,summary,th,strong:not(:empty),b:not(:empty),[class*="title" i],[class*="heading" i],' +
+    '[class*="header" i],[class*="legend" i],[class*="caption" i],[class*="bold" i],[style*="font-weight" i]';
+  const HEADING_CONTROLS = 'input:not([type="hidden"]),select,textarea,[role="combobox"],[role="radio"],[role="checkbox"],' + editors;
+  const NOT_A_HEADING = 'label,button,a,option,nav,[role="navigation"],[role="option"],[role="listbox"],[role="button"],[role="alert"],' +
+    '.field-error,.error-message';
+  const HEADING_WORDS = new Set(['title', 'heading', 'headline', 'header', 'legend', 'caption', 'subtitle', 'subheading', 'bold', 'semibold']);
+  const CAPTION_WORDS = new Set(['label', 'question', 'field', 'input', 'option', 'choice', 'answer', 'hint', 'help', 'description', 'desc',
+    'error', 'required', 'placeholder', 'tooltip']);
+  const classWords = el => (el.getAttribute('class') || '').replace(/([a-z])([A-Z])/g, '$1 $2').toLowerCase().split(/[^a-z0-9]+/).filter(Boolean);
+  const squash = n => (n.textContent || '').replace(/\s+/g, ' ').trim();
+  const headingCache = new Map(), scopeCache = new Map(), fieldCache = new Map(), headingLists = new Map();
+  // the first ancestor of a heading block that holds controls: what the heading titles
+  const headingScope = el => {
+    if (scopeCache.has(el)) return scopeCache.get(el);
+    let scope = null;
+    if (el.tagName === 'LEGEND' || el.tagName === 'SUMMARY') scope = el.parentElement;
+    else if (el.tagName === 'TH' || el.tagName === 'CAPTION') scope = el.closest('table');
+    else {
+      let own = el;
+      for (let depth = 0; depth < 4 && own.parentElement && !own.parentElement.querySelector(HEADING_CONTROLS); depth++) own = own.parentElement;
+      scope = own.parentElement;
+    }
+    scopeCache.set(el, scope);
+    return scope;
+  };
+  // how many distinct questions a scope holds (2 means "many": all a title needs to be above several of them)
+  const questionsIn = scope => {
+    if (fieldCache.has(scope)) return fieldCache.get(scope);
+    const seen = new Set();
+    for (const control of scope.querySelectorAll(HEADING_CONTROLS)) {
+      seen.add(['radio', 'checkbox'].includes(control.type) && control.name ? `${control.type}:${control.name}` : control);
+      if (seen.size > 1) break;
+    }
+    fieldCache.set(scope, seen.size);
+    return seen.size;
+  };
+  const headingText = el => {
+    if (headingCache.has(el)) return headingCache.get(el);
+    let text = '';
+    try {
+      const tag = el.tagName;
+      const semantic = /^(?:H[1-6]|LEGEND|CAPTION)$/.test(tag) || el.getAttribute('role') === 'heading';
+      const loose = !semantic && tag !== 'SUMMARY' && tag !== 'TH';
+      const raw = squash(el);   // cheap rejects first: a page can hold thousands of bold bits and class names that say "header"
+      let plausible = raw.length >= 2 && raw.length <= 120 && /\p{L}/u.test(raw);
+      if (plausible && loose) {
+        const words = classWords(el);
+        const boldTag = tag === 'STRONG' || tag === 'B';
+        // a bare <strong> inside a sentence is emphasis: only a bold LINE (its block holds nothing else) can be a heading
+        plausible = !words.some(w => CAPTION_WORDS.has(w)) &&
+          (boldTag ? !!el.parentElement && squash(el.parentElement) === raw : words.some(w => HEADING_WORDS.has(w)) || el.hasAttribute('style'));
+      }
+      if (plausible && (tag === 'SUMMARY' || !el.closest(NOT_A_HEADING)) && !el.querySelector(HEADING_CONTROLS) && visible(el)) {
+        const line = (el.innerText || '').replace(/\s+/g, ' ').trim();
+        if (line.length < 2 || line.length > 120) text = '';
+        else if (!loose) {
+          if (tag !== 'TH') text = line;
+          else { const row = el.closest('tr'); if (row && !row.querySelector(HEADING_CONTROLS)) text = line; }
+        } else {
+          const scope = headingScope(el);
+          const boldLine = tag === 'STRONG' || tag === 'B' || classWords(el).some(w => w === 'bold' || w === 'semibold') ||
+            /^(?:bold|[6-9]00)$/.test(getComputedStyle(el).fontWeight);
+          if (scope && questionsIn(scope) > 1 && (classWords(el).some(w => HEADING_WORDS.has(w)) || boldLine)) text = line;
+        }
+      }
+    } catch (error) { text = ''; }
+    headingCache.set(el, text);
+    return text;
+  };
+  const nearestHeading = (node, limit) => {
+    let list = headingLists.get(limit);   // the candidates inside this section/form only, in document order
+    if (!list) { list = [...limit.querySelectorAll(HEADINGISH)]; headingLists.set(limit, list); }
+    let lo = 0, hi = list.length;   // the candidates that precede the control form a prefix of the list
+    while (lo < hi) {
+      const mid = (lo + hi) >> 1;
+      if (list[mid].compareDocumentPosition(node) & 4) lo = mid + 1; else hi = mid;
+    }
+    for (let i = lo - 1, steps = 0; i >= 0 && steps < 40; i--, steps++) {
+      const el = list[i];
+      if (el === node || el.contains(node) || node.contains(el) || !headingText(el)) continue;
+      const scope = headingScope(el);
+      if (scope && scope.contains(node)) return el;   // not the heading of a section that closed before the control
+    }
+    return null;
+  };
   const sectionFor = node => {
     const container = node.closest('fieldset,section,[role="group"],[role="region"],.ashby-application-form-section');
-    let heading = container?.querySelector('legend,h1,h2,h3,h4,[role="heading"]');
+    const form = node.closest('form');
+    let heading = container || form ? nearestHeading(node, container || form) : null;
+    if (!heading && container) heading = headingOf(container);
     // Many accessible forms use sibling headings rather than section wrappers.
     // Walk only preceding siblings inside the same form, never another page.
-    if (!heading && node.closest('form')) {
-      for (let current = node; current && current !== node.closest('form') && !heading; current = current.parentElement) {
+    if (!heading && form) {
+      for (let current = node; current && current !== form && !heading; current = current.parentElement) {
         for (let sibling = current.previousElementSibling; sibling; sibling = sibling.previousElementSibling) {
           if (sibling.matches('h1,h2,h3,h4,h5,h6,[role="heading"]') && visible(sibling)) { heading = sibling; break; }
         }
@@ -239,6 +448,10 @@
     if (tag === 'a' && !node.hasAttribute('href') && !node.hasAttribute('role')) role = 'button';
     const yesno = node.matches('button[data-option][aria-pressed]') && node.closest('.ashby-application-form-input-yesno');
     if (yesno) role = 'radio';
+    const listbox = listboxButton(node);
+    const pair = pressedPair(node);
+    if (listbox) role = 'combobox';
+    if (pair) role = 'radio';
     if (role === 'treeitem' && node.closest('.select2-results')) role = 'option';
     const enabled = !node.matches(':disabled') && !node.closest('[aria-disabled="true"]');
     const readonly = !!node.readOnly || node.getAttribute('aria-readonly') === 'true';
@@ -272,9 +485,9 @@
         '[class*="chat-widget"],[class*="chatbot"],[id*="chatbot"],[data-chat-widget]'),
       label: node.hasAttribute('data-dropdown-selection') ? node.getAttribute('data-dropdown-label') || node.innerText.trim()
         : backed ? [...(backed.backing.labels || [])].map(plainCopy).filter(Boolean).join(' ') || groupQuestion(node) || meaningfulName(backed.backing)
-        : visual ? visual.caption.textContent.trim() : role === 'combobox' || role === 'upload' ? question || fileQuestion(node) || questionContainerText(node) || label(node) :
+        : visual ? visual.caption.textContent.trim() : listbox ? listbox.label : role === 'combobox' || role === 'upload' ? question || declaredFileLabel(node) || fileQuestion(node) || questionContainerText(node) || label(node) :
         (role === 'textbox' && /^(?:YYYY|MM|DD|YYYY-MM-DD)$/i.test(node.placeholder || '') && !node.labels?.length
-          ? [groupQuestion(node), meaningfulName(node)].filter(Boolean).join(' — ') : label(node)), ...sectionFor(node),
+          ? [groupQuestion(node), meaningfulName(node)].filter(Boolean).join(' — ') : label(node, role === 'radio' || (role === 'checkbox' && !!groupedCheckbox))), ...sectionFor(node),
       upload_proxy_id: type === 'file' && proxy && visible(proxy) ? identity(proxy) : null,
       interaction_proxy_id: role === 'combobox' && proxy && visible(proxy) ? identity(proxy) : null,
       dropdown_trigger_id: dropdown ? identity(dropdown) : null,
@@ -315,8 +528,8 @@
       field_path: fieldFor(node)?.getAttribute('data-field-path') || '',
       expanded: node.getAttribute('aria-expanded') === 'true',
       value: type === 'file' ? [...node.files || []].map(f => f.name).join(', ') :
-        String(visual ? visual.caption.textContent.trim() : yesno ? node.getAttribute('data-option') : node.value ?? nativeToggle?.value ?? (node.isContentEditable ? node.innerText : '')),
-      checked: visual ? visible(visual.indicator) : yesno ? node.getAttribute('aria-pressed') === 'true' :
+        String(visual ? visual.caption.textContent.trim() : yesno ? node.getAttribute('data-option') : pair ? pair.value : node.value ?? nativeToggle?.value ?? (node.isContentEditable ? node.innerText : '')),
+      checked: visual ? visible(visual.indicator) : yesno || pair ? node.getAttribute('aria-pressed') === 'true' :
         typeof node.checked === 'boolean' ? node.checked : node.getAttribute('aria-checked') === 'true',
       required: required(node),
       enabled, readonly, operations: enabled ? operations : [],
@@ -325,7 +538,7 @@
       href: tag === 'a' ? node.href : null,
       options: backed ? [...backed.list.querySelectorAll('[data-dropdown-selection]')].map(o => ({label:o.getAttribute('data-dropdown-label') || o.textContent.trim(),value:o.getAttribute('data-dropdown-selection')})) : tag === 'select' ? [...node.options].map(o => ({label:o.label, value:o.value,
         disabled:o.disabled || !!o.closest('optgroup[disabled]')})) : [],
-      group: visual ? `visual-${identity(visual.group)}` : ['radio','checkbox'].includes(role) ? fieldFor(node)?.getAttribute('data-field-path') ||
+      group: visual ? `visual-${identity(visual.group)}` : pair ? pair.group : ['radio','checkbox'].includes(role) ? fieldFor(node)?.getAttribute('data-field-path') ||
         (groupedCheckbox ? `choice-${identity(choiceContainer)}` : '') || node.name || nativeToggle?.name || node.closest('[role="radiogroup"],fieldset')?.textContent?.slice(0,500) || '' : '',
       selected_text: role === 'combobox' ? backed?.backing.value || node.getAttribute('aria-valuetext') ||
         selectedText(node) ||
@@ -360,7 +573,7 @@
   const employerText = node => {
     const copy = node.cloneNode(true);
     copy.querySelectorAll('form,input,textarea,select,button,script,style,nav,footer,' +
-      '[contenteditable="true"],[role="combobox"],[role="listbox"],.select__container,.select2-container,' +
+      editors + ',[role="combobox"],[role="listbox"],.select__container,.select2-container,' +
       '[data-field-path],.ashby-application-form-field-entry,.application-question,.application-field,' +
       '[data-applicant-answer],[data-candidate-answer],[role="alert"],.field-error,.error-message').forEach(n => n.remove());
     return copy.textContent.replace(/\s+/g, ' ').trim().slice(0, 24000);

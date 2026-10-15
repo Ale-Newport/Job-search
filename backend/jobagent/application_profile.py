@@ -141,6 +141,59 @@ FIELDS = [
             "if you answered yes to the above can you please confirm your current visa type and status",
         ],
     ),
+    # Spain and the EU: each place states its own right to work, sponsorship and pay (never inferred from the UK fields).
+    # Written in Spanish as well: a Spanish form asks '¿Tienes autorización para trabajar en España?'.
+    field(
+        "work_authorization_es",
+        "Right to work in Spain",
+        "Work eligibility",
+        sensitive=True,
+        scope="ES",
+        options=YES_NO,
+        aliases=["are you legally authorized to work in spain", "are you authorized to work in spain",
+                 "do you have the right to work in spain", "tienes autorizacion para trabajar en espana",
+                 "tienes derecho a trabajar en espana", "estas autorizado para trabajar en espana",
+                 "autorizacion para trabajar en espana", "derecho a trabajar en espana"],
+    ),
+    field(
+        "sponsorship_es",
+        "Need sponsorship now or later (Spain)",
+        "Work eligibility",
+        sensitive=True,
+        scope="ES",
+        options=YES_NO,
+        aliases=["do you require sponsorship to work in spain", "will you require visa sponsorship to work in spain",
+                 "necesitas patrocinio de visado para trabajar en espana", "necesitaras patrocinio de visado ahora o en el futuro",
+                 "necesitas patrocinio de visado ahora o en el futuro", "necesitas un visado para trabajar en espana"],
+    ),
+    field(
+        "expected_salary_es",
+        "Expected annual gross salary (EUR, Spain roles)",
+        "Availability & compensation",
+        kind="number",
+        scope="ES",
+        aliases=["pretensiones salariales", "expectativas salariales", "salario esperado", "salario deseado",
+                 "salario bruto anual", "expected salary", "salary expectations", "what are your salary expectations"],
+    ),
+    field(
+        "work_authorization_eu",
+        "Right to work in the EU / EEA",
+        "Work eligibility",
+        sensitive=True,
+        scope="EU",
+        options=YES_NO,
+        aliases=["are you authorized to work in the european union", "do you have the right to work in the eu",
+                 "tienes derecho a trabajar en la union europea", "tienes autorizacion para trabajar en la union europea"],
+    ),
+    field(
+        "sponsorship_eu",
+        "Need sponsorship now or later (EU / EEA)",
+        "Work eligibility",
+        sensitive=True,
+        scope="EU",
+        options=YES_NO,
+        aliases=["do you require sponsorship to work in the eu", "necesitas patrocinio de visado para trabajar en la union europea"],
+    ),
     field(
         "work_eligibility_other", "Work rights in other countries", "Work eligibility", sensitive=True, multiline=True
     ),
@@ -227,6 +280,7 @@ FIELDS = [
     ],
 ]
 BY_KEY = {f["key"]: f for f in FIELDS}
+JURISDICTION_YES_NO = {"work_authorization_es", "sponsorship_es", "work_authorization_eu", "sponsorship_eu"}
 for key, alias in {
     "gender": "describe your gender",
     "sexual_orientation": "describe your sexual orientation",
@@ -331,9 +385,14 @@ def profile(db):
         "SELECT m.*,f.value AS answer,f.verification_status FROM browser_answers m JOIN facts f ON m.fact_id=f.id ORDER BY m.updated_at DESC"
     )
     from .intelligence.engine import CandidateEngine
+    from .extension.api import extension_memory_stamps
     intelligence = CandidateEngine(db)
+    # 'extension' marks a memory whose latest save came from the browser assistant (the audit line of that save names
+    # the memory and the moment it was written); any later edit made in Meridian or in Auto Apply's browser clears it.
+    assisted = extension_memory_stamps(db)
     for row in memory:
         row['superseded'] = memory_superseded(db, row['question'], row['updated_at'], intelligence)
+        row['origin'] = 'extension' if (row['fact_id'], row['updated_at']) in assisted else None
     return {"fields": rows, "answers": memory}
 
 
@@ -346,6 +405,8 @@ def write_profile(db, key, value, confirmed, note="Entered in application profil
     f = BY_KEY[key]
     if f["type"] == "number" and value and (not re.fullmatch(r"\d+(?:\.\d+)?", value) or float(value) > 1e9):
         raise ValueError("Enter a nonnegative number without a currency symbol")
+    if key in JURISDICTION_YES_NO and value not in {"", "Yes", "No"}:
+        raise ValueError("Answer Yes or No")
     if f["type"] == "month" and value and not re.fullmatch(r"\d{4}-(?:0[1-9]|1[0-2])", value):
         raise ValueError("Enter a month as YYYY-MM")
     if f["type"] == "date" and value:
@@ -379,6 +440,11 @@ def scope_matches(scope, application):
         return True
     if scope == "Trainline":
         return normalize(application.get("company", "")) == "trainline"
+    if scope in {"ES", "EU"}:
+        from .extension.places import countries_in_text
+        named = countries_in_text(str(application.get("location", "")), known_places=True)
+        from .intelligence.jurisdiction import EU_MEMBERS
+        return bool(named) and all(country == "Spain" if scope == "ES" else country in EU_MEMBERS for country in named)
     if scope == "UK":
         return bool(
             re.search(

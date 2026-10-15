@@ -1,0 +1,826 @@
+{
+"A levels or equivalent": {
+"cause": "PLAIN_QUESTION_REQUIRED",
+"was": [
+"DEGREE",
+null,
+"MISSING_SECONDARY_INSTITUTION"
+]
+},
+"A private residence marker": {
+"cause": "PLAIN_QUESTION_REQUIRED",
+"was": [
+"LOCATION",
+"London, United Kingdom",
+null
+]
+},
+"Advertised salary is below the minimum": {
+"cause": "PLAIN_QUESTION_REQUIRED",
+"was": [
+"SALARY",
+null,
+"MISSING_FACT"
+]
+},
+"Applicant's private salary and medical details": {
+"cause": "PLAIN_QUESTION_REQUIRED",
+"was": [
+"SALARY",
+"60000",
+null
+]
+},
+"Application identified from confirmation email.": {
+"cause": "PLAIN_QUESTION_REQUIRED",
+"was": [
+"CONTACT",
+"test@example.test",
+null
+]
+},
+"Arc Systems Graduate Software Engineer": {
+"cause": "PLAIN_QUESTION_REQUIRED",
+"was": [
+"GRADUATION",
+"27 September 2027",
+null
+]
+},
+"Are you at least 18 years of age?": {
+"cause": "PLAIN_QUESTION_REQUIRED",
+"was": [
+"IDENTITY",
+null,
+"MISSING_FACT"
+]
+},
+"Available from November": {
+"cause": "PLAIN_QUESTION_REQUIRED",
+"was": [
+"START_DATE",
+"28 September 2027",
+null
+]
+},
+"BSc Computer Science at North University": {
+"cause": "PLAIN_QUESTION_REQUIRED",
+"was": [
+"EDUCATION",
+"North University",
+null
+]
+},
+"Breadth-first search finds paths on an unweighted grid.": {
+"cause": "PLAIN_QUESTION_REQUIRED",
+"was": [
+"GRADE",
+"79.94",
+null
+]
+},
+"Breadth-first search on an unweighted grid.": {
+"cause": "PLAIN_QUESTION_REQUIRED",
+"was": [
+"GRADE",
+"79.94",
+null
+]
+},
+"Built a Python data pipeline for a university project.": {
+"cause": "PLAIN_QUESTION_REQUIRED",
+"was": [
+"EDUCATION",
+"South University",
+null
+]
+},
+"Confirmed synthetic UK Student route": {
+"cause": "PLAIN_QUESTION_REQUIRED",
+"was": [
+"EDUCATION",
+"South University",
+null
+]
+},
+"Corrected master institution": {
+"cause": "PLAIN_QUESTION_REQUIRED",
+"was": [
+"EDUCATION",
+"South University",
+null
+]
+},
+"Could not reach the email provider": {
+"cause": "PLAIN_QUESTION_REQUIRED",
+"was": [
+"CONTACT",
+"test@example.test",
+null
+]
+},
+"Country dialing code": {
+"cause": "PLAIN_QUESTION_REQUIRED",
+"was": [
+"LOCATION",
+"United Kingdom",
+null
+]
+},
+"Country number": {
+"cause": "PLAIN_QUESTION_REQUIRED",
+"was": [
+"LOCATION",
+"United Kingdom",
+null
+]
+},
+"Country of study": {
+"cause": "PLAIN_QUESTION_REQUIRED",
+"was": [
+"LOCATION",
+"United Kingdom",
+null
+]
+},
+"Currently studying MSc Computer Science": {
+"cause": "PLAIN_QUESTION_REQUIRED",
+"was": [
+"EDUCATION",
+"South University",
+null
+]
+},
+"Do you have British citizenship?": {
+"cause": "PLAIN_QUESTION_REQUIRED",
+"was": [
+"NATIONALITY",
+"Spanish",
+null
+]
+},
+"Email access was not authorized": {
+"cause": "PLAIN_QUESTION_REQUIRED",
+"was": [
+"CONTACT",
+"test@example.test",
+null
+]
+},
+"Email: morgan@example.test Phone: +1 (555) 010-9876": {
+"cause": "PLAIN_QUESTION_REQUIRED",
+"was": [
+"CONTACT",
+null,
+"ANSWER_FORMAT_ERROR"
+]
+},
+"Evil Name": {
+"cause": "PLAIN_QUESTION_REQUIRED",
+"was": [
+"IDENTITY",
+"Test Candidate",
+null
+]
+},
+"Example Maze. Sole author. Uses Python. Breadth-first search finds paths on an unweighted grid.": {
+"cause": "PLAIN_QUESTION_REQUIRED",
+"was": [
+"GRADE",
+"79.94",
+null
+]
+},
+"GCSEs or equivalent": {
+"cause": "PLAIN_QUESTION_REQUIRED",
+"was": [
+"DEGREE",
+null,
+"MISSING_SECONDARY_INSTITUTION"
+]
+},
+"Graduate &amp; Engineer": {
+"cause": "PLAIN_QUESTION_REQUIRED",
+"was": [
+"GRADUATION",
+"27 September 2027",
+null
+]
+},
+"Graduate AI Engineer at Example Labs. 2 more AI jobs in london": {
+"cause": "PLAIN_QUESTION_REQUIRED",
+"was": [
+"GRADUATION",
+"27 September 2027",
+null
+]
+},
+"Graduate Data Engineer": {
+"cause": "PLAIN_QUESTION_REQUIRED",
+"was": [
+"GRADUATION",
+"27 September 2027",
+null
+]
+},
+"Graduate Engineer": {
+"cause": "PLAIN_QUESTION_REQUIRED",
+"was": [
+"GRADUATION",
+"27 September 2027",
+null
+]
+},
+"Graduate Python": {
+"cause": "PLAIN_QUESTION_REQUIRED",
+"was": [
+"GRADUATION",
+"27 September 2027",
+null
+]
+},
+"Graduate Python software engineer working on data pipelines.": {
+"cause": "PLAIN_QUESTION_REQUIRED",
+"was": [
+"GRADUATION",
+"27 September 2027",
+null
+]
+},
+"Graduate Software Engineer": {
+"cause": "PLAIN_QUESTION_REQUIRED",
+"was": [
+"GRADUATION",
+"27 September 2027",
+null
+]
+},
+"Graduate Software Engineer: complete your coding challenge within 3 days.": {
+"cause": "PLAIN_QUESTION_REQUIRED",
+"was": [
+"GRADUATION",
+"30 June 2026",
+null
+]
+},
+"Graduate hiring post": {
+"cause": "PLAIN_QUESTION_REQUIRED",
+"was": [
+"GRADUATION",
+"27 September 2027",
+null
+]
+},
+"Graduate recruiter": {
+"cause": "PLAIN_QUESTION_REQUIRED",
+"was": [
+"GRADUATION",
+"27 September 2027",
+null
+]
+},
+"I am a Spanish citizen.": {
+"cause": "PLAIN_QUESTION_REQUIRED",
+"was": [
+"NATIONALITY",
+"Spanish",
+null
+]
+},
+"I am a citizen of Spain.": {
+"cause": "PLAIN_QUESTION_REQUIRED",
+"was": [
+"NATIONALITY",
+"Spanish",
+null
+]
+},
+"I am studying Artificial Intelligence at South University": {
+"cause": "PLAIN_QUESTION_REQUIRED",
+"was": [
+"EDUCATION",
+"South University",
+null
+]
+},
+"I am studying Artificial Intelligence at South University.": {
+"cause": "PLAIN_QUESTION_REQUIRED",
+"was": [
+"EDUCATION",
+"South University",
+null
+]
+},
+"I am willing to relocate": {
+"cause": "PLAIN_QUESTION_REQUIRED",
+"was": [
+"RELOCATION",
+null,
+"MISSING_FACT"
+]
+},
+"I have a visa which gives me the permanent right to work": {
+"cause": "PLAIN_QUESTION_REQUIRED",
+"was": [
+"WORK_AUTHORIZATION",
+null,
+"MISSING_WORK_AUTHORIZATION_EVIDENCE:United Kingdom"
+]
+},
+"I identify as one or more of the classifications of protected veteran": {
+"cause": "PLAIN_QUESTION_REQUIRED",
+"was": [
+"GRADE",
+"First Class Honours",
+null
+]
+},
+"I studied Computer Science at North University": {
+"cause": "PLAIN_QUESTION_REQUIRED",
+"was": [
+"EDUCATION",
+"South University",
+null
+]
+},
+"I studied Computer Science at North University.": {
+"cause": "PLAIN_QUESTION_REQUIRED",
+"was": [
+"EDUCATION",
+"South University",
+null
+]
+},
+"I'm a citizen or have permanent residency": {
+"cause": "PLAIN_QUESTION_REQUIRED",
+"was": [
+"NATIONALITY",
+"Spanish",
+null
+]
+},
+"If you answered \"Other\" to \"Notice period\", please explain:": {
+"cause": "PLAIN_QUESTION_REQUIRED",
+"was": [
+"NOTICE_PERIOD",
+"None",
+null
+]
+},
+"Job location - Berlin": {
+"cause": "PLAIN_QUESTION_REQUIRED",
+"was": [
+"LOCATION",
+"London, United Kingdom",
+null
+]
+},
+"LANGUAGES & SOFT SKILLS": {
+"cause": "PLAIN_QUESTION_REQUIRED",
+"was": [
+"LANGUAGE",
+"English: Fluent, Spanish: Native",
+null
+]
+},
+"MSc Artificial Intelligence at South University is in progress": {
+"cause": "PLAIN_QUESTION_REQUIRED",
+"was": [
+"EDUCATION",
+"South University",
+null
+]
+},
+"Mobile: 07123456789 users": {
+"cause": "PLAIN_QUESTION_REQUIRED",
+"was": [
+"CONTACT",
+"+441234567890",
+null
+]
+},
+"My graduation year is 2027 at Example Bank": {
+"cause": "PLAIN_QUESTION_REQUIRED",
+"was": [
+"GRADUATION",
+"2027",
+null
+]
+},
+"My phone +44 7700 900123. I process records.": {
+"cause": "PLAIN_QUESTION_REQUIRED",
+"was": [
+"CONTACT",
+"+441234567890",
+null
+]
+},
+"New Name": {
+"cause": "PLAIN_QUESTION_REQUIRED",
+"was": [
+"IDENTITY",
+"Test Candidate",
+null
+]
+},
+"No email authorization tokens are stored in Keychain": {
+"cause": "PLAIN_QUESTION_REQUIRED",
+"was": [
+"CONTACT",
+"test@example.test",
+null
+]
+},
+"No master's degree": {
+"cause": "PLAIN_QUESTION_REQUIRED",
+"was": [
+"DEGREE",
+"MSc Artificial Intelligence",
+null
+]
+},
+"No official US GPA": {
+"cause": "PLAIN_QUESTION_REQUIRED",
+"was": [
+"GPA",
+"UK First Class Honours; 79.94%. No official US GPA.",
+null
+]
+},
+"Old structured name": {
+"cause": "PLAIN_QUESTION_REQUIRED",
+"was": [
+"IDENTITY",
+"Test Candidate",
+null
+]
+},
+"Original Name": {
+"cause": "PLAIN_QUESTION_REQUIRED",
+"was": [
+"IDENTITY",
+"Test Candidate",
+null
+]
+},
+"Original institution": {
+"cause": "PLAIN_QUESTION_REQUIRED",
+"was": [
+"EDUCATION",
+"South University",
+null
+]
+},
+"Phone prefix": {
+"cause": "PLAIN_QUESTION_REQUIRED",
+"was": [
+"CONTACT",
+"+441234567890",
+null
+]
+},
+"Reconnect email": {
+"cause": "PLAIN_QUESTION_REQUIRED",
+"was": [
+"CONTACT",
+"test@example.test",
+null
+]
+},
+"Relevant Modules: Algebra, Statistics.": {
+"cause": "PLAIN_QUESTION_REQUIRED",
+"was": [
+"MODULE",
+null,
+"MISSING_FACT"
+]
+},
+"Relevant Modules: Information Retrieval, Systems Verification.": {
+"cause": "PLAIN_QUESTION_REQUIRED",
+"was": [
+"MODULE",
+null,
+"MISSING_FACT"
+]
+},
+"Search current location": {
+"cause": "PLAIN_QUESTION_REQUIRED",
+"was": [
+"LOCATION",
+"London, United Kingdom",
+null
+]
+},
+"Spanish and British": {
+"cause": "PLAIN_QUESTION_REQUIRED",
+"was": [
+"LANGUAGE",
+"Native",
+null
+]
+},
+"Specialised graduate jobs board": {
+"cause": "PLAIN_QUESTION_REQUIRED",
+"was": [
+"GRADUATION",
+"27 September 2027",
+null
+]
+},
+"Student or Graduate Visa (with right to work)": {
+"cause": "PLAIN_QUESTION_REQUIRED",
+"was": [
+"WORK_AUTHORIZATION",
+"Yes",
+null
+]
+},
+"Student/Graduate Visa (with current and future work rights)": {
+"cause": "PLAIN_QUESTION_REQUIRED",
+"was": [
+"VISA",
+"Student",
+null
+]
+},
+"Student/Graduate Visa (with full-time work rights)": {
+"cause": "PLAIN_QUESTION_REQUIRED",
+"was": [
+"VISA",
+"Student",
+null
+]
+},
+"Student/Graduate Visa (with unlimited work rights)": {
+"cause": "PLAIN_QUESTION_REQUIRED",
+"was": [
+"VISA",
+"Student",
+null
+]
+},
+"Student/Graduate Visa (with work rights until 2028)": {
+"cause": "PLAIN_QUESTION_REQUIRED",
+"was": [
+"VISA",
+"Student",
+null
+]
+},
+"Supported 64 students in weekly debugging labs.": {
+"cause": "PLAIN_QUESTION_REQUIRED",
+"was": [
+"EDUCATION",
+"South University",
+null
+]
+},
+"Synthetic Student permission": {
+"cause": "PLAIN_QUESTION_REQUIRED",
+"was": [
+"EDUCATION",
+"South University",
+null
+]
+},
+"Synthetic verified school record": {
+"cause": "PLAIN_QUESTION_REQUIRED",
+"was": [
+"EDUCATION",
+"South University",
+null
+]
+},
+"Thank you for applying to Graduate Software Engineer at Example Labs.": {
+"cause": "PLAIN_QUESTION_REQUIRED",
+"was": [
+"GRADUATION",
+"27 September 2027",
+null
+]
+},
+"The label is just 'Name' or 'Email': the heading above it, its group and the field's own name say whose.": {
+"cause": "MULTI_INTENT_REQUIRES_MORE_EVIDENCE",
+"was": [
+"CONTACT",
+"test@example.test; Test Candidate",
+null
+]
+},
+"University College London - UCL": {
+"cause": "PLAIN_QUESTION_REQUIRED",
+"was": [
+"EDUCATION",
+"South University",
+null
+]
+},
+"User chosen name": {
+"cause": "PLAIN_QUESTION_REQUIRED",
+"was": [
+"IDENTITY",
+"Test Candidate",
+null
+]
+},
+"Verified academic dates": {
+"cause": "PLAIN_QUESTION_REQUIRED",
+"was": [
+"EDUCATION",
+"South University",
+null
+]
+},
+"Verified school record": {
+"cause": "PLAIN_QUESTION_REQUIRED",
+"was": [
+"EDUCATION",
+"South University",
+null
+]
+},
+"We are seeking a graduate engineer to build backend services with Python and SQL.": {
+"cause": "PLAIN_QUESTION_REQUIRED",
+"was": [
+"GRADUATION",
+"27 September 2027",
+null
+]
+},
+"We welcome people of every religion. What is your notice period?": {
+"cause": "PLAIN_QUESTION_REQUIRED",
+"was": [
+"NOTICE_PERIOD",
+"None",
+null
+]
+},
+"What is your current notice period? Choose 1 month 2 weeks": {
+"cause": "PLAIN_QUESTION_REQUIRED",
+"was": [
+"NOTICE_PERIOD",
+"None",
+null
+]
+},
+"What is your current notice period? Choose Immediately available 2 weeks Other": {
+"cause": "PLAIN_QUESTION_REQUIRED",
+"was": [
+"NOTICE_PERIOD",
+"None",
+null
+]
+},
+"When does your visa expire?": {
+"cause": "PLAIN_QUESTION_REQUIRED",
+"was": [
+"VISA",
+null,
+"MISSING_VISA_EVIDENCE:United Kingdom"
+]
+},
+"Yes, I am also authorised to work in the United States": {
+"cause": "PLAIN_QUESTION_REQUIRED",
+"was": [
+"WORK_AUTHORIZATION",
+null,
+"MISSING_WORK_AUTHORIZATION_EVIDENCE:United States"
+]
+},
+"address directly on the job": {
+"cause": "PLAIN_QUESTION_REQUIRED",
+"was": [
+"ADDRESS",
+null,
+"MISSING_FACT"
+]
+},
+"city only: the engine's own place list": {
+"cause": "PLAIN_QUESTION_REQUIRED",
+"was": [
+"LOCATION",
+"London",
+null
+]
+},
+"country name with region": {
+"cause": "PLAIN_QUESTION_REQUIRED",
+"was": [
+"IDENTITY",
+"Test Candidate",
+null
+]
+},
+"country object": {
+"cause": "PLAIN_QUESTION_REQUIRED",
+"was": [
+"LOCATION",
+"United Kingdom",
+null
+]
+},
+"different email": {
+"cause": "PLAIN_QUESTION_REQUIRED",
+"was": [
+"CONTACT",
+"test@example.test",
+null
+]
+},
+"labelled line, city only": {
+"cause": "PLAIN_QUESTION_REQUIRED",
+"was": [
+"LOCATION",
+"London",
+null
+]
+},
+"location hint": {
+"cause": "PLAIN_QUESTION_REQUIRED",
+"was": [
+"LOCATION",
+"London, United Kingdom",
+null
+]
+},
+"new phone": {
+"cause": "PLAIN_QUESTION_REQUIRED",
+"was": [
+"CONTACT",
+"+441234567890",
+null
+]
+},
+"no location at all": {
+"cause": "PLAIN_QUESTION_REQUIRED",
+"was": [
+"LOCATION",
+"London, United Kingdom",
+null
+]
+},
+"old phone": {
+"cause": "PLAIN_QUESTION_REQUIRED",
+"was": [
+"CONTACT",
+"+441234567890",
+null
+]
+},
+"plain string address": {
+"cause": "PLAIN_QUESTION_REQUIRED",
+"was": [
+"ADDRESS",
+null,
+"MISSING_FACT"
+]
+},
+"plain string location": {
+"cause": "PLAIN_QUESTION_REQUIRED",
+"was": [
+"LOCATION",
+"London, United Kingdom",
+null
+]
+},
+"remote country": {
+"cause": "PLAIN_QUESTION_REQUIRED",
+"was": [
+"LOCATION",
+"United Kingdom",
+null
+]
+},
+"secret applicant email and salary": {
+"cause": "MULTI_INTENT_REQUIRES_MORE_EVIDENCE",
+"was": [
+"CONTACT",
+"test@example.test; 60000",
+null
+]
+},
+"shared live database": {
+"cause": "PLAIN_QUESTION_REQUIRED",
+"was": [
+"LOCATION",
+"London, United Kingdom",
+null
+]
+},
+"shared live monthly AI spending cap is zero": {
+"cause": "PLAIN_QUESTION_REQUIRED",
+"was": [
+"LOCATION",
+"London, United Kingdom",
+null
+]
+},
+"title with city and country": {
+"cause": "MULTI_INTENT_REQUIRES_MORE_EVIDENCE",
+"was": [
+"LOCATION",
+"London; United Kingdom",
+null
+]
+}
+}

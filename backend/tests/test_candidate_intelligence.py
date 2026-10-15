@@ -702,12 +702,21 @@ async def test_model_still_interprets_an_unknown_concept(knowledge, monkeypatch)
     from jobagent.intelligence.semantics import interpret
 
     async def classifier(*args):
-        return {**interpret("Current university"), "parser": "local_semantic"}
+        return {**interpret("LinkedIn profile"), "parser": "local_semantic"}
 
     monkeypatch.setattr(module, "semantic_interpret", classifier)
-    result = await CandidateEngine(knowledge, as_of="2026-10-03").answer("Which alma mater is mine nowadays?")
-    assert result["answer"] == "South University"
+    result = await CandidateEngine(knowledge, as_of="2026-10-03").answer("Where would a recruiter look you up professionally?")
+    assert result["answer"] == "https://example.test/linkedin"
     assert result["requires_review"] and not result["verified"]
+
+    # ... but never INTO a kind of fact that has a plain-question gate (a degree, a school, a work right...): an unusual wording of
+    # those is the user's, whatever a model reads it as
+    async def school(*args):
+        return {**interpret("Current university"), "parser": "local_semantic"}
+
+    monkeypatch.setattr(module, "semantic_interpret", school)
+    result = await CandidateEngine(knowledge, as_of="2026-10-03").answer("Which alma mater is mine nowadays?")
+    assert result["answer"] is None
 def test_repeated_education_fields_use_their_sections_and_never_substitute_overall_results(knowledge):
     engine = CandidateEngine(knowledge)
     under = {'section_label':'Education - Undergraduate'}

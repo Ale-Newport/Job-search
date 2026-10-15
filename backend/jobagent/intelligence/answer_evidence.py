@@ -4,6 +4,7 @@ from __future__ import annotations
 import hashlib
 import json
 import re
+import unicodedata
 from decimal import Decimal
 from difflib import SequenceMatcher
 
@@ -33,45 +34,74 @@ def digest(value):
     return hashlib.sha256(json.dumps(value, sort_keys=True, ensure_ascii=False, default=str).encode()).hexdigest()
 
 
+SPANISH_WORDS = set("""el la los las del de que por para con una uno unos unas es en tu tus su sus nuestra nuestro nuestros nuestras
+como porque trabajar quieres tienes has he mi mis me se lo al pero mas tambien sobre entre este esta estos estas cual cuales
+donde cuando empresa puesto palabras maximo caracteres cuentanos incluye explica motivacion experiencia proyecto equipo
+candidatura oferta solicitud nos eres estas puedes podrias dos tres ejemplo ejemplos liderazgo informacion adicional cuenta hablanos
+escribe resume lista frase carta presentacion logros aqui ti sin desde hasta nuestro rol""".split())
+ENGLISH_WORDS = set("""the of to and in is that for with as are you your why what how do this we our at from be on by it or an
+have would can could will about tell describe words maximum characters please role company team experience project""".split())
+PAGE_LANGUAGES = {"es": "Spanish", "ca": "Catalan", "gl": "Galician", "eu": "Basque", "fr": "French", "de": "German",
+                  "it": "Italian", "pt": "Portuguese", "nl": "Dutch", "en": "English"}
+
+
+def detect_language(text, page_lang=''):
+    """The language a question is written in: the words of the question first (Spanish function words, an inverted mark),
+    then the language of the page. English when nothing says otherwise. A draft is written in this language."""
+    plain = unicodedata.normalize('NFKD', str(text or '')[:800]).encode('ascii', 'ignore').decode().lower()
+    words = re.findall(r'[a-z]+', plain)
+    spanish = sum(word in SPANISH_WORDS for word in words) + (3 if re.search(r'[¿¡ñÑ]', str(text or '')) else 0)
+    english = sum(word in ENGLISH_WORDS for word in words)
+    if spanish >= 2 and spanish > english:
+        return 'Spanish'
+    if english >= 2 and english >= spanish:
+        return 'English'
+    return PAGE_LANGUAGES.get(str(page_lang or '').lower()[:2], 'English')
+
+
 def requirements(question, field=None):
     field = field or {}
     text = ' '.join(str(x or '') for x in (question, field.get('description'), field.get('placeholder')))
-    result = {'language': 'English', 'max_characters': field.get('max_length') or field.get('maxlength')}
-    match = re.search(r'(?:approx(?:imately)?\.?|around|about|roughly)\s*(\d+)\s*words?', text, re.I)
+    result = {'language': detect_language(' '.join(str(x or '') for x in (question, field.get('description'))), field.get('_page_lang')),
+              'max_characters': field.get('max_length') or field.get('maxlength')}
+    match = re.search(r'(?:approx(?:imately)?\.?|around|about|roughly|aproximadamente|aprox\.?|alrededor de|en torno a|cerca de|unas|unos)\s*(\d+)\s*(?:words?|palabras?)', text, re.I)
     if match:
         count = int(match[1])
         result.update(min_words=round(count * .9), max_words=round(count * 1.1), target_words=count)
-    match = re.search(r'(?:under|fewer than|less than)\s*(\d+)\s*words?', text, re.I)
+    match = re.search(r'(?:under|fewer than|less than|menos de|por debajo de)\s*(\d+)\s*(?:words?|palabras?)', text, re.I)
     if match:
         result['max_words'] = int(match[1]) - 1
-    match = re.search(r'(?:up to|maximum|max\.?|no more than|at most)\s*(\d+)\s*words?', text, re.I)
+    match = re.search(r'(?:up to|maximum|max\.?|no more than|at most|m[aá]ximo(?: de)?|como m[aá]ximo|como mucho|hasta|no m[aá]s de|un m[aá]ximo de)\s*(\d+)\s*(?:words?|palabras?)', text, re.I)
     if match:
         result['max_words'] = int(match[1])
-    match = re.search(r'(\d+)\s*[- ]?\s*words?\s*(?:limit|maximum|max\b)', text, re.I)
+    match = re.search(r'(\d+)\s*[- ]?\s*(?:words?|palabras?)\s*(?:limit|maximum|max\b|m[aá]ximo|como m[aá]ximo|de l[ií]mite)', text, re.I)
     if match:
         result['max_words'] = int(match[1])
-    match = re.search(r'\bexactly\s*(\d+)\s*words?\b', text, re.I)
+    match = re.search(r'\b(?:exactly|exactamente)\s*(\d+)\s*(?:words?|palabras?)\b', text, re.I)
     if match:
         result.update(min_words=int(match[1]), max_words=int(match[1]), target_words=int(match[1]))
-    match = re.search(r'(\d+)\s*[-–]\s*(\d+)\s*words?', text, re.I)
+    match = re.search(r'(\d+)\s*[-–]\s*(\d+)\s*(?:words?|palabras?)|\bentre\s*(\d+)\s*y\s*(\d+)\s*palabras?', text, re.I)
     if match:
-        result.update(min_words=int(match[1]), max_words=int(match[2]))
-    match = re.search(r'(?:maximum|max\.?|under|up to|at most|no more than)\s*(\d+)\s*characters?', text, re.I)
+        low, high = (match[1], match[2]) if match[1] else (match[3], match[4])
+        result.update(min_words=int(low), max_words=int(high))
+    match = re.search(r'(?:maximum|max\.?|under|up to|at most|no more than|m[aá]ximo(?: de)?|hasta|como m[aá]ximo|no m[aá]s de|menos de)\s*(\d+)\s*(?:characters?|caracteres)', text, re.I)
     if match:
-        maximum = int(match[1]) - (1 if match[0].lower().startswith('under') else 0)
+        maximum = int(match[1]) - (1 if re.match(r'(?:under|menos de)', match[0], re.I) else 0)
         result['max_characters'] = min(maximum, result['max_characters']) if result['max_characters'] else maximum
-    if re.search(r'\b(?:one|single|1) sentence\b', text, re.I):
+    if re.search(r'\b(?:one|single|1) sentence\b|\b(?:una|1)\s+(?:sola\s+)?(?:frase|oraci[oó]n)\b', text, re.I):
         result['sentences'] = 1
-    match = re.search(r'\b(one|two|three|four|five|\d+)\s+examples?\b', text, re.I)
+    match = re.search(r'\b(one|two|three|four|five|\d+)\s+examples?\b|\b(un|uno|una|dos|tres|cuatro|cinco|\d+)\s+ejemplos?\b', text, re.I)
     if match:
-        result['examples'] = {'one': 1, 'two': 2, 'three': 3, 'four': 4, 'five': 5}.get(match[1].lower()) or int(match[1])
-    if re.search(r'bullet(?:ed)?(?: points)?', text, re.I):
+        word = (match[1] or match[2]).lower()
+        result['examples'] = {'one': 1, 'two': 2, 'three': 3, 'four': 4, 'five': 5, 'un': 1, 'uno': 1, 'una': 1, 'dos': 2,
+                              'tres': 3, 'cuatro': 4, 'cinco': 5}.get(word) or int(word)
+    if re.search(r'bullet(?:ed)?(?: points)?|vi[ñn]etas?|puntos clave', text, re.I):
         result['bullets'] = True
     if field.get('options'):
         result['options'] = field['options']
         if not field.get('multiple') and field.get('type') not in {'multiselect', 'checkbox_group'}:
             result.update(min_selections=1, max_selections=1)
-        match = re.search(r'(?:pick|select|choose)\s*(\d+)\s*[-–]\s*(\d+)', text, re.I)
+        match = re.search(r'(?:pick|select|choose|elige|selecciona)\s*(\d+)\s*[-–]\s*(\d+)', text, re.I)
         if match:
             result.update(min_selections=int(match[1]), max_selections=int(match[2]))
     return result
@@ -471,7 +501,10 @@ def reconcile_claim_evidence(generated, facts):
     return list(dict.fromkeys(restored))
 
 
-def entailment_issues(answer, claims, known, used):
+def entailment_issues(answer, claims, known, used, cross_lingual=False):
+    """``cross_lingual``: the answer is not in the language of the evidence (a Spanish draft of English facts). Words cannot be
+    compared across languages, so the lexical overlap of a claim with its evidence (and with the answer) is not asked of it:
+    the claim then quotes the evidence it relies on, and the numbers, names and the independent review carry the check."""
     issues = prose_claim_issues(answer, known, used)
     source = '\n'.join(str(known[x]['value']) for x in used if x in known)
     historical_sentences = '\n'.join(sentence for sentence in re.split(r'(?<!\d)[.!?](?:\s+|$)', answer)
@@ -496,7 +529,7 @@ def entailment_issues(answer, claims, known, used):
         if len(words) >= 4 and len(missing) / len(words) > .5 and not (subjective and not historical):
             issues.append('UNSUPPORTED_LLM_CLAIM: claim contains detail absent from cited evidence: ' + ', '.join(sorted(missing)[:6]))
         reflected = words & content_words(answer)
-        if len(words) >= 4 and len(reflected) / len(words) < .35:
+        if len(words) >= 4 and len(reflected) / len(words) < .35 and not cross_lingual:
             issues.append('UNSUPPORTED_LLM_CLAIM: evidence claim is not reflected in the actual answer')
         named_details = re.findall(r'\b[A-Z][A-Za-z0-9+#.-]*\b', claim.get('text', ''))[1:]
         if any(word.casefold() not in answer.casefold() for word in named_details):
@@ -522,9 +555,224 @@ def candidate_numeric_prose(answer, generated, facts, company_sources, company_n
     return candidate_text
 
 
+# A present-tense job: 'I work at', 'I currently work for', 'I am now employed by', 'actualmente trabajo en'.
+CURRENT_EMPLOYMENT = re.compile(
+    r"\b(?:i|we) (?:(?:currently|now|presently|also|still) )?(?:work|am working|am employed|serve|am based)\s+(?:at|for|by|with)\b|"
+    r"\b(?:currently|now|presently|at present|right now)\b[^.!?]{0,15}\b(?:work(?:ing)?|employed)\s+(?:at|for|by|with)\b|"
+    r"\bcurrently\s*,?\s*(?:as\b|employed|working)|\bmy current (?:role|job|position|employer)\b|"
+    r"\bactualmente\b[^.!?]{0,15}\btrabaj\w+\s+(?:en|para|con)\b|\btrabajo\s+(?:actualmente\s+)?(?:en|para)\b|"
+    r"\bsoy emplead[oa]\b|\bmi (?:puesto|empleo|trabajo|empleador) actual\b", re.I)
+SPELLED_NUMBERS = {}
+for _value, _words in enumerate(('three four five six seven eight nine ten eleven twelve thirteen fourteen fifteen sixteen seventeen '
+                                 'eighteen nineteen twenty').split(), start=3):
+    SPELLED_NUMBERS[_words] = _value
+for _value, _words in enumerate(('tres cuatro cinco seis siete ocho nueve diez ONCE doce trece catorce quince dieciseis diecisiete '
+                                 'dieciocho diecinueve veinte').split(), start=3):
+    if _words != 'ONCE':  # 'once' is a word of English ('once a week'): the Spanish eleven is not read
+        SPELLED_NUMBERS[_words] = _value
+for _tens, _value in (('thirty', 30), ('forty', 40), ('fifty', 50), ('sixty', 60), ('seventy', 70), ('eighty', 80), ('ninety', 90),
+                      ('hundred', 100), ('thousand', 1000), ('million', 1000000), ('treinta', 30), ('cuarenta', 40),
+                      ('cincuenta', 50), ('sesenta', 60), ('setenta', 70), ('ochenta', 80), ('noventa', 90), ('cien', 100),
+                      ('ciento', 100), ('mil', 1000), ('millon', 1000000), ('millones', 1000000)):
+    SPELLED_NUMBERS[_tens] = _value
+SPELLED = re.compile(r'(?<![a-z])(' + '|'.join(sorted(SPELLED_NUMBERS, key=len, reverse=True)) + r')(?![a-z])')
+# Words of ordinary prose that are capitalised and no proper noun.
+NOT_NAMES = set(w.casefold() for w in (
+    'I I\'m I\'ve I\'d I\'ll English Spanish French German Italian Portuguese Dutch Arabic Chinese Japanese Korean Russian Hindi '
+    'January February March April May June July August September October November December Monday Tuesday Wednesday Thursday '
+    'Friday Saturday Sunday The This That These Those My Our Your Its Their A An And Or But So As At In On For With By From To Of '
+    'Yo Mi Mis El La Los Las Un Una Y O Pero Con Para Por En De Del Al Este Esta Estos Estas Como Cuando Donde').split())
+EMPLOYER_CUE = re.compile(r"\b(?:at|for|with|by|joined|from|via|en|para|con|por|desde|trabaj\w+ en|empresa)\s+$", re.I)
+ORGANISATION = re.compile(r"\b(?:Inc|Ltd|LLC|LLP|Corp|Corporation|GmbH|S\.?A\.?|S\.?L\.?|Limited|Bank|Banco|University|Universidad|"
+                          r"College|Technologies|Labs|Group|Grupo|Systems|Solutions|Partners|Studios?|Consulting|Capital|Holdings|"
+                          r"Industries|Foundation|Fundaci[oó]n|Institute|Instituto|Agency|Agencia)\b")
+NAME_PHRASE = re.compile(r"[A-ZÁÉÍÓÚÑÜ][\w&'’.-]*(?:\s+(?:(?:of|de|del|de la|and|y|&)\s+)?[A-ZÁÉÍÓÚÑÜ][\w&'’.-]*)*")
+# Things a draft about a job, a project or a motive has no business saying unless the evidence it cites does.
+PRIVATE_IN_ANSWER = re.compile(
+    r"\b(?:visa|work permit|right to work|eligible to work|authori[sz]ed to work|legally (?:able|allowed|entitled) to work|"
+    r"available (?:to start|immediately|from)|start immediately|sponsorship|citizen(?:ship)?|nationality|passport|date of birth|born in|years old|"
+    r"my salary|salary expectations?|gender|religion|ethnic\w*|disabilit\w*|marital|pregnan\w*|sexual orientation|criminal record|"
+    r"convicted|visado|permiso de trabajo|derecho a trabajar|patrocinio|ciudadan[ií]a|nacionalidad|pasaporte|fecha de nacimiento|"
+    r"mi salario|pretensiones salariales|g[eé]nero|religi[oó]n|etnia|discapacidad|estado civil|antecedentes penales)\b", re.I)
+COMPLETION = re.compile(r"\b(?:i (?:have |'ve )?(?:hold|earned|obtained|completed|graduated|received|got|achieved)|(?:graduated|"
+                        r"completed|finished)|me (?:he )?(?:graduado|titulado)|he (?:completado|obtenido|terminado|finalizado)|"
+                        r"tengo (?:un|el) (?:t[ií]tulo|m[aá]ster|grado))\b", re.I)
+
+
+def _plain(text):
+    return unicodedata.normalize('NFKD', str(text or '')).encode('ascii', 'ignore').decode().casefold()
+
+
+def fabrication_issues(answer, facts, cited_facts, context_text=''):
+    """What a draft states that no evidence it was given supports, checked without a model and in any language: an EMPLOYER or
+    organisation the candidate's facts and the question never name, a spelled-out number ('fifty engineers', 'diez años') that
+    no cited fact states, something private (a visa, a nationality, a salary) the cited facts do not hold, and a degree
+    presented as finished whose record is still in progress. The independent review can then judge the rest."""
+    issues = []
+    everything = _plain(' '.join(str(f.get('entity') or '') + ' ' + str(f.get('value')) for f in facts) + ' ' + str(context_text))
+    cited = _plain(' '.join(str(f.get('entity') or '') + ' ' + str(f.get('value')) for f in cited_facts))
+    for sentence in re.split(r'(?<=[.!?])\s+|\n+', answer):
+        for match in NAME_PHRASE.finditer(sentence):
+            tokens = list(re.finditer(r"[^\s]+", match.group(0)))
+            # the words of ordinary prose at the edges ('At', 'I') are no part of a name: 'At Globex Corporation I built'
+            while tokens and tokens[0].group(0).strip(" .,;:'").casefold() in NOT_NAMES:
+                tokens.pop(0)
+            while tokens and tokens[-1].group(0).strip(" .,;:'").casefold() in NOT_NAMES:
+                tokens.pop()
+            if not tokens:
+                continue
+            begin = match.start() + tokens[0].start()
+            phrase = sentence[begin: match.start() + tokens[-1].end()].strip(' .,;:')
+            first = not sentence[:begin].strip()
+            if not phrase or (len(phrase.split()) == 1 and (first or len(phrase) < 3)):
+                continue
+            employer = bool(EMPLOYER_CUE.search(sentence[:begin])) or bool(ORGANISATION.search(phrase))
+            # 'Python y OpenCV' and 'Python and OpenCV' are the same two names: the connective is a word of a language, not of the
+            # name, so each name is looked for on its own (a name of two words, 'Globex Corporation', is looked for whole)
+            parts = [part for part in re.split(r"\s+(?:of|de|del|de la|and|y|e|&)\s+", phrase) if part.strip()]
+            if employer and not all(_plain(part) in everything for part in parts):
+                issues.append('UNSUPPORTED_LLM_CLAIM: an employer or organisation absent from the evidence: ' + phrase)
+    evidenced = {value for value in (SPELLED_NUMBERS.get(w) for w in SPELLED.findall(cited))}
+    evidenced |= {int(d) for d in re.findall(r'\b\d{1,7}\b', cited)}
+    for word in dict.fromkeys(SPELLED.findall(_plain(answer))):
+        value = SPELLED_NUMBERS[word]
+        if value not in evidenced:
+            issues.append('UNSUPPORTED_LLM_CLAIM: number ' + word + ' is absent from cited evidence')
+    for found in dict.fromkeys(m.group(0).casefold() for m in PRIVATE_IN_ANSWER.finditer(answer)):
+        if _plain(found) not in cited and _plain(found) not in _plain(context_text):
+            issues.append('UNSUPPORTED_LLM_CLAIM: private information not in the cited evidence: ' + found)
+    for sentence in re.split(r'(?<=[.!?])\s+|\n+', answer):
+        if not COMPLETION.search(sentence):
+            continue
+        for entity in {f['entity'] for f in facts if f.get('category') == 'education' and f.get('entity')}:
+            if entity.casefold() in sentence.casefold():
+                states = [str(f['value']).casefold() for f in facts if f.get('entity') == entity and f.get('key') == 'status']
+                if states and 'completed' not in states:
+                    issues.append('UNSUPPORTED_LLM_CLAIM: a qualification at ' + entity + ' is presented as finished, but is in progress')
+    return issues
+
+
+# --- the language a draft is written in -------------------------------------------------------------------------------------------
+STOP_WORDS = {
+    'English': set('the of and to in is that for with as are was were be been have has had it its this these those on by from at or an '
+                   'my our your we i you they their not but which who what when where how also can will would about into over than '
+                   'more most such through during while between both each other'.split()),
+    'Spanish': set('el la los las de del que y en un una unos unas es son fue fueron ser ha han he hemos para con por como mi mis su '
+                   'sus se lo al pero mas tambien sobre entre este esta estos estas donde cuando muy sin desde hasta nuestro nuestra '
+                   'nuestros nuestras tengo tiene tienen porque durante cada otros otras'.split()),
+    'French': set('le la les de des du et en un une est sont dans que qui pour avec sur par au aux ce cette ces mon ma mes notre nos '
+                  'votre vos je nous vous ils elle il pas plus mais ou ainsi aussi tres comme entre depuis pendant chaque'.split()),
+    'German': set('der die das den dem des und in ist sind war waren ein eine einen einem einer zu mit von fur auf bei als auch nicht '
+                  'ich wir sie er es sich dass wie oder aber nach uber mein meine unser unsere durch zwischen wahrend jede'.split()),
+    'Portuguese': set('o a os as de do da dos das que e em um uma uns umas e sao foi para com por como meu minha meus minhas seu sua '
+                      'se ao mas tambem sobre entre este esta estes estas onde quando muito sem desde ate nosso nossa tenho tem'.split()),
+    'Italian': set('il lo la i gli le di del della dei delle che e in un una uno e sono per con come mio mia miei mie suo sua si al ma '
+                   'anche su tra fra questo questa questi queste dove quando molto senza da fino nostro nostra ho ha'.split()),
+}
+
+
+def language_of(text: str) -> tuple[str | None, dict]:
+    """The language a text is written in, by the share of its words that are that language's most frequent function words (None when
+    it is too short to say, or no language of the table is clearly ahead). No model, no network."""
+    words = re.findall(r"[a-z]+", unicodedata.normalize('NFKD', str(text or '')[:4000]).encode('ascii', 'ignore').decode().lower())
+    if len(words) < 12:
+        return None, {}
+    share = {language: sum(word in stop for word in words) / len(words) for language, stop in STOP_WORDS.items()}
+    best = max(share, key=share.get)
+    others = max(value for language, value in share.items() if language != best)
+    return (best if share[best] >= .12 and share[best] >= 1.5 * others else None), share
+
+
+def wrong_language_issue(answer, wanted):
+    """The question (or the page) asks for ``wanted``: a draft written in another language of the table is not that answer."""
+    if wanted not in STOP_WORDS:
+        return None
+    found, share = language_of(answer)
+    if found is not None and found != wanted:
+        return f'INSTRUCTION_COMPLIANCE: the answer is written in {found}, the form asks for {wanted}'
+    return None
+
+
+# --- credentials, titles, awards, languages, technologies and legal status a draft can only state if a cited fact does ----------
+CLAIM_TERMS = {
+    'a doctorate': r"\bph\.?d\b|\bdoctorate\b|\bdoctoral\b|\bdphil\b|\bdoctorado\b",
+    "a master's degree": r"\bmaster'?s\b|\bmsc\b|\bm\.sc\b|\bmba\b|\bmeng\b|\bmaster\b|\bmaestria\b|\bpostgraduate\b|\bposgrado\b|\bpostgrado\b",
+    "a bachelor's degree": r"\bbachelor'?s\b|\bbsc\b|\bb\.sc\b|\bbeng\b|\bundergraduate\b|\blicenciatura\b|\bgrado\b",
+    'a thesis': r"\btheses\b|\bthesis\b|\bdissertation\b|\btesis\b|\btfm\b|\btfg\b",
+    'a certification': r"\bcertified\b|\bcertifications?\b|\bcertificates?\b|\bcertificad[oa]s?\b|\bchartered\b|\bceng\b|\bieng\b|"
+                       r"\blicen[cs]ed\b|\baccredited\b|\baccreditation\b|\bdiploma\b|\bcolegiad[oa]\b",
+    'a security clearance': r"\bclearance\b|\bhabilitacion de seguridad\b",
+    'an award': r"\bwon\b|\bwinners?\b|\bawards?\b|\bawarded\b|\bprizes?\b|\bfirst place\b|\bhackathons?\b|\bscholarships?\b|\bpremios?\b|"
+                r"\bbecas?\b|\bganador\w*\b|\bgalardon\w*\b",
+    'a promotion': r"\bpromoted\b|\bpromotions?\b|\bpromovid[oa]s?\b|\bascendid[oa]s?\b",
+    'a founded company': r"\bfounded\b|\bco-?founded\b|\bfounders?\b|\bstarted (?:my own|a|an|our) (?:own )?(?:company|startup|business)\b|"
+                         r"\bfund[eo]\b|\bfundador\w*\b|\bfundamos\b",
+    'a leadership role': r"\bled (?:a |an |the |my |our )?(?:\w+ ){0,3}teams?\b|\bmanaged (?:a |an |the |my |our )?(?:\w+ ){0,3}teams?\b|"
+                         r"\bteam lead(?:er)?\b|\bengineering manager\b|\blider[eo]\b|\bdirig[io]\b|\bhead of\b",
+    'years of experience': r"\bdecades?\b|\bdecada\b",
+    'a title': r"\bI (?:was|am|became|worked as|served as|joined as) (?:a |an |the )?(?:senior|principal|staff|lead|head|director|chief|manager)\b|"
+               r"\b(?:soy|fui|trabaje como|trabajo como) (?:un |una |el |la )?(?:senior|principal|lider|director|jefe|gerente)\b",
+}
+TECHNOLOGIES = set('python java javascript typescript rust golang kotlin swift scala ruby php haskell sql postgresql postgres mysql '
+                   'mongodb redis kafka docker kubernetes terraform aws azure gcp linux react angular vue django flask fastapi spring '
+                   'pytorch tensorflow keras pandas numpy scikit-learn sklearn spark hadoop c++ c# git graphql opencv jupyter matlab '
+                   'tableau excel unity unreal swiftui flutter nginx ansible jenkins elasticsearch rabbitmq cassandra snowflake '
+                   'databricks airflow dbt hugging transformers langchain llama openai'.split())
+TECH_TOKEN = re.compile(r"(?<![A-Za-z0-9+#.-])([A-Za-z][A-Za-z0-9+#.-]*[A-Za-z0-9+#])(?![A-Za-z0-9+#-])|(?<![A-Za-z0-9+#])(C\+\+|C#)")
+# 'I worked at google': an employer is named even without capitals; a determiner or a common noun after the verb is no employer
+EMPLOYED_AT = re.compile(r"\b(?:worked|work|working|interned|interning|employed|joined|volunteered|trabaje|trabajo|trabajaba)\s+(?:at|for|by|en|para)\s+"
+                         r"([a-z][a-z0-9&.-]{2,}(?:\s+[a-z][a-z0-9&.-]{2,}){0,1})")
+COMMON_AFTER_WORKED = set('a an the my our their his her its this that these those one two several many some various multiple other another '
+                          'each every both all any no more most few team teams company companies startup startups firm firms home night '
+                          'nights weekends weekend university universities school schools lab labs agency agencies bank banks hospital '
+                          'project projects client clients customer customers organisation organisation organization organizations '
+                          'research least most about over under around nearly almost roughly part full time scale speed pace '
+                          'un una el la los las mi mis nuestro nuestra varios varias algunos algunas otro otra cada todo toda '
+                          'equipo equipos empresa empresas proyecto proyectos cliente clientes universidad escuela casa'.split())
+SPOKEN = re.compile(r"\b(?:fluent(?:ly)?|native(?:ly)?|bilingual|proficient|speak(?:s)?|spoke|hablo|fluido|nativo|biling[uü]e|domino)\b", re.I)
+LANGUAGE_NAMES = ('english', 'spanish', 'french', 'german', 'portuguese', 'italian', 'dutch', 'arabic', 'mandarin', 'chinese', 'japanese',
+                  'korean', 'russian', 'hindi', 'polish', 'turkish', 'catalan', 'ingles', 'espanol', 'frances', 'aleman', 'portugues',
+                  'italiano', 'chino', 'japones', 'ruso')
+
+
+def credential_issues(answer, cited_facts, context_text=''):
+    """What a draft CLAIMS that no cited fact (nor the question or job) states, found deterministically: a doctorate, a master's, a
+    certification, a clearance, an award, a promotion, a founded company, a team led, a decade of experience, a title, a spoken
+    language, a technology. The independent reviewer then judges only what remains; with it disabled these are still never offered
+    as written. (The status of the right to work, a nationality, a salary and a visa are ``PRIVATE_IN_ANSWER``.)"""
+    issues = []
+    evidence = _plain(' '.join(str(f.get('entity') or '') + ' ' + str(f.get('key') or '') + ' ' + str(f.get('value')) for f in cited_facts) + ' ' + str(context_text))
+    text = _plain(answer)
+    for what, pattern in CLAIM_TERMS.items():
+        regex = re.compile(pattern, re.I)
+        hit = regex.search(answer)
+        if hit and not regex.search(evidence):
+            issues.append(f'UNSUPPORTED_LLM_CLAIM: states {what} that no cited fact states: {hit.group(0).strip()}')
+    for sentence in re.split(r'(?<=[.!?])\s+|\n+', answer):
+        if SPOKEN.search(sentence):
+            plain_sentence = _plain(sentence)
+            for name in LANGUAGE_NAMES:
+                if re.search(r'(?<![a-z])' + name + r'(?![a-z])', plain_sentence) and not re.search(r'(?<![a-z])' + name + r'(?![a-z])', evidence):
+                    issues.append('UNSUPPORTED_LLM_CLAIM: a spoken language that no cited fact states: ' + name)
+    for match in EMPLOYED_AT.finditer(text):
+        name = match.group(1).casefold()
+        if name.split()[0] not in COMMON_AFTER_WORKED and name not in evidence:
+            issues.append('UNSUPPORTED_LLM_CLAIM: an employer or organisation absent from the evidence: ' + match.group(1))
+    seen = set()
+    for match in TECH_TOKEN.finditer(answer):
+        token = (match.group(1) or match.group(2) or '').strip('.-')
+        key = token.casefold()
+        if key in seen or not (key in TECHNOLOGIES or re.search(r'[A-Za-z][+#]', token)):
+            continue
+        seen.add(key)
+        if _plain(token) not in evidence and key not in evidence:
+            issues.append('UNSUPPORTED_LLM_CLAIM: a technology that no cited fact states: ' + token)
+    return issues
+
+
 class AnswerEvidenceValidator:
     def validate(self, generated, facts, question_id, intent, output_requirements, previous_answers=(), resume=None,
-                 *, company_sources=None, company_names=()):
+                 *, company_sources=None, company_names=(), context_text=''):
         issues = []
         answer = generated.get('answer')
         if generated.get('question_id') != question_id:
@@ -578,8 +826,14 @@ class AnswerEvidenceValidator:
                 issues.append('UNSUPPORTED_LLM_CLAIM: a metric is attributed to an entity absent from its cited evidence')
         current = any((f['key'] == 'current_company' or (f['category'] == 'experience' and f['key'] == 'ongoing'))
                       and f['value'] not in (False, 'false') for f in facts)
-        if not current and re.search(r'\bi (?:work|am working|am employed) (?:at|for)\b|\bcurrently\s*,?\s*(?:as\b|employed|working)|\bmy current (?:role|job)', answer, re.I):
+        if not current and CURRENT_EMPLOYMENT.search(answer):
             issues.append('UNSUPPORTED_LLM_CLAIM: current employment is not confirmed')
+        issues.extend(fabrication_issues(answer, facts, cited_facts, ' '.join([context_text, *(company_sources or {}).values(),
+                                                                                *company_names])))
+        issues.extend(credential_issues(answer, cited_facts, ' '.join([context_text, *company_names])))
+        wrong_language = wrong_language_issue(answer, output_requirements.get('language', 'English'))
+        if wrong_language:
+            issues.append(wrong_language)
         for prior in previous_answers:
             text = prior.get('answer', '') if isinstance(prior, dict) else str(prior)
             prior_id = prior.get('question_id') if isinstance(prior, dict) else None
@@ -623,7 +877,8 @@ class AnswerEvidenceValidator:
                     claim_facts = [known[x] for x in claim['fact_ids'] if x in known]
                     if factual_numeric_claims(claim['text'], claim_facts) - factual_numeric_claims(claim_source, claim_facts):
                         issues.append('UNSUPPORTED_LLM_CLAIM: a factual claim contains a metric absent from its own cited evidence')
-        issues.extend(entailment_issues(answer, claims, known, used))
+        issues.extend(entailment_issues(answer, claims, known, used,
+                                        cross_lingual=output_requirements.get('language', 'English') != 'English'))
         return list(dict.fromkeys(issues))
 
 

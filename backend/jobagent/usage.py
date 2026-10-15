@@ -9,6 +9,16 @@ from datetime import datetime, timezone
 MAX_MONTHLY_BUDGET = 20.0
 
 
+class BudgetExceededError(ValueError):
+    """The shared monthly AI cap cannot cover another provider request.
+
+    A ValueError subclass, so existing callers and message checks keep working; ``code`` lets
+    callers (the browser extension queue) stop spending without parsing the message.
+    """
+
+    code = 'AI_BUDGET_EXCEEDED'
+
+
 def unlimited_authorized(connection):
     row = connection.execute("SELECT value FROM settings WHERE key='ai_budget_unlimited'").fetchone()
     if not row or json.loads(row['value']) is not True:
@@ -55,7 +65,7 @@ class Reservation:
                 budget = min(budget, validate_budget(json.loads(configured['value'])))
             usage = self._read(connection)
             if not unlimited and maximum_cost > 0 and usage["cost"] + maximum_cost > budget:
-                raise ValueError("Monthly AI budget would be exceeded")
+                raise BudgetExceededError("Monthly AI budget would be exceeded")
             usage["cost"] += maximum_cost
             usage["calls"] += 1
             entry = usage.setdefault("providers", {}).setdefault(provider, {"cost": 0, "calls": 0})

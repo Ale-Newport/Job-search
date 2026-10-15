@@ -278,10 +278,66 @@ class Knowledge:
         return result
 
 
+# The Application profile's fields about ONE place's work rights and pay: what they become in the typed knowledge the answer
+# engine reads. {profile key: (place as the engine names it, what the field holds)}. The UK fields are unchanged and flat.
+JURISDICTION_FIELDS = {
+    "work_authorization_es": ("Spain", "right"), "sponsorship_es": ("Spain", "sponsorship"),
+    "expected_salary_es": ("Spain", "salary"),
+    "work_authorization_eu": ("European Union", "right"), "sponsorship_eu": ("European Union", "sponsorship"),
+}
+SALARY_CURRENCY = {"Spain": "EUR"}
+
+
+def sync_jurisdiction_field(db, key, value, confirmed):
+    """A confirmed answer to 'Right to work in Spain', 'Need sponsorship (Spain)' or 'Expected salary (EUR, Spain)' of the
+    Application profile is the candidate's immigration record for that place (country, right to work, sponsorship) or a
+    salary policy scoped to it: the engine answers a Spanish role's questions from them, never another country's. A cleared
+    or unconfirmed field is not used. Never inferred from the UK fields: each place states its own."""
+    from ..core import invalidate_fact_evidence
+
+    place, kind = JURISDICTION_FIELDS[key]
+    source = "application_profile:" + key
+    value = str(value or "").strip()
+    usable = bool(confirmed and value)
+    if kind == "salary":
+        number = float(value) if value else None
+        policy(db, "salary_expected", {"target": int(number) if number is not None and number.is_integer() else number,
+                                       "currency": SALARY_CURRENCY.get(place, "")} if number is not None else {"target": None},
+               {"country": place}, source=source, confirmed=usable)
+        return
+    entity_id = entity(db, "immigration", "Right to work in " + place + " (Application profile)")
+    facts = {"country": (place, "text")}
+    if kind == "right":
+        facts["current_right_to_work"] = (value, "boolean")
+    else:
+        facts["sponsorship_now_or_future"] = (value, "boolean")
+        if value == "No":  # no need now or ever: neither now nor later (the reverse says nothing of either)
+            facts["sponsorship_current"] = (value, "boolean")
+            facts["sponsorship_future"] = (value, "boolean")
+    with db.transaction() as conn:
+        for row in conn.execute(
+                "SELECT f.* FROM facts f JOIN knowledge_facts k ON k.fact_id=f.id WHERE k.entity_id=? AND f.source=?",
+                (entity_id, source)).fetchall():
+            invalidate_fact_evidence(db, conn, dict(row))
+            conn.execute("UPDATE facts SET verification_status='unverified',updated_at=? WHERE id=?", (now(), row["id"]))
+    if not value:
+        return
+    for concept, (item, kind_of) in facts.items():
+        identifier = ingest_fact(db, entity_id, concept, item, value_type=kind_of, source=source,
+                                 evidence={"source": "Explicit profile edit"}, verified=usable, priority=100,
+                                 sensitivity="personal")
+        with db.transaction() as conn:
+            conn.execute("UPDATE facts SET verification_status=?,updated_at=? WHERE id=?",
+                         ("verified" if usable else "unverified", now(), identifier))
+            conn.execute("UPDATE knowledge_facts SET source_priority=100,revision=revision+1 WHERE fact_id=?", (identifier,))
+
+
 def sync_profile_fact(db, key, value, confirmed):
     """Keep edits in the established Profile editor authoritative over imported data."""
     from ..core import invalidate_fact_evidence
 
+    if key in JURISDICTION_FIELDS:
+        return sync_jurisdiction_field(db, key, value, confirmed)
     people = db.query("SELECT id FROM knowledge_entities WHERE kind='person'")
     if len(people) != 1:
         return

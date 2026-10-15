@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import re
 import unicodedata
+from functools import lru_cache
 
 
 POLICY_SUBJECT = "personal_disclosures"
@@ -61,19 +62,19 @@ def disclosure_profile_key(question: str, element: dict | None = None) -> str | 
         text = " ".join(_normal(element.get(key)) for key in ("description", "context", "section_label"))
     keys = []
     patterns = (
-        ("pronouns", r"\bpronouns?\b"),
-        ("sexual_orientation", r"\bsexual(?:ity| orientation| identity| preference)\b"),
-        ("sex", r"\bsex(?: assigned at birth)?\b"),
-        ("gender", r"\bgender\b"),
-        ("ethnicity", r"\bethnic\w*\b|\brace\b|\bracial\b"),
-        ("religion", r"\breligi\w*\b|\bfaith\b|\bbeliefs?\b"),
-        ("neurodivergence", r"\bneurodiver\w*\b"),
-        ("mental_health", r"\bmental health\b"),
-        ("disability", r"\bdisabilit\w*\b|\bdisabled\b"),
-        ("adjustments", r"\badjustments?\b|\baccommodations?\b"),
-        ("veteran", r"\bveteran\b"),
-        ("date_of_birth", r"\bdate of birth\b|\bbirth ?date\b|\bdob\b"),
-        ("age", r"\bage\b"),
+        ("pronouns", r"\bpronouns?\b|\bpronombres?\b"),
+        ("sexual_orientation", r"\bsexual(?:ity| orientation| identity| preference)\b|\borientacion sexual\b|\bidentidad sexual\b"),
+        ("sex", r"\bsex(?: assigned at birth)?\b|\bsexo\b"),
+        ("gender", r"\bgender\b|\bgenero\b|\bidentidad de genero\b"),
+        ("ethnicity", r"\bethnic\w*\b|\brace\b|\bracial\b|\betnia\b|\betnic\w*\b|\borigen racial\b|\braza\b"),
+        ("religion", r"\breligi\w*\b|\bfaith\b|\bbeliefs?\b|\bcreencias?\b"),
+        ("neurodivergence", r"\bneurodiver\w*\b|\bneurodivergen\w*\b"),
+        ("mental_health", r"\bmental health\b|\bsalud mental\b"),
+        ("disability", r"\bdisabilit\w*\b|\bdisabled\b|\bdiscapacidad(?:es)?\b|\bdiscapacitad[oa]\b|\bminusvalia\b"),
+        ("adjustments", r"\badjustments?\b|\baccommodations?\b|\bajustes? razonables?\b|\badaptaciones? razonables?\b"),
+        ("veteran", r"\bveteran\b|\bveterano\b"),
+        ("date_of_birth", r"\bdate of birth\b|\bbirth ?date\b|\bdob\b|\bfecha de nacimiento\b"),
+        ("age", r"\bage\b|\bedad\b"),
     )
     for key, pattern in patterns:
         if re.search(pattern, text):
@@ -84,11 +85,12 @@ def disclosure_profile_key(question: str, element: dict | None = None) -> str | 
     qualified = " ".join((text, _normal(element.get("description"))))
     if keys != ["date_of_birth"] and re.search(
         r"\b(?:previous(?:ly)?|former(?:ly)?|histor(?:y|ical)|ever|in the past|used to|"
-        r"grew up|growing up|raised|upbringing|childhood|as a child)\b",
+        r"grew up|growing up|raised|upbringing|childhood|as a child|"
+        r"anterior(?:mente)?|antes|alguna vez|en el pasado|historial|infancia|crecio|criado)\b",
         qualified,
     ):
         return None
-    if "gender" in keys and re.search(r"\b(?:at birth|birth gender|assigned)\b", qualified):
+    if "gender" in keys and re.search(r"\b(?:at birth|birth gender|assigned|al nacer|asignado)\b", qualified):
         return None
     # A No for one kind of condition cannot answer No to a broader collection
     # of health conditions. Remove the supported mental-health phrase before
@@ -98,7 +100,8 @@ def disclosure_profile_key(question: str, element: dict | None = None) -> str | 
     )
     if any(key in keys for key in ("mental_health", "disability", "neurodivergence")) and re.search(
         r"\b(?:physical|medical|health (?:conditions?|status|information)|"
-        r"(?:long term|chronic) (?:illness(?:es)?|conditions?)|illness(?:es)?|impairments?)\b",
+        r"(?:long term|chronic) (?:illness(?:es)?|conditions?)|illness(?:es)?|impairments?|"
+        r"fisic[oa]s?|medic[oa]s?|condicion(?:es)? (?:medicas?|de salud)|enfermedad(?:es)?|cronic[oa]s?|deficiencias?|dolencias?)\b",
         health_scope,
     ):
         return None
@@ -106,43 +109,58 @@ def disclosure_profile_key(question: str, element: dict | None = None) -> str | 
         return "adjustments"  # A disability accommodation request asks for the request, not its cause.
     # Do not turn a broad identity into answers to narrower legal definitions
     # or diagnostic details. These require their own explicit response.
-    if re.search(r"transgender|cisgender|hispanic|latino|latina|latinx|diagnos|describe.*condition|details.*condition", text):
+    if re.search(r"transgender|cisgender|hispanic|latino|latina|latinx|diagnos|describe.*condition|details.*condition|"
+                 r"transgenero|cisgenero|hispan[oa]|diagnostic|describe.*condicion|detalles.*condicion", text):
         return None
-    if re.search(r"\b(?:physical health|medical|health (?:conditions?|history|status))\b", text) and "mental health" not in text:
+    if re.search(r"\b(?:physical health|medical|health (?:conditions?|history|status)|salud fisica|medic[oa]|"
+                 r"(?:historial|condicion(?:es)?|estado) (?:medic[oa]|de salud))\b", text) and "mental health" not in text \
+            and "salud mental" not in text:
         return None
     return keys[0] if len(keys) == 1 else None
 
 
-def _normal(value):
-    text = unicodedata.normalize("NFKD", str(value or "")).encode("ascii", "ignore").decode().lower()
+@lru_cache(maxsize=1 << 15)
+def _normalised(text):
+    text = unicodedata.normalize("NFKD", text).encode("ascii", "ignore").decode().lower()
     return re.sub(r"[^a-z0-9]+", " ", text).strip()
 
 
+def _normal(value):
+    text = str(value or "")
+    return _normalised(text) if len(text) <= 512 else _normalised.__wrapped__(text)
+
+
 _TOPICS = (
-    ("pronouns", r"\bpronouns?\b"),
-    ("sexual_orientation", r"\bsexual(?:ity| orientation| identity| preference)\b|\blgbtq?\+?\b"),
-    ("gender", r"\bgender\b|\bsex(?: assigned at birth)?\b|\b(?:transgender|cisgender)\b"),
+    ("pronouns", r"\bpronouns?\b|\bpronombres?\b"),
+    ("sexual_orientation", r"\bsexual(?:ity| orientation| identity| preference)\b|\blgbtq?\+?\b|\borientacion sexual\b|\bidentidad sexual\b|\blgtb\w*\b"),
+    ("gender", r"\bgender\b|\bsex(?: assigned at birth)?\b|\b(?:transgender|cisgender)\b|\bgenero\b|\bsexo\b|\bidentidad de genero\b|\b(?:transgenero|cisgenero)\b"),
     (
         "ethnicity",
-        r"\bethnic(?:ity|ities| origin| background| group)?\b|\brace\b|\bracial\b|\b(?:hispanic|latino|latina|latinx|aboriginal|indigenous|national origin)\b",
+        r"\bethnic(?:ity|ities| origin| background| group)?\b|\brace\b|\bracial\b|\b(?:hispanic|latino|latina|latinx|aboriginal|indigenous|national origin)\b"
+        r"|\betnia\b|\betnic[oa]s?\b|\borigen (?:etnico|racial)\b|\braza\b|\b(?:hispan[oa]|latin[oa]|indigena)\b",
     ),
-    ("religion", r"\breligi(?:on|ous)\b|\bfaith\b|\b(?:religious|philosophical) beliefs?\b"),
+    ("religion", r"\breligi(?:on|ous)\b|\bfaith\b|\b(?:religious|philosophical) beliefs?\b|\breligion\b|\breligios[oa]\b|\bcreencias? (?:religiosas|filosoficas)\b"),
     (
         "disability",
-        r"\bdisabilit(?:y|ies)\b|\bdisabled\b|\bneurodivergen\w*\b|\bneurodivers\w*\b|\breasonable (?:adjustments?|accommodations?)\b|\b(?:need|require|request)\w*\b.{0,45}\b(?:adjustments?|accommodations?)\b|\b(?:adjustments?|accommodations?)\b.{0,25}\b(?:need|require|request)\w*\b",
+        r"\bdisabilit(?:y|ies)\b|\bdisabled\b|\bneurodivergen\w*\b|\bneurodivers\w*\b|\breasonable (?:adjustments?|accommodations?)\b|\b(?:need|require|request)\w*\b.{0,45}\b(?:adjustments?|accommodations?)\b|\b(?:adjustments?|accommodations?)\b.{0,25}\b(?:need|require|request)\w*\b"
+        r"|\bdiscapacidad(?:es)?\b|\bdiscapacitad[oa]\b|\bminusvalia\b|\bajustes? razonables?\b|\badaptaciones? razonables?\b"
+        r"|\b(?:necesitas|necesita|requieres|requiere|solicitas|solicita)\b.{0,45}\b(?:ajustes|adaptaciones)\b",
     ),
     (
         "health",
-        r"^health$|\b(?:mental|physical) health\b|\b(?:medical|health) (?:history|conditions?|status|information)\b|\b(?:chronic illness|long term (?:illness|condition)|diagnos\w*|impairments?|medical treatment)\b",
+        r"^health$|\b(?:mental|physical) health\b|\b(?:medical|health) (?:history|conditions?|status|information)\b|\b(?:chronic illness|long term (?:illness|condition)|diagnos\w*|impairments?|medical treatment)\b"
+        r"|^salud$|\bsalud (?:mental|fisica)\b|\b(?:historial|condicion(?:es)?|estado|informacion) (?:medic[oa]|de salud)\b|\benfermedad(?:es)? cronic[oa]s?\b|\bdiagnostico\b",
     ),
     (
         "demographic",
-        r"\b(?:marital|civil partnership|parental|pregnancy|veteran|military service|socioeconomic)(?: (?:status|background|history))?\b|\bdemographics?\b|\b(?:caring responsibilities|underrepresented group)\b",
+        r"\b(?:marital|civil partnership|parental|pregnancy|veteran|military service|socioeconomic)(?: (?:status|background|history))?\b|\bdemographics?\b|\b(?:caring responsibilities|underrepresented group)\b"
+        r"|\b(?:estado civil|situacion familiar|veterano|servicio militar|origen socioeconomico|embarazo)\b|\bdemograf\w*\b|\b(?:hijos a cargo|responsabilidades de cuidado)\b",
     ),
-    ("birth", r"\b(?:date of birth|birth date|birthdate|age|dob)\b"),
+    ("birth", r"\b(?:date of birth|birth date|birthdate|age|dob)\b|\b(?:fecha de nacimiento|edad)\b"),
 )
 _PERSONAL = re.compile(
-    r"\b(?:your|yours|you|applicant|candidate|self identif\w*|identify as|identifies as|i (?:am|have|identify)|my)\b"
+    r"\b(?:your|yours|you|applicant|candidate|self identif\w*|identify as|identifies as|i (?:am|have|identify)|my)\b|"
+    r"\b(?:tu|tus|su|sus|usted|tienes|tiene|eres|te identificas|te consideras|mi|mis|soy|tengo|me identifico|candidato|candidata|solicitante|postulante)\b"
 )
 _PROFESSIONAL = re.compile(
     r"\b(?:(?:build|built)\w*|test\w*|deploy\w*|develop\w*|design\w*|implement\w*|research\w*|improv\w*|experienc\w*|work\w*|approach\w*)\b.*"
@@ -152,10 +170,15 @@ _PROFESSIONAL = re.compile(
 )
 _BOILERPLATE = re.compile(
     r"\b(?:equal opportunity|we (?:do not|don t) discriminate|regardless of|without regard to|"
-    r"protected characteristics|all qualified applicants|diverse (?:team|workforce))\b"
+    r"protected characteristics|all qualified applicants|diverse (?:team|workforce)|"
+    r"igualdad de oportunidades|no discriminamos|no discriminacion|independientemente de|sin distincion de|"
+    r"todas las personas candidatas|equipo diverso|plantilla diversa)\b"
 )
 _AMBIGUOUS = re.compile(
-    r"^(?:(?:please )?(?:select|choose)(?: all that apply| an? (?:option|answer))?|"
+    r"^(?:(?:por favor )?(?:selecciona|elige)(?: una opcion| todas las que apliquen)?|por favor (?:especifica|detalla|elabora)|"
+    r"informacion adicional|detalles adicionales|tu respuesta|respuesta|cuentanos mas|otro(?: especifica)?|como te identificas|"
+    r"te identificas con alguno de los siguientes|si|prefiero no (?:decirlo|responder|contestar)|no deseo (?:responder|contestar)|"
+    r"(?:please )?(?:select|choose)(?: all that apply| an? (?:option|answer))?|"
     r"please (?:specify|elaborate)|additional (?:information|context|details)|further (?:information|details)|supporting information|.*anything else.*|your response|your answer|response|answer|tell us more about yourself|other(?: please specify)?|how (?:would|do) you (?:describe|identify) yourself|"
     r"do you identify with any of the following|yes|no|prefer not to (?:say|answer)|decline to (?:answer|self identify))$"
 )
@@ -178,7 +201,8 @@ def _candidate_clause(text):
         # applicant attribute, even when the statement is a short clause.
         return None
     if re.search(
-        r"\b(?:your|my) (?:current |personal |preferred )?(?:gender|sex(?:ual)?|ethnic\w*|race|religio\w*|pronouns?|disabilit\w*|(?:mental|physical) health|medical (?:history|condition)|date of birth|age)\b",
+        r"\b(?:your|my) (?:current |personal |preferred )?(?:gender|sex(?:ual)?|ethnic\w*|race|religio\w*|pronouns?|disabilit\w*|(?:mental|physical) health|medical (?:history|condition)|date of birth|age)\b|"
+        r"\b(?:tu|tus|mi|mis|su|sus) (?:genero|sexo|etnia|origen (?:etnico|racial)|raza|religion|pronombres|discapacidad|salud (?:mental|fisica)|fecha de nacimiento|edad|estado civil)\b",
         normalized,
     ):
         return topic

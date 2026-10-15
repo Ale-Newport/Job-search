@@ -1,0 +1,28 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><title>Whose details, which unit, which dial code</title>
+<style>body{font:16px system-ui;padding:32px}label{display:block;margin:12px}fieldset{margin:12px 0}</style>
+<h1>Apply to Example Company</h1>
+<form>
+<fieldset><legend>Personal information</legend>
+<label>First name <input name="first_name"></label>
+<label>Email <input name="email" type="email"></label>
+<label>Country Phone Code <select name="phone_code"><option value="">Select...</option><option value="es">Spain (+34)</option><option value="gb">United Kingdom (+44)</option><option value="us">United States (+1)</option></select></label>
+<label>Phone prefix <input name="phone_prefix"></label>
+<label>Phone <input name="phone" type="tel"></label>
+<label>Middle name <input name="middle_name"></label>
+</fieldset>
+<fieldset><legend>Emergency contact</legend>
+<label>Name <input name="ec_name"></label>
+<label>Emergency contact phone number <input name="ec_phone" type="tel"></label>
+</fieldset>
+<fieldset><legend>Employment</legend>
+<label>Company name <input name="company_name"></label>
+<label>Manager's email <input name="manager_email" type="email"></label>
+</fieldset>
+<fieldset><legend>Compensation</legend>
+<label>What are your salary expectations? <input name="salary" type="text"></label>
+<label>Expected monthly salary <input name="salary_monthly" type="text"></label>
+<label>Desired salary in EUR <input name="salary_eur" type="text"></label>
+<label>Expected salary range <input name="salary_range" type="text"></label>
+</fieldset>
+<button>Submit application</button></form>
+<script>window.submissions=0;document.querySelector('form').onsubmit=e=>{e.preventDefault();window.submissions++}</script></html>

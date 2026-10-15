@@ -214,7 +214,7 @@ def test_verified_secondary_level_fields_select_school_and_native_graduation_yea
                 evidence_ids[concept] = fact_id
     engine = CandidateEngine(db, as_of="2026-10-10")
     for question in ("High School Name✱", "Secondary school name"):
-        result = engine.answer_question(question, {"type": "textarea", "required": True})
+        result = engine.answer_question(question, {"type": "text", "required": True})  # (a long-text field is never answered from one line of a fact)
         assert result["answer"] == "Harbor School", result
         assert result["root_cause"] is None
         assert evidence_ids["institution"] in result["fact_ids"]

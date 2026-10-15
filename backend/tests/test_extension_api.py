@@ -311,15 +311,16 @@ def test_core_defaults_for_every_extension_setting(workspace):
     expected = {
         "extension_enabled": True, "extension_language": "auto", "extension_auto_advance": True,
         "extension_skip_filled": True, "extension_tab_inserts_protected": False, "extension_save_corrections": "ask",
-        "extension_research_enabled": True, "extension_background_drafts": True, "extension_web_lookup": True,
+        "extension_research_enabled": True, "extension_background_drafts": True, "extension_local_assist": True,
+        "extension_web_lookup": True,
         "extension_hint_on_ats": True, "extension_pairing_dialog": True, "extension_draft_budget_usd": None,
         "extension_always_on_sites": [], "extension_research_concurrency": 2, "extension_company_sites": {},
     }
     assert {key: settings[key] for key in expected} == expected
     assert extension_api.read_extension_settings(workspace.db) == {
         "enabled": True, "language": "auto", "auto_advance": True, "skip_filled": True, "tab_inserts_protected": False,
-        "save_corrections": "ask", "background_research": True, "background_drafts": True, "web_lookup": True,
-        "hint_on_ats": True, "draft_budget_usd": extension_api.DEFAULT_DRAFT_BUDGET_USD, "always_on_sites": []}
+        "save_corrections": "ask", "background_research": True, "background_drafts": True, "local_assist": True,
+        "web_lookup": True, "hint_on_ats": True, "draft_budget_usd": extension_api.DEFAULT_DRAFT_BUDGET_USD, "always_on_sites": []}
     # the stored default stays "unset"; what a page may spend by default is never "unlimited" (SEC-06)
     assert extension_api.DEFAULT_DRAFT_BUDGET_USD == 1.0
 
@@ -328,12 +329,13 @@ def test_setting_name_mapping_is_one_bijection():
     forward = extension_api.translate_settings({"background_research": False, "enabled": True, "other": 1}, to_core=True)
     assert forward == {"extension_research_enabled": False, "extension_enabled": True}
     assert extension_api.translate_settings(forward, to_core=False) == {"background_research": False, "enabled": True}
-    assert len(set(extension_api.SETTING_KEYS.values())) == len(extension_api.SETTING_KEYS) == 12
+    assert len(set(extension_api.SETTING_KEYS.values())) == len(extension_api.SETTING_KEYS) == 13
 
 
 def test_settings_patch_persists_and_returns_the_status(workspace):
     patch = {"language": "es", "auto_advance": False, "skip_filled": False, "tab_inserts_protected": True,
-             "save_corrections": "always", "background_research": False, "background_drafts": False, "web_lookup": False,
+             "save_corrections": "always", "background_research": False, "background_drafts": False, "local_assist": False,
+             "web_lookup": False,
              "hint_on_ats": False, "draft_budget_usd": 2.5, "always_on_sites": ["Jobs.Example.com", "careers.acme.io.", "jobs.example.com"]}
     body = workspace.client.patch("/api/extension/settings", json=patch).json()
     assert body["settings"] == patch | {"enabled": True, "always_on_sites": ["jobs.example.com", "careers.acme.io"]}

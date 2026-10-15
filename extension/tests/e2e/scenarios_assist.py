@@ -376,3 +376,59 @@ async def scenario_options_page_smoke(env: Env) -> None:
     await expect(page.locator("body")).not_to_be_empty()
     check("no page error", not rig.errors, rig.errors[:2])
 
+
+
+# ---------------------------------------------------------------------------------------------- local models (Laya, Ollama)
+@scenario(needs=SUGGEST, timeout=240)
+async def scenario_local_models_finish_what_the_profile_cannot(env: Env) -> None:
+    """A menu the engine found no option for and a value the field wants written its own way are finished by two models on this
+    Mac (scripted here, on loopback): the field says it is working, is told when they end, never takes a Tab for what no fact says,
+    never gives a protected question to a model, and keeps what it had when the models fail."""
+    local = env.local
+    local.laya_picks = {"area of engineering": "Robotics", "kind of company": "Startup"}
+    local.ollama_picks = {"area of engineering": "Robotics", "kind of company": "Startup"}
+    local.ollama_values = {"month and year in words": "November 2026"}
+    local.hold()
+    await env.start_backend(local=True)
+    rig, page, panel = await ready_form(env, "local_assist.html")
+    chip = Chip(page)
+
+    await page.locator("#start_month").focus()
+    await chip.expect_chip(state="GENERATING", insert="never")
+    await expect(chip.part("chip-status")).to_contain_text("local AI")
+    await ui.tab(page)
+    check("Tab while a model works inserts nothing and does not wait", await ui.field_value(page, "#start_month") == "")
+    await page.locator("#start_month").focus()
+    local.release()
+    await chip.expect_chip(state="VERIFIED", tone="verified", insert="tab", value="November 2026", timeout=millis(30_000))
+    await ui.tab(page)
+    check("the value is written the way the field asked (month and year in words)", await ui.field_value(page, "#start_month") == "November 2026")
+    sent = local.calls_of("ollama_write")
+    check("the writing model was given the question WITHOUT its instruction, and the instruction apart",
+          sent and sent[0]["question"] == "Earliest start date" and sent[0]["hints"] == ["month and year in words"], sent)
+
+    await page.locator("#area").focus()
+    await chip.expect_chip(state="INFERRED", tone="inferred", insert="tab", value="Robotics", timeout=millis(30_000))
+    check("both models read only the options the page offers (no placeholder) and short statements of the profile",
+          local.calls_of("laya")[0]["options"] == ["Web development", "Data science", "Robotics", "Mobile apps"]
+          and not any(word in json.dumps(local.calls_of("laya")[0]["facts"]).lower() for word in ("alex", "example.test", "+44", "settled")),
+          local.calls_of("laya")[0])
+    await ui.tab(page)
+    check("Tab took the option a fact of the profile names", await ui.select_label(page, "#area") == "Robotics")
+
+    await page.locator("#company_type").focus()
+    await chip.expect_chip(state="INFERRED", tone="inferred", insert="explicit", value="Startup", timeout=millis(30_000))
+    await ui.tab(page)
+    check("an option the models only read into the profile is NOT taken by Tab", await ui.select_label(page, "#company_type") in {"", "Select..."})
+    await page.locator("#company_type").focus()
+    await chip.expect_chip(state="INFERRED", insert="explicit", value="Startup")
+    await page.keyboard.press("Enter")
+    check("it is taken by Enter", await ui.select_label(page, "#company_type") == "Startup")
+
+    before = len(local.calls)
+    await page.locator("input[name=disability]").first.focus()
+    await asyncio.sleep(1.5)
+    check("a protected question is never given to a model", len(local.calls) == before and
+          not any("disab" in str(call.get("question", "")).lower() for call in local.calls))
+    await page.locator("#subject").focus()
+    await chip.expect_chip(state="NEEDS_YOU", timeout=millis(10_000))

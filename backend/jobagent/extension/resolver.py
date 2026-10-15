@@ -37,11 +37,21 @@ from ..automation.disclosures import (disclosure_memory_key, disclosure_resoluti
 from ..automation.option_selection import OptionSelector
 from ..automation.reasoning import conditional_state, profile_resolution
 from ..automation.runner import BrowserManager
+from ..intelligence import instructions
 from ..intelligence.engine import CandidateEngine
 from ..intelligence.plain import label_core
 from ..intelligence.semantics import entry_attribute, form_repeats, refuse_repeated_identity
 from .schemas import ElementIn
 from .text import strip_controls
+
+# the controls whose value a form dictates (a picker, a number box, an address) or that are written at length: never rewritten
+NOT_REWRITTEN_TYPES = {"password", "hidden", "file", "checkbox", "radio", "date", "month", "number", "email", "url", "color", "range"}
+
+
+def is_long_text(field_el: dict) -> bool:
+    return field_el.get("tag") == "textarea" or str(field_el.get("type") or "") == "textarea" \
+        or bool(field_el.get("max_length") and field_el["max_length"] >= 150)
+
 
 DETERMINISTIC = {"browser_engine": "deterministic"}  # no text_provider: semantic_interpret never leaves the process
 OPERATIONS_BY_ROLE = {"textbox": ["TYPE_TEXT", "CLEAR"], "radio": ["CHECK"], "checkbox": ["CHECK", "UNCHECK"],
@@ -376,6 +386,7 @@ class FieldResolver:
             field_el["_repeated_block"] = True  # 'Start date' of the 2nd block of a form that repeats it: an entry, not the applicant
         result = await self._raw(asked, element, field_el, engine, job, generate)
         result = await self._map_options(asked, field_el, result, engine, job)
+        result = self._choose_plan(field_el, result, generate)
         result = self.normalise(result, question, qid)
         result = refuse_repeated_identity(result, question, repeats)  # the applicant's own details are offered in the first block only
         if element.get("_label_mismatch") and result["answer"] is not None and result["confidence_level"] in {"EXACT", "POLICY"}:
@@ -386,6 +397,41 @@ class FieldResolver:
         return Resolution(question, qid, element, field_el, result, condition, from_client)
 
     async def _raw(self, question: str, element: dict, field_el: dict, engine, job: dict, generate: bool) -> dict:
+        result = await self._raw_core(question, element, field_el, engine, job, generate)
+        return await self._with_instructions(question, element, field_el, result, engine, job, generate)
+
+    async def _with_instructions(self, question: str, element: dict, field_el: dict, result: dict, engine, job: dict,
+                                 generate: bool) -> dict:
+        """A control that says HOW its answer is to be written ('(e.g. Summer 2027)', 'no spaces', a placeholder example) is answered
+        in two parts: the question without its instruction is answered by the engine as it always is, and the instruction is left
+        to the local writing model, which may only write that value differently (``local_assist.rewrite_value``). Here only the
+        first part happens, and what the second needs travels with the result as ``_local``; nothing is changed in what the
+        engine said, so a page that never reaches a model behaves exactly as before."""
+        if (generate or element.get("role") not in {"textbox", "combobox"} or field_el.get("options")
+                or str(field_el.get("type") or "").lower() in NOT_REWRITTEN_TYPES or is_long_text(field_el)):
+            return result
+        if not [hint for hint in instructions.hints(question, field_el) if not instructions.explained(hint)]:
+            return result
+        core, _ = instructions.split_instruction(question)
+        cleaned = {**field_el, "label": instructions.split_instruction(field_el.get("label") or "")[0],
+                   "description": "", "help_text": "", "instructions": "", "hint": "",
+                   "placeholder": "" if instructions.example_of(field_el) else field_el.get("placeholder", "")}
+        base = await engine.answer(core, cleaned, job, audit=False, generate=False)
+        base = engine.confirmed_fallback(core, base, self.env.facts, self.env.policies)
+        if base.get("answer") is None or base.get("root_cause") or base.get("leave_blank") \
+                or base.get("confidence_level") not in {"EXACT", "POLICY", "DERIVED_HIGH", "DERIVED_MEDIUM"}:
+            return result
+        hints = instructions.needs_rewriting(str(base["answer"]), question, field_el)
+        if not hints or not instructions.worth_rewriting(str(base["answer"]), hints):
+            # Nothing a model could check would improve the answer to the question itself ("Degree subject (e.g. Computer Science)": the
+            # bracket is an example, not a fact), so no model works on this field. When the engine had refused the label only because of
+            # that bracket, the answer to the plain question is the answer.
+            if result.get("answer") is not None or result.get("root_cause") != "PLAIN_QUESTION_REQUIRED":
+                return result
+            return {**base, "question": question, "rules_used": [*(base.get("rules_used") or []), "instruction_split"]}
+        return {**result, "_local": {"kind": "rewrite", "base": base, "hints": hints, "core": core}}
+
+    async def _raw_core(self, question: str, element: dict, field_el: dict, engine, job: dict, generate: bool) -> dict:
         env = self.env
         facts, policies = env.facts, env.policies
         # 'Phone country code', 'Country Phone Code', 'Dialling code'...: a country's code, never the whole number (the
@@ -472,6 +518,17 @@ class FieldResolver:
                 "form_value": labels if field_el.get("multiple") else labels[0],
                 "option_selection": [{k: v for k, v in decision.items() if k != "option"} for decision in decisions],
                 "confirmed_answer": raw["answer"]}
+
+    @staticmethod
+    def _choose_plan(field_el: dict, result: dict, generate: bool) -> dict:
+        """A menu the engine found no option for: say so, so that the local models may be asked (``local_assist.choose_option``).
+        Only a menu of one choice (not a set of boxes) and only the plain "no confirmed value"; the policy of the question (consent,
+        demographics, legal) is judged where the control is known (``suggest._local``)."""
+        options = field_el.get("options") or []
+        if (generate or not options or field_el.get("multiple") or result.get("answer") is not None or result.get("leave_blank")
+                or str(field_el.get("type") or "").lower() in {"password", "hidden", "file"}):
+            return result
+        return {**result, "_local": {"kind": "choose"}}
 
     @staticmethod
     def normalise(result: dict, question: str, question_id: str) -> dict:

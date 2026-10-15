@@ -6,6 +6,9 @@
 const SAFE_WORD = /^[A-Za-z0-9 ._:-]{0,60}$/;
 const SECRETISH = /mrd1|bearer|token|secret|password|proof/i;
 
+let lastLine = "";
+let lastAt = 0;
+
 export function trace(label: string, data: Record<string, boolean | number | string | null | undefined> = {}): void {
   try {
     const clean: Record<string, boolean | number | string> = {};
@@ -13,7 +16,12 @@ export function trace(label: string, data: Record<string, boolean | number | str
       if (typeof value === "boolean" || typeof value === "number") clean[key] = value;
       else if (typeof value === "string" && SAFE_WORD.test(value) && !SECRETISH.test(value)) clean[key] = value;
     }
-    console.info(`[meridian] ${label} ${Object.entries(clean).map(([k, v]) => `${k}=${v}`).join(" ")}`);
+    const line = `[meridian] ${label} ${Object.entries(clean).map(([k, v]) => `${k}=${v}`).join(" ")}`;
+    const now = Date.now();
+    if (line === lastLine && now - lastAt < 2000) return; // a poll that fails every second says so once, not every time
+    lastLine = line;
+    lastAt = now;
+    console.info(line);
   } catch {
     /* tracing never fails the caller */
   }

@@ -120,6 +120,15 @@ To get the browser's normal Tab back for a while, turn off **Use Tab to insert &
 
 If a field is covered by a popup the page opened (a date picker, a list), the assistant still inserts the answer but leaves the Tab to the page so the popup closes; it never writes into a field that popup covers.
 
+### Local AI: options and how a value is written
+
+Some questions are not answered by one profile fact: a menu to pick from, or a field that says how it wants the answer written. For those, two models that run **on this Mac** may help (they cost nothing, send nothing out, and are used only if they are installed and the setting below is on):
+
+- **Laya** and your **local writing model (Ollama)** each pick one of the options the form *offers*, from the few facts of your profile that bear on the question. They can pick nothing else: no new text, no option nobody offered, never a "No", "None", "Never" or "Other" (those are not concluded from a missing fact), and never an answer to a protected, legal or consent question. When both pick the same option and your facts say a word of it (and of no other option), it is shown **amber** ("Check this") and Tab inserts it. When the facts say several options ("hybrid or remote", every language you speak), or name another option than the one they picked, nothing is offered: any pick would be a guess. When no fact says a word of any option but both models relied on one ("path planning" for a preference of company size), it is shown amber as a suggestion and **only Enter or a click** takes it. When they disagree, nothing is suggested: the field is yours, exactly as before.
+- The **local writing model** writes a value you already have **the way the field asks**: "Graduation date (month and year in words)" gives *November 2026*, "Phone (include country code, no spaces)" gives *+447700900123*, "(e.g. 1 November 2026)" gives *2 November 2026*. Meridian answers the question without its instruction, as always, and the model may only rewrite that answer; its rewriting is checked against the answer (the same date with fewer parts, never a day or month that you do not have; the same digits; the same words) and discarded when it differs, so an example in the label is never copied in as your answer. Instructions that are plain date tokens (DD-MM-YYYY, MM/YYYY, dd.mm.yy) are written exactly so without any model.
+
+While a model works, the field says so ("Checking your profile with local AI on this Mac…") and is updated when it finishes; the page's first answers never wait for it. The first use after starting Meridian may take a few seconds longer, because the model has to load. **Settings > Browser assistant > Let local AI finish what the profile alone cannot** turns this off.
+
 ### Fill verified
 
 The panel's **Fill verified (n)** button fills every field that is currently Verified, Tab-eligible and not protected, in one go. It asks first: the panel lists the fields and the values that will go in, and nothing is written until you press **Fill now**. It never fills Check this answers, drafts, protected answers or consent. Afterwards, **Undo all** (or Option+Shift+Z) takes the batch back.
@@ -175,13 +184,14 @@ In Meridian, **Settings > Browser assistant** (applies to every connected browse
 | When you correct a suggestion | Ask me each time | Ask, Save automatically, Never save |
 | Research the company and role in the background | on | Public pages only, no AI |
 | Search the web for the company's official site | on | Only when the page does not link to it; sends only the company name (section 8) |
+| Let local AI finish what the profile alone cannot | on | Laya and Ollama on this Mac pick among a form's options and write a known value as the field asks (section 5). Free and local; off means exactly the behaviour without them |
 | Prepare long answers in advance | on | Uses your answer model and counts in the monthly AI limit |
 | Spending cap per application | 1 USD | An empty value means this default. Use a large amount for "no practical cap" |
 | Show a discreet hint on known application sites | on | The "ready" pill |
 | Language on websites | Automatic | English or Spanish for the assistant's buttons and tips (not your answers) |
 | Start automatically on these sites | none | See section 5 |
 
-The extension panel's footer shows this month's AI spend. Settings > Browser assistant also holds a feed of assisted pages, and the Tracker has an **Open with assistant** button on Tracker rows that opens the exact application link in the paired browser and starts the research. The setup guide gains a ninth step, "browser assistant". The native approval window can be switched off with the stored setting `extension_pairing_dialog` (there is no control for it in Settings > Browser assistant; the in-app Approve button always remains).
+The extension panel's footer shows this month's AI spend. It is an estimate made from the token counts the provider reports and the rates you configured for the model: prompt tokens the provider served from its cache and requests made outside its peak hours are charged as the provider charges them where it publishes that (DeepSeek: cache hits at a fraction of the input rate, half price outside 01:00-04:00 and 06:00-10:00 UTC on weekdays), and the monthly cap still reserves every request at the highest rate. If your provider's own dashboard says something else, **Settings > AI > AI usage & budget > Match this month** sets the month to that figure (the correction is kept in the record). Settings > Browser assistant also holds a feed of assisted pages, and the Tracker has an **Open with assistant** button on Tracker rows that opens the exact application link in the paired browser and starts the research. The setup guide gains a ninth step, "browser assistant". The native approval window can be switched off with the stored setting `extension_pairing_dialog` (there is no control for it in Settings > Browser assistant; the in-app Approve button always remains).
 
 ## 7. Troubleshooting
 
@@ -216,6 +226,7 @@ The options page has a diagnostics block (ports checked, versions, last error) t
 | The employer's public pages (the posting, public job-board APIs of the ATS vendor, the company's verified website and its about/mission/values/engineering/careers pages, robots.txt) | Fetched **by Meridian**, from your Mac's IP address, as read-only GETs without cookies or credentials (User-Agent `Meridian/1.0`). No candidate data is in these requests | Once per page when research is enabled | Research setting |
 | The company **name** only, as the search `<name> official website` | Meridian asks the public DuckDuckGo HTML page | Only when the page does not link to the company site and the web-lookup setting is on | "Search the web for the company's official site" |
 | The question, the field's description, an excerpt of the job text and verified company pages, and the verified facts needed to answer | The text-model provider you configured (cloud provider endpoint, or a model on this Mac, which sends nothing out) | Only for a draft or a rewrite of a long answer | Prepare long answers setting; provider choice in Settings > AI & providers |
+| The question, the offered options and a few short statements of your profile (never your name, contact details, nationality, work rights or anything personal) | **Laya** and **Ollama**, programs on this Mac reached only on `127.0.0.1`; an engine that is not installed or not running is skipped | Only for a menu the profile cannot answer, or a value the field asks to be written in a particular way | "Let local AI finish what the profile alone cannot" |
 | Anything else | Nothing. No telemetry, no analytics, no project server | | |
 
 The page address that is stored or sent to a model first has parameters that look like secrets, names or emails removed.

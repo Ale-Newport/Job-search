@@ -1103,6 +1103,9 @@ export class Controller {
     } else if (duplicateBlocked) {
       reasonCode = "duplicate";
       reasonText = this.duplicateReason();
+    } else if (insertable && s.insert === "explicit" && s.flags?.read_in) {
+      reasonCode = "read_in";
+      reasonText = "Suggested from your profile, but no fact says it: press Enter to use it.";
     } else if (insertable && s.insert === "explicit") {
       reasonCode = "protected";
       reasonText = "Protected answer: press Enter to insert it.";
@@ -1131,7 +1134,8 @@ export class Controller {
       canRegenerate,
       canDraft: s.state === "NEEDS_YOU" && !!s.needs?.actions?.some((a) => a.type === "draft_with_ai") && this.canGenerate(),
       review: s.state === "INFERRED" || s.state === "GENERATED_DRAFT" || !!s.flags?.requires_review,
-      generation: s.generation ? { status: s.generation.status, attempt: s.generation.attempt, wordCount: s.generation.word_count } : undefined,
+      readIn: !!s.flags?.read_in,
+      generation: s.generation ? { status: s.generation.status, attempt: s.generation.attempt, wordCount: s.generation.word_count, kind: s.generation.kind } : undefined,
       conflictsWithCurrent: insertable && relation === "conflict",
       undoable,
       dwellRemainingMs: dwell,

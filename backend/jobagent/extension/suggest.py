@@ -40,6 +40,7 @@ from dataclasses import dataclass, field
 from ..application_profile import question_field
 from ..automation.answers import SENSITIVE, classify_question, dropdown_search_value, normalize
 from ..automation.disclosures import personal_disclosure_kind
+from ..intelligence import local_assist as assist
 from ..intelligence.formatting import choice as option_for
 from ..intelligence.semantics import history_block, signature_field
 from . import draft_basis, draft_limits, documents_pick  # ASSIST2: SAFE-09/11, CPL-06/09/14, SEC-06
@@ -47,6 +48,7 @@ from .documents_pick import (CV_KINDS, MAX_DOCUMENT, approved_documents, documen
                              looks_like_cv_field)
 from .feedback import never_saved_reason, scope_of
 from .generation import ACTIVE, GenerationQueue, Job, Refused
+from .local_queue import ACTIVE as LOCAL_ACTIVE
 from .research import tail_key
 from .resolver import Environment, FieldResolver, Resolution, load_environment, prepare_elements
 from .schemas import RegenerateRequest, SuggestRequest
@@ -61,6 +63,10 @@ CONSENT_INTENTS = {"CONSENT", "GDPR", "CRIMINAL_HISTORY", "SECURITY_CLEARANCE", 
 NO_PROFILE_INTENTS = {"OTHER_PARTY", "HISTORY_ENTRY"}
 NOT_FIELD_ROLES ={"button", "link", "option", "treeitem", "menuitem", "tab", "listitem", "heading", "alert", "img"}
 NOT_FIELD_TYPES = {"submit", "reset", "button", "image", "range", "color"}
+# What a local model may be asked about a control with options: the generic "no confirmed value", an answer that did not map to the menu,
+# and a question the engine could only defer to a writing model (a menu cannot be written). Every other "no answer" is a decision of the
+# engine (a plain-question refusal, a consent, an education fact that no record establishes...) and a model never second-guesses it.
+LOCAL_CHOICE_CAUSES = {"MISSING_FACT", "BAD_ENUM_MAPPING", ASYNC}  # ASYNC: a question the engine only knows as "something to write"
 DRAFT_WAIT = 8.0
 SLICE_SECONDS = 0.02  # the longest the answers of one scan may run before the event loop gets a turn
 HEAVY_TEXT = 1500  # characters of label + context + hint + placeholder past which a control is read under a deadline
@@ -287,6 +293,7 @@ class StoredField:
     draft_key: str | None = None
     state: str = ""
     suggestion: dict | None = None
+    local_key: str | None = None  # the local-model job (``local_queue``) that is finishing this control, if any
 
 
 def _words(value: str) -> int:
@@ -396,6 +403,99 @@ class SuggestService:
 
     def forget(self, session_id: str) -> None:
         self._env_cache.pop(session_id, None)
+        if self.local_queue is not None:
+            self.local_queue.forget_session(session_id)
+
+    # ------------------------------------------------------------------------------- local models
+    @property
+    def local_queue(self):
+        return getattr(self.app.state, "extension_local", None)
+
+    @property
+    def local_models(self):
+        return getattr(self.app.state, "local_models", None)
+
+    async def _local(self, session, env, ext, frame: Frame, stored: StoredField):
+        """Start (or join) the local-model job that may finish this control, or None. Everything here is decided from what the
+        resolver left in ``_local`` and from the policy of the control; no model is asked until the job runs."""
+        plan = (stored.resolution.result or {}).get("_local")
+        queue, models = self.local_queue, self.local_models
+        if not plan or queue is None or models is None or ext.get("local_assist") is False or session.dead:
+            return None
+        result, element = stored.resolution.result, stored.resolution.element
+        question = stored.question
+        scope = stored.scope
+        if (result.get("canonical_intent") in NO_PROFILE_INTENTS or result.get("root_cause") == "UNTRUSTED_INSTRUCTION_IN_QUESTION"
+                or (scope and (scope.protected or scope.legal)) or is_protected(question, element, result, frame.elements, env.job)
+                or never_saved_reason(question, element) is not None or signature_field(question, element, frame.elements, env.job)):
+            return None
+        kind = plan["kind"]
+        today = env.engine.knowledge.today.isoformat()
+        if kind == "choose":
+            if str(result.get("root_cause") or "") not in LOCAL_CHOICE_CAUSES or result.get("canonical_intent") in CONSENT_INTENTS:
+                return None
+            options = assist.offered(stored.resolution.field.get("options") or [])
+            if not 2 <= len(options) <= assist.MAX_OPTIONS:
+                return None
+            evidence = assist.relevant(assist.evidence_index(env), question, [str(o["label"]) for o in options])
+            if not evidence:
+                return None
+            engines = ("laya", "ollama")
+            key = hashlib.sha256(json.dumps(["choose", question, [o["label"] for o in options],
+                                             [[e.id, e.text] for e in evidence], env.version, today]).encode()).hexdigest()
+            runner = self._choose_runner(question, options, evidence, result, today)
+        elif kind == "rewrite":
+            engines = ("ollama",)
+            base = plan["base"]
+            fields = {k: element.get(k) for k in ("pattern", "max_length")}
+            key = hashlib.sha256(json.dumps(["rewrite", question, str(base["answer"]), plan["hints"], fields, env.version]).encode()).hexdigest()
+            runner = self._rewrite_runner(plan, fields, result)
+        else:
+            return None
+        for engine in engines:
+            if not await self.local_models.usable(engine):
+                return None
+        job = queue.submit(session_id=session.id, key=key, order=stored.order, kind=kind, runner=runner, listener_id=stored.key,
+                           listener=self._local_listener(session, stored))
+        if job is not None:
+            stored.local_key = job.key
+        return job
+
+    def _choose_runner(self, question: str, options: list, evidence: list, result: dict, today: str):
+        models = self.local_models
+
+        async def run():
+            if not (await models.available("laya", wait=75) and await models.available("ollama", wait=75)):
+                return None
+            picked = await assist.choose_option(models, question, options, evidence, today=today)
+            return assist.merge_choice(result, picked) if picked is not None else None
+        return run
+
+    def _rewrite_runner(self, plan: dict, fields: dict, result: dict):
+        models = self.local_models
+
+        async def run():
+            if not await models.available("ollama", wait=75):
+                return None
+            written = await assist.rewrite_value(models, plan["core"], fields, str(plan["base"]["answer"]), plan["hints"])
+            return assist.merge_rewrite(result, plan["base"], written.value) if written is not None else None
+        return run
+
+    def _local_listener(self, session, stored: StoredField):
+        def on_job(job) -> None:
+            session.local_changed(self, stored.key, job)
+        return on_job
+
+    def rebuild_local(self, session, key: str, job) -> dict | None:
+        """The suggestion of a field after its local-model job started or ended."""
+        stored = session.fields.get(key)
+        if stored is None or stored.local_key != job.key:
+            return None
+        ext = self.extension_settings()
+        env = self.environment(session, ext)
+        suggestion = self.build(session, env, ext, self.generation_status(), stored, local=job)
+        stored.suggestion, stored.state = suggestion, suggestion["state"]
+        return suggestion
 
     @staticmethod
     def _limit_frames(session) -> None:
@@ -520,7 +620,13 @@ class SuggestService:
         blocked = None
         if resolution.result.get("root_cause") == ASYNC:
             job, blocked = self._draft(session, env, ext, gen, resolver, frame, stored, explicit=False)
-        suggestion = self.build(session, env, ext, gen, stored, job=job, blocked=blocked)
+        local = None
+        if job is None:
+            try:
+                local = await self._local(session, env, ext, frame, stored)
+            except Exception as exc:  # noqa: BLE001 - the help of a model must never cost the control the answer the engine gave it
+                logger.warning("extension_local_failed %s", type(exc).__name__)
+        suggestion = self.build(session, env, ext, gen, stored, job=job, blocked=blocked, local=local)
         stored.suggestion, stored.state = suggestion, suggestion["state"]
         return suggestion
 
@@ -768,7 +874,7 @@ class SuggestService:
 
     # ------------------------------------------------------------------------------- the builder
     def build(self, session, env: Environment, ext: dict, gen: dict, stored: StoredField, *, job: Job | None = None,
-              blocked: dict | None = None) -> dict:
+              blocked: dict | None = None, local=None) -> dict:
         resolution = stored.resolution
         frame = session.frames.get(stored.frame_key)
         element, field_el = resolution.element, resolution.field
@@ -785,6 +891,8 @@ class SuggestService:
                       "reason": (job.error or {}).get("message", "")}
         elif blocked:
             result = {**result, "answer": None, "root_cause": blocked["code"], "reason": blocked["message"]}
+        elif local is not None and local.status == "DONE" and local.result:
+            result = dict(local.result)  # a local model finished the control: its answer stands in for the engine's (cites its facts)
         question, question_id = stored.question, stored.question_id
         out = self._base(env, frame or Frame(stored.frame_key, "", session.url, []), element, question, question_id)
         peers = frame.elements if frame is not None else None
@@ -801,7 +909,8 @@ class SuggestService:
         secret = never_saved_reason(question, element)  # ASSIST2 (SAFE-14): a code, a card, an ID: no "save this answer?" offer
         if secret:
             flags["never_saved"] = secret
-        state = "GENERATING" if job is not None and job.status in ACTIVE else decide(result)
+        working = (job is not None and job.status in ACTIVE) or (local is not None and local.status in LOCAL_ACTIVE)
+        state = "GENERATING" if working else decide(result)
         value, problem = None, None
         if state in {"VERIFIED", "INFERRED", "GENERATED_DRAFT"}:
             value, problem = build_value(element, field_el, result)
@@ -818,8 +927,12 @@ class SuggestService:
                 insert = "explicit"  # never on a Tab, whatever the protected-Tab switch says: the user's own Enter or click
             if state == "GENERATED_DRAFT" and (result.get("quality") or {}).get("independent_review") == "disabled":
                 insert = "explicit"  # only the deterministic checks ran (the user turned the model review off): never on a Tab
+            if result.get("insert_explicit"):
+                insert = "explicit"  # a local model read the answer into the facts: only the person's own Enter or click takes it
         out.update(state=state, insert=insert, suggestion=value, flags=flags)
         out["flags"]["requires_review"] = state in {"INFERRED", "GENERATED_DRAFT"}
+        if result.get("insert_explicit") and not protected and not signature and state == "INFERRED":
+            out["flags"]["read_in"] = True  # a model read the option into the facts (not a protected answer): amber, taken with Enter
         out["why"] = self._why(env, state, result, element, resolution, ext, job)
         if signature and state in {"VERIFIED", "INFERRED"}:
             out["why"]["summary"] = "Your name typed as a signature: a legal act, so Meridian inserts it only when you press Enter"
@@ -827,6 +940,9 @@ class SuggestService:
             out["confidence"] = {"value": round(float(result.get("confidence") or 0), 2), "level": result["confidence_level"]}
         if state == "NEEDS_YOU":
             out["needs"] = self._needs(session, env, gen, stored, result, ext, blocked)
+        if local is not None and local.status in LOCAL_ACTIVE:
+            # only while it works: a finished local answer is an ordinary answer (it is not a draft and has none of a draft's controls)
+            out["generation"] = {"id": local.id, "status": "GENERATING", "attempt": 1, "cache_hit": False, "kind": "local"}
         if job is not None:
             out["generation"] = self._generation_info(job, gen)
             out["based_on"] = job.result.get("based_on") if job.result else self._based_on(session)

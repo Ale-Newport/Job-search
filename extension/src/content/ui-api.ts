@@ -31,8 +31,10 @@ export interface ChipView {
   canRegenerate: boolean;
   canDraft: boolean; // "Draft with AI" for short fields on explicit request
   review: boolean; // amber "review before sending"
+  /** A model on this Mac read this option into the profile: amber like any inferred answer, but only Enter or a click takes it. */
+  readIn?: boolean;
   /** Generation progress (state GENERATING) */
-  generation?: { status: GenerationStatus; attempt?: number; wordCount?: number };
+  generation?: { status: GenerationStatus; attempt?: number; wordCount?: number; kind?: "local" };
   /** The field already contains a different value: Tab will not overwrite it, offer an explicit Replace. */
   conflictsWithCurrent: boolean;
   /**

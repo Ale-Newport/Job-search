@@ -255,6 +255,16 @@ class Session:
                                                                "message": (job.error or {}).get("message", "")[:160]})
             self.registry.persist(self)
 
+    def local_changed(self, service: SuggestService, key: str, job) -> None:
+        """A local-model job of a field started, finished or found nothing: the field says so (a draft's bookkeeping does not apply)."""
+        try:
+            suggestion = service.rebuild_local(self, key, job)
+        except Exception as exc:  # never leave a field pulsing forever because a rebuild failed
+            logger.warning("extension_local_event_failed %s", type(exc).__name__)
+            return
+        if suggestion is not None:
+            self.emit({"type": "suggestion", "suggestion": suggestion})
+
     def on_generation_stop(self, code: str, message: str) -> None:
         if self.stop_seen == code:
             return

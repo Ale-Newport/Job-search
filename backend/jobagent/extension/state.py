@@ -8,6 +8,8 @@ the bridge is disabled (tests, packaged workers).
 ``app.state.extension_research``    ``ResearchManager``   company and role research (no model calls)
 ``app.state.extension_sessions``    ``SessionRegistry``   page sessions, suggestions, feedback, tracking, documents
 ``app.state.extension_generation``  ``GenerationQueue``   background drafting of long answers
+``app.state.extension_local``       ``LocalQueue``        local-model help for controls the engine could not finish
+``app.state.local_models``          ``LocalModels``       Laya and the local writing model (loopback HTTP, started on demand)
 """
 
 from __future__ import annotations
@@ -72,17 +74,26 @@ def install_extension_state(app) -> None:
         db, root = app.state.db, app.state.data_dir
         research = ResearchManager(root, db, settings_getter=lambda: research_settings(db))
         generation = GenerationQueue(llm_getter=lambda: getattr(getattr(app.state, "text_ai", None), "answer_llm", None))
+        from ..intelligence.local_models import LocalModels
+        from .local_queue import LocalQueue
+
+        # Laya and the local writing model, for what the engine could not finish: inert until a control needs them
+        app.state.local_models = LocalModels(laya_runtime=lambda: getattr(app.state, "laya_runtime", None),
+                                             ollama_runtime=lambda: getattr(app.state, "ollama_runtime", None),
+                                             settings=lambda: read_settings(db))
+        app.state.extension_local = LocalQueue()
         app.state.extension_research = research
         app.state.extension_generation = generation
         app.state.extension_sessions = SessionRegistry(app, research, generation)
     except Exception as exc:  # the assistant is optional: a failure here must never stop Meridian
         logger.error("extension_state_unavailable %s", type(exc).__name__)
         app.state.extension_research = app.state.extension_generation = app.state.extension_sessions = None
+        app.state.extension_local = app.state.local_models = None
 
 
 async def close_extension_state(app) -> None:
     """Stop accepting work, cancel QUEUED drafts and unfinished research, restore the model's progress hook. Never raises."""
-    for name in ("extension_sessions", "extension_generation", "extension_research"):
+    for name in ("extension_sessions", "extension_generation", "extension_local", "local_models", "extension_research"):
         service = getattr(app.state, name, None)
         if service is None:
             continue

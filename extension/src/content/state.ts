@@ -20,6 +20,7 @@ export const DEFAULT_SETTINGS: ExtensionSettings = {
   save_corrections: "ask",
   background_research: true,
   background_drafts: true,
+  local_assist: true,
   web_lookup: true,
   hint_on_ats: true,
   draft_budget_usd: null,

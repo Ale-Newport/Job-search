@@ -60,6 +60,7 @@ SETTING_KEYS = {
     "save_corrections": "extension_save_corrections",
     "background_research": "extension_research_enabled",
     "background_drafts": "extension_background_drafts",
+    "local_assist": "extension_local_assist",
     "web_lookup": "extension_web_lookup",
     "hint_on_ats": "extension_hint_on_ats",
     "draft_budget_usd": "extension_draft_budget_usd",
@@ -67,7 +68,7 @@ SETTING_KEYS = {
 }
 BOOLEAN_SETTINGS = {
     "enabled", "auto_advance", "skip_filled", "tab_inserts_protected", "background_research", "background_drafts",
-    "web_lookup", "hint_on_ats",
+    "local_assist", "web_lookup", "hint_on_ats",
 }
 CHOICES = {"language": ("auto", "en", "es"), "save_corrections": ("ask", "always", "never")}
 # What the browser extension itself may change through PATCH /v1/settings.

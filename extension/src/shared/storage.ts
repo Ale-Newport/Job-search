@@ -139,7 +139,7 @@ function hostList(value: unknown): string[] {
 export function defaultSettings(): ExtensionSettings {
   return {
     enabled: true, language: "auto", auto_advance: true, skip_filled: true, tab_inserts_protected: false,
-    save_corrections: "ask", background_research: true, background_drafts: true, web_lookup: true, hint_on_ats: true,
+    save_corrections: "ask", background_research: true, background_drafts: true, local_assist: true, web_lookup: true, hint_on_ats: true,
     draft_budget_usd: null, always_on_sites: [],
   };
 }
@@ -160,6 +160,7 @@ export function normalizeSettings(raw: unknown): ExtensionSettings | null {
     save_corrections: (SAVE_MODES as readonly string[]).includes(save) ? (save as SaveCorrections) : base.save_corrections,
     background_research: bool(source.background_research, base.background_research),
     background_drafts: bool(source.background_drafts, base.background_drafts),
+    local_assist: bool(source.local_assist, base.local_assist),
     web_lookup: bool(source.web_lookup, base.web_lookup),
     hint_on_ats: bool(source.hint_on_ats, base.hint_on_ats),
     draft_budget_usd: typeof budget === "number" && Number.isFinite(budget) && budget >= 0 ? budget : null,

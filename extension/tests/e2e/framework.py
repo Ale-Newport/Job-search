@@ -20,6 +20,7 @@ import harness
 import servers
 from backend import RealBackend, make_dir, temp_root
 from fake_llm import FakeLLM
+from fake_local import FakeLocalEngines
 from harness import Rig
 
 DEFAULT_TIMEOUT = 90
@@ -84,6 +85,7 @@ class Env:
         self.fixtures = servers.FixtureServers()
         self._company: servers.CompanySite | None = None
         self._llm: FakeLLM | None = None
+        self._local: FakeLocalEngines | None = None
         self.backends: list[RealBackend] = []
         self.rigs: list[Rig] = []
         self.squatters: list[servers.Squatter] = []
@@ -104,6 +106,13 @@ class Env:
         return self._llm
 
     @property
+    def local(self) -> FakeLocalEngines:
+        """Laya and Ollama on loopback, scripted by the scenario (``start_backend(local=True)`` points the backend at them)."""
+        if self._local is None:
+            self._local = FakeLocalEngines().start()
+        return self._local
+
+    @property
     def backend(self) -> RealBackend:
         assert self.backends, "no backend started in this scenario"
         return self.backends[-1]
@@ -116,11 +125,13 @@ class Env:
     # ------------------------------------------------------------------ backend
     async def start_backend(self, *, bridge: bool = True, seed_profile: bool = True, llm: bool = True,
                             research: bool = False, api_seed: bool = True, extra_env: dict | None = None,
-                            data_dir=None) -> RealBackend:
+                            data_dir=None, local: bool = False) -> RealBackend:
         """The real backend on a temp data dir, seeded through the real API (and the fake loopback writing model)."""
         env = dict(extra_env or {})
         if research:
             env.update(self.company.research_hosts_env())
+        if local:
+            env["MERIDIAN_LOCAL_ENGINES"] = "1"  # the backend may meet the (scripted) local models; under test it never meets the machine's own
         backend = RealBackend(bridge=bridge, seed_profile=seed_profile, llm=self.llm if llm else None,
                               extra_env=env, data_dir=data_dir)
         self.backends.append(backend)
@@ -132,6 +143,9 @@ class Env:
         if bridge:
             # The native code-entry dialog must never appear on the tester's Mac; the in-app approval is used instead.
             await backend.settings(extension_pairing_dialog=False)
+        if local:
+            await backend.settings(browser_engine="laya", laya_endpoint=self.local.laya_url,
+                                   local_assist_ollama_endpoint=self.local.ollama_url, extension_local_assist=True)
         return backend
 
     # ------------------------------------------------------------------ browser
@@ -218,6 +232,8 @@ class Env:
             self._company.close()
         if self._llm is not None:
             self._llm.stop()
+        if self._local is not None:
+            self._local.stop()
         self.rigs.clear()
         self.backends.clear()
 

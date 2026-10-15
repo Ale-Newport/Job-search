@@ -73,6 +73,8 @@ export interface ExtensionSettings {
   save_corrections: SaveCorrections;
   background_research: boolean;
   background_drafts: boolean;
+  /** Laya and the local writing model may pick among offered options and write a known value as the field asks (all on this Mac) */
+  local_assist: boolean;
   web_lookup: boolean;
   hint_on_ats: boolean;
   draft_budget_usd: number | null;
@@ -310,6 +312,8 @@ export interface GenerationInfo {
   id: string;
   status: GenerationStatus;
   attempt?: number;
+  /** "local": a model on this Mac is finishing the control (picking an option, writing a known value as asked), not a draft */
+  kind?: "local";
   cache_hit?: boolean;
   word_count?: number;
   provider?: string;
@@ -340,6 +344,8 @@ export interface Suggestion {
     reusable?: boolean;
     /** node_ids of every control of a radio/checkbox group; the suggestion's `node_id` is the first one. */
     members?: number[];
+    /** Additive: a model on this Mac read the option into the profile (no fact says it): amber, never taken by Tab, Enter or a click takes it. */
+    read_in?: boolean;
     /** Additive (ASSIST2/SAFE-14): `otp` | `card` | `bank` | `id` | `security_answer` | `password` | `hidden` | `file`: whatever is typed here is
      *  NEVER saved (the server refuses it with `code: never_saved_<kind>`): offer no "save this answer?" prompt, whatever the save mode. */
     never_saved?: string;

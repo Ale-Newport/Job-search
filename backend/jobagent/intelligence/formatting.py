@@ -1,11 +1,12 @@
 from __future__ import annotations
 import calendar
-from datetime import date
+from datetime import date, datetime
 from functools import lru_cache
 from decimal import Decimal, InvalidOperation
 import re
 from urllib.parse import urlparse
 from ..automation.answers import normalize, option_for
+from .quantities import bucket_option
 
 EQUIVALENTS = [
     {"first", "first class", "first class honours", "1st", "1", "first 1st", "1st class honours"},
@@ -46,6 +47,19 @@ EQUIVALENTS = [
 ]
 
 
+DATE_TOKENS = {"DD": "%d", "MM": "%m", "YYYY": "%Y", "AAAA": "%Y", "YY": "%y", "AA": "%y"}
+_TOKEN = r"(?:DD|MM|YYYY|AAAA|YY|AA)"
+GENERAL_DATE = re.compile(rf"(?<![A-Za-z]){_TOKEN}(?:\s*[/\-.]\s*{_TOKEN}){{1,2}}(?![A-Za-z])", re.I)
+NAMED_DATES = {"%d/%m/%Y": "DD/MM/YYYY", "%m/%d/%Y": "MM/DD/YYYY", "%Y-%m-%d": "ISO_DATE", "%m/%Y": "MM/YYYY",
+               "%m/%y": "MM/YY", "%Y-%m": "YYYY-MM"}
+_DATE_PARTS = {"%d": r"(?:0[1-9]|[12]\d|3[01])", "%m": r"(?:0[1-9]|1[0-2])", "%Y": r"\d{4}", "%y": r"\d{2}"}
+
+
+def written_date_pattern(strftime_format: str) -> str:
+    """The text a ``DATE:<strftime>`` contract allows (zero-padded numbers, the separators as written)."""
+    return "".join(_DATE_PARTS.get(part, re.escape(part)) for part in re.split(r"(%[dmYy])", strftime_format) if part)
+
+
 class AnswerFormatResolver:
     """Infer a value contract from field metadata and visible instructions.
 
@@ -74,6 +88,13 @@ class AnswerFormatResolver:
             return "ISO_DATE"
         if kind == "month":
             return "YYYY-MM"
+        # A date written as tokens in ANY order and with any of / - . between them (dd-mm-yyyy, MM.YYYY, YYYY/MM/DD, dd.mm.yy): the
+        # tokens say how it is to be written, so that is the contract (the named ones below stay what they were).
+        written = GENERAL_DATE.search(text)
+        if written:
+            pattern = "".join(DATE_TOKENS[token.upper()] if token.upper() in DATE_TOKENS else token
+                              for token in re.split(r"([/\-.])", re.sub(r"\s+", "", written.group(0))))
+            return NAMED_DATES.get(pattern, "DATE:" + pattern)
         # Match the most precise explicit patterns before their substrings.
         for pattern, output in (
             (r"\bDD\s*/\s*MM\s*/\s*(?:YYYY|AAAA)\b", "DD/MM/YYYY"),
@@ -130,6 +151,14 @@ class AnswerFormatResolver:
             parsed = date.fromisoformat(raw + ("-01-01" if precision == "year" else "-01" if precision == "month" else ""))
         except ValueError:
             return None, "ANSWER_FORMAT_ERROR"
+        if contract.startswith("DATE:"):
+            # a contract made of tokens: a day needs a day, a month needs a month; a year is always there
+            written = contract[5:]
+            if "%d" in written and precision != "day":
+                return None, "MISSING_EXACT_DATE"
+            if "%m" in written and precision == "year":
+                return None, "MISSING_DATE_MONTH"
+            return parsed.strftime(written), None
         if contract in {"ISO_DATE", "DD/MM/YYYY", "MM/DD/YYYY"} and precision != "day":
             return None, "MISSING_EXACT_DATE"
         if contract in {"MM/YYYY", "MM/YY", "YYYY-MM", "MONTH_YEAR", "MONTH"} and precision == "year":
@@ -162,6 +191,15 @@ class AnswerFormatResolver:
         }
         if contract in patterns and not re.fullmatch(patterns[contract], text):
             return "ANSWER_FORMAT_ERROR"
+        if contract.startswith("DATE:"):
+            written = contract[5:]
+            if not re.fullmatch(written_date_pattern(written), text):
+                return "ANSWER_FORMAT_ERROR"
+            if "%d" in written:
+                try:
+                    datetime.strptime(text, written)
+                except ValueError:
+                    return "ANSWER_FORMAT_ERROR"
         if contract == "URL":
             parsed = urlparse(text)
             if parsed.scheme not in {"http", "https"} or not parsed.hostname or re.search(r"\s", text):
@@ -348,13 +386,14 @@ def choice(value, options, *, question="", disclosure_concept=None):
     try:
         number = float(value)
     except (ValueError, TypeError):
-        return None
+        # "4 years", "about 18 months": the range of a menu of ranges that holds it (quantities.py), else nothing
+        return bucket_option(value, labels, question=question)
     matches = []
     for o in labels:
         m = re.fullmatch(r"\s*(\d+(?:\.\d+)?)\s*[%+]?\s*[-–—]\s*(\d+(?:\.\d+)?)\s*%?\s*", o["label"])
         if m and float(m[1]) <= number <= float(m[2]):
             matches.append(o)
-    return matches[0] if len(matches) == 1 else None
+    return matches[0] if len(matches) == 1 else bucket_option(value, labels, question=question)
 
 
 def adapt(value, semantic, field):

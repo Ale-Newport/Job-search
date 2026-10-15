@@ -98,7 +98,7 @@ async def test_a_whole_page_visit_has_the_documented_shapes(real):
     assert body["job"]["company"] == "Acme Robotics" and body["job"]["tracked"] == "none"
     assert set(body["generation"]) == {"available", "tested", "provider", "local", "message", "monthly_limit_usd", "spent_usd"}
     assert set(body["settings"]) == {"enabled", "language", "auto_advance", "skip_filled", "tab_inserts_protected",
-                                     "save_corrections", "background_research", "background_drafts", "web_lookup",
+                                     "save_corrections", "background_research", "background_drafts", "local_assist", "web_lookup",
                                      "hint_on_ats", "draft_budget_usd", "always_on_sites"}
     sid = body["session_id"]
     add_cv(real.app, filename="cv.pdf")

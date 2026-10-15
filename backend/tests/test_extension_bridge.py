@@ -569,8 +569,8 @@ def test_status_shape_and_no_keychain_access(workspace):
     assert body["generation"]["available"] is False and body["generation"]["provider"] == "none"
     assert body["settings"] == {
         "enabled": True, "language": "auto", "auto_advance": True, "skip_filled": True, "tab_inserts_protected": False,
-        "save_corrections": "ask", "background_research": True, "background_drafts": True, "web_lookup": True,
-        "hint_on_ats": True, "draft_budget_usd": 1.0, "always_on_sites": [],  # never "unlimited" by default (SEC-06)
+        "save_corrections": "ask", "background_research": True, "background_drafts": True, "local_assist": True,
+        "web_lookup": True, "hint_on_ats": True, "draft_budget_usd": 1.0, "always_on_sites": [],  # never "unlimited" by default (SEC-06)
     }
     assert "mrd1" not in response.text and "token_hash" not in response.text
     assert workspace.secrets.reads == []  # the Keychain is never touched

@@ -109,6 +109,8 @@ class ExtensionSettings(BaseModel):
     save_corrections: SaveCorrections = "ask"
     background_research: bool = True
     background_drafts: bool = True
+    # Laya and the local writing model may pick among the offered options and write a known value as the field asks (all on this Mac)
+    local_assist: bool = True
     web_lookup: bool = True  # last-resort public web search for the official company site (company name only)
     hint_on_ats: bool = True
     # What one page may spend on drafts. Unset (None, or cleared) means the default of ``api.DEFAULT_DRAFT_BUDGET_USD`` (the

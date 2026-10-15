@@ -797,6 +797,7 @@ function SettingsCard({ s, ctx }: { s: ExtensionStatus; ctx: AppContext }) {
         <SettingsGroup title={c.groups.prepare} />
         <ToggleRow id="background_research" copy={c.research} checked={view.background_research} disabled={locked} onChange={(v) => patch({ background_research: v })} />
         <ToggleRow id="web_lookup" copy={c.webLookup} checked={view.web_lookup} disabled={locked || !view.background_research} onChange={(v) => patch({ web_lookup: v })} />
+        <ToggleRow id="local_assist" copy={c.localAssist} checked={view.local_assist} disabled={locked} onChange={(v) => patch({ local_assist: v })} />
         <ToggleRow id="background_drafts" copy={c.drafts} checked={view.background_drafts} disabled={locked} onChange={(v) => patch({ background_drafts: v })} />
         <CapRow value={view.draft_budget_usd} disabled={locked || !view.background_drafts} onSave={(v) => patch({ draft_budget_usd: v })} />
         <SettingsGroup title={c.groups.browser} />

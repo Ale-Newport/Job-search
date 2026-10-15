@@ -70,6 +70,10 @@ DEFAULT_SETTINGS = {
     "browser_engine": "laya",
     "browser_confidence_threshold": 0.9,
     "laya_endpoint": "http://127.0.0.1:8791",
+    # The local writing model the browser assistant may ask (docs/EXTENSION_DESIGN.md 5.4a); empty = the one Meridian manages
+    "local_text_assist": True,
+    "local_assist_model": "",
+    "local_assist_ollama_endpoint": "",
     "jev_endpoint": "",
     "jev_model": "",
     "jev_fallback_enabled": False,
@@ -113,6 +117,7 @@ DEFAULT_SETTINGS = {
     "extension_save_corrections": "ask",
     "extension_research_enabled": True,
     "extension_background_drafts": True,
+    "extension_local_assist": True,
     "extension_web_lookup": True,
     "extension_hint_on_ats": True,
     "extension_pairing_dialog": True,

@@ -91,7 +91,7 @@ export function visualTone(view: ChipView): VisualTone {
       break;
   }
   if (!isReady(view)) return "neutral";
-  if (view.insert === "explicit") return "locked";
+  if (view.insert === "explicit" && !view.readIn) return "locked";
   if (view.tone === "verified" || view.tone === "inferred" || view.tone === "draft") return view.tone;
   return view.state === "VERIFIED" ? "verified" : view.state === "INFERRED" ? "inferred" : "draft";
 }
@@ -116,7 +116,7 @@ function trustLabel(view: ChipView, tone: VisualTone): string {
     case "CONSENT": return t("chip.trust.consent");
     case "SENSITIVE_BLANK": return t("chip.trust.sensitive");
     case "NOT_APPLICABLE": return t("chip.trust.notApplicable");
-    case "GENERATING": return isBusy(view) ? t("chip.trust.busy") : t("chip.trust.needs");
+    case "GENERATING": return isBusy(view) ? t(view.generation?.kind === "local" ? "chip.trust.busyLocal" : "chip.trust.busy") : t("chip.trust.needs");
     default: break;
   }
   if (tone === "error") return t("chip.trust.error");
@@ -221,7 +221,10 @@ function announceKind(view: ChipView, tone: VisualTone): string {
 }
 
 function announceText(view: ChipView, tone: VisualTone): string {
-  if (view.state === "GENERATING") return isBusy(view) ? `${trustLabel(view, tone)}. ${t("chip.announce.busy")}` : t(`gen.${view.generation?.status ?? "FAILED"}` as StringKey);
+  if (view.state === "GENERATING") {
+    return isBusy(view) ? `${trustLabel(view, tone)}. ${t("chip.announce.busy")}`
+      : t((view.generation?.kind === "local" ? "gen.local" : `gen.${view.generation?.status ?? "FAILED"}`) as StringKey);
+  }
   if (!isReady(view) || tone === "error") return t("chip.announce.blocked", { reason: quietReason(view) });
   const lead = t("chip.announce.lead", { trust: trustLabel(view, tone), value: truncate(displayValue(view), 140) });
   const stale = staleKey(view);
@@ -506,7 +509,7 @@ export function createChip(ctx: UiCtx, layer: HTMLElement): ChipController {
     let toggle: HTMLButtonElement | null = null;
     if (generating) {
       const status = v.generation?.status ?? "GENERATING";
-      const key = `gen.${status}` as StringKey;
+      const key = (v.generation?.kind === "local" ? "gen.local" : `gen.${status}`) as StringKey;
       const attempt = v.generation?.attempt && v.generation.attempt > 1 ? ` ${t("gen.attempt", { n: v.generation.attempt })}` : "";
       root.append(h("div", { class: "value muted", testid: "chip-status" }, `${t(key)}${attempt}`));
     } else {
@@ -532,6 +535,7 @@ export function createChip(ctx: UiCtx, layer: HTMLElement): ChipController {
       if (v.duplicateBlocksInsert) root.append(h("div", { class: "note warn", testid: "chip-duplicate" }, icon("alert", 13), t("reason.duplicate")));
       else if (v.conflictsWithCurrent) root.append(h("div", { class: "note warn", testid: "chip-conflict" }, icon("alert", 13), t("chip.conflict")));
       else if (v.alreadyInserted) root.append(h("div", { class: "note ok", testid: "chip-already" }, icon("check", 13), t("chip.alreadyInserted")));
+      else if (v.insert === "explicit" && v.readIn) root.append(h("div", { class: "note", testid: "chip-read-in" }, icon("eye", 13), t("reason.readInReady")));
       else if (v.insert === "explicit") root.append(h("div", { class: "note", testid: "chip-protected" }, icon("lock", 13), t("reason.protectedReady")));
       else if (v.review && v.state === "VERIFIED") root.append(h("div", { class: "note", testid: "chip-review" }, icon("eye", 13), t("chip.review")));
     }

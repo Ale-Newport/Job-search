@@ -240,6 +240,8 @@ export interface ExtensionSettings {
   save_corrections: ExtensionSaveCorrections;
   background_research: boolean;
   background_drafts: boolean;
+  /** Laya and the local writing model pick among the offered options and write a known value as the field asks (all on this Mac). */
+  local_assist: boolean;
   /** Last-resort public web search for the official company site (company name only). */
   web_lookup: boolean;
   /** Small hint pill on known application systems. */

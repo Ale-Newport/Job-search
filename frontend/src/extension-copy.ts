@@ -191,6 +191,10 @@ const en = {
       "Search the web for the company's official site",
       "Only when the job page does not link to it. Sends just the company name to a public search engine.",
     ],
+    localAssist: [
+      "Let local AI finish what the profile alone cannot",
+      "Laya and your local writing model (Ollama) pick among the options a form offers and write a value the way the field asks (a date as dd-mm-yyyy, a number without spaces). They run on this Mac, cost nothing and never invent a value: what they pick is shown in amber with the facts it came from.",
+    ],
     drafts: ["Prepare long answers in advance", "Uses your answer model, counted in your monthly AI limit."],
     draftCap: [
       "Spending cap per application",
@@ -413,6 +417,10 @@ const es: Dict = {
     webLookup: [
       "Buscar en la web el sitio oficial de la empresa",
       "Solo cuando la oferta no lo enlaza. Envía únicamente el nombre de la empresa a un buscador público.",
+    ],
+    localAssist: [
+      "Dejar que la IA local complete lo que el perfil no resuelve",
+      "Laya y tu modelo de texto local (Ollama) eligen entre las opciones que ofrece un formulario y escriben un valor como pide el campo (una fecha como dd-mm-aaaa, un número sin espacios). Funcionan en este Mac, no cuestan nada y nunca inventan un dato: lo que eligen se muestra en ámbar con los hechos de los que sale.",
     ],
     drafts: ["Preparar respuestas largas con antelación", "Usa tu modelo de respuestas y cuenta en tu límite mensual de IA."],
     draftCap: [

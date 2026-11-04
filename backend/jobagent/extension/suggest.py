@@ -946,6 +946,12 @@ class SuggestService:
         if job is not None:
             out["generation"] = self._generation_info(job, gen)
             out["based_on"] = job.result.get("based_on") if job.result else self._based_on(session)
+            if standing is not None and standing["status"] != "outdated" and (job.result or {}).get("basis") \
+                    and (out["based_on"] or {}).get("knowledge_version"):
+                # The version is a hash of ALL knowledge, so an unrelated write (an answer confirmed elsewhere on the page, a research
+                # ingest) would make every finished draft read "profile changed" on the page. The verdict above already compared the
+                # facts the draft cites: they stand, so it is vouched for under the version the page holds now.
+                out["based_on"] = {**out["based_on"], "knowledge_version": env.version}
             if standing is not None and standing["status"] != "fresh" and out["based_on"] is not None:
                 # the draft says what it was written from, and that it no longer matches (the panel offers a rewrite)
                 out["based_on"] = {**out["based_on"], "stale": True, "reason": standing["reason"]}

@@ -83,6 +83,23 @@ async def test_a_change_to_a_fact_the_draft_does_not_cite_leaves_it_alone(ctx):
     assert len(ctx.model.drafts) == 1
 
 
+async def test_a_draft_whose_cited_facts_stand_is_vouched_for_under_the_current_profile_version(ctx):
+    """The page blocks a draft whose ``based_on.knowledge_version`` differs from the current one ("profile changed"). That version
+    is a hash of the whole knowledge, so any unrelated write (an answer confirmed on another field, a research ingest) made every
+    finished long draft uncheckable. ``draft_basis.verdict`` already says exactly whether the facts it cites changed: when they did
+    not, the server vouches for the draft under the version the page now holds."""
+    draft = await written(ctx)
+    written_under = draft["based_on"]["knowledge_version"]
+    other = ctx.app.state.db.one("SELECT f.id FROM facts f JOIN knowledge_facts k ON k.fact_id=f.id WHERE k.concept='email'")
+    update_fact(ctx.app.state.db, other["id"], "other@example.test", True)
+    scanned = await scan(ctx, [narrative(1)])
+    again = scanned[1]
+    assert again["state"] == "GENERATED_DRAFT" and len(ctx.model.drafts) == 1
+    now = ctx.app.state.extension_sessions.sessions[ctx.sid].known_version
+    assert now != written_under  # the profile version did move
+    assert again["based_on"]["knowledge_version"] == again["knowledge_version"] == now
+
+
 async def test_asking_for_a_new_draft_after_the_change_writes_one_from_the_current_facts(ctx):
     draft = await written(ctx)
     fact = cited_fact(ctx)

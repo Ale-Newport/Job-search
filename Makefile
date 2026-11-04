@@ -1,6 +1,6 @@
 SHELL := /bin/bash
 PYTHON := .venv/bin/python
-.PHONY: setup dev dev-web backend test test-ui test-ui-suite test-ext test-ext-fast release-gate lint typecheck extension extension-deps extension-safari extension-typecheck build build-app clean clean-dry
+.PHONY: setup dev dev-web backend test test-ui test-ui-suite test-ext test-ext-fast release-gate lint typecheck extension extension-deps extension-safari extension-typecheck build build-app clean clean-dry backup-data
 setup:
 	./scripts/bootstrap_macos.sh
 dev:
@@ -102,3 +102,7 @@ clean:
 # Shows what clean would delete and deletes nothing.
 clean-dry:
 	$(PYTHON) scripts/clean_build.py --dry-run
+# Clones Meridian's data folder into .local-data/backups (git-ignored) and deletes the previous backup once the new one is checked.
+# Quit Meridian first; run it before installing a new build.
+backup-data:
+	./scripts/backup_data.sh

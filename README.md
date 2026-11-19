@@ -1,4 +1,81 @@
-# Meridian
+<p align="center">
+  <img src="docs/media/demo.gif" width="880" alt="Meridian running on macOS: the Today dashboard, the Opportunities table with ranked vacancies, the application Tracker, the verified Profile and Analytics (recorded from the real app with synthetic data)">
+</p>
+
+<h1 align="center">Meridian</h1>
+
+<p align="center"><b>Your job search on your Mac: daily ranked vacancies from public job boards, one tracker for every application, and a browser assistant that fills application forms from facts you verified, with nothing leaving your machine unless you choose.</b></p>
+
+<p align="center">
+  <a href="https://github.com/Ale-Newport/Job-search/actions/workflows/ci.yml"><img src="https://github.com/Ale-Newport/Job-search/actions/workflows/ci.yml/badge.svg?branch=main" alt="CI"></a>
+  <a href="https://github.com/Ale-Newport/Job-search/actions/workflows/codeql.yml"><img src="https://github.com/Ale-Newport/Job-search/actions/workflows/codeql.yml/badge.svg?branch=main" alt="CodeQL"></a>
+  <a href="https://github.com/Ale-Newport/Job-search/releases/latest"><img src="https://img.shields.io/github/v/release/Ale-Newport/Job-search?sort=semver" alt="Latest release"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/github/license/Ale-Newport/Job-search" alt="MIT licence"></a>
+  <img src="https://img.shields.io/badge/platform-macOS%2015%2B%20(Apple%20Silicon)-111?logo=apple" alt="macOS 15+ on Apple Silicon">
+  <img src="https://img.shields.io/badge/python-3.12-3776AB?logo=python&logoColor=white" alt="Python 3.12">
+  <img src="https://img.shields.io/badge/Tauri-2-24C8DB?logo=tauri&logoColor=white" alt="Tauri 2">
+  <img src="https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=black" alt="React 19">
+  <img src="https://img.shields.io/badge/telemetry-none-2ea44f" alt="No telemetry">
+</p>
+
+<p align="center">
+  <a href="#quick-start">Quick start</a> ·
+  <a href="#features">Features</a> ·
+  <a href="#how-it-works">How it works</a> ·
+  <a href="docs/EXTENSION.md">Browser assistant</a> ·
+  <a href="docs/INICIO_RAPIDO.es.md">Guía en español</a> ·
+  <a href="CONTRIBUTING.md">Contributing</a>
+</p>
+
+## Features
+
+- **Daily recommendations, ranked for you.** Greenhouse, Lever, Ashby and SmartRecruiters boards, GitHub job lists, Trackr
+  graduate programmes, RSS/JSON/CSV feeds, company career pages and LinkedIn/Indeed alert emails feed up to 50 ranked
+  vacancies a day, deduplicated across sources and matched against your verified skills and preferences.
+- **One tracker for every application.** Company, role, stage, dates, deadlines, notes and the original link in one table.
+  Read-only Gmail, Outlook or IMAP access matches confirmation and interview emails to the right application.
+- **A profile built from evidence.** Import a CV (PDF, DOCX or text); Meridian proposes facts and you verify them. Nothing is
+  used in an application until you confirm it, and every generated answer cites the facts behind it.
+- **Meridian Assistant for Chrome and Safari.** Click a field on any application form to see a suggestion, where it came from
+  and how far to trust it; press Tab to insert it. It never clicks Submit and never touches passwords, CAPTCHAs, payment or
+  consent fields.
+- **Apply with review.** An optional, visible browser fills a form section by section, only after you approve the exact values,
+  and stops for anything it does not know.
+- **Private by design.** A local SQLite database, secrets in macOS Keychain, an API that only listens on loopback, and no
+  telemetry. Local AI through Ollama or Laya; cloud models only if you add a key and a monthly budget.
+
+| Today | Opportunities |
+|---|---|
+| <img src="docs/media/overview.png" alt="Today dashboard with recommendation counts and setup guide" width="480"> | <img src="docs/media/opportunities.png" alt="Opportunities table with fictional graduate vacancies ranked by match" width="480"> |
+| **Tracker** | **Profile** |
+| <img src="docs/media/tracker.png" alt="Application tracker with stages and dates" width="480"> | <img src="docs/media/profile.png" alt="Verified candidate profile with facts and evidence" width="480"> |
+
+<sub>Screenshots and the demo above are recorded from the real app with `scripts/record_demo.py`, on an isolated data folder
+with a synthetic candidate and fictional employers.</sub>
+
+## How it works
+
+```mermaid
+flowchart LR
+  subgraph Mac["Your Mac (nothing below listens beyond 127.0.0.1)"]
+    UI["Desktop app<br/>Tauri 2 + React"] -- "bearer token, loopback" --> API["Local service<br/>Python · FastAPI"]
+    EXT["Meridian Assistant<br/>Chrome / Safari extension"] -- "paired bridge, ports 47615-47624" --> API
+    API --- DB[("SQLite<br/>documents · tracker")]
+    API --- KC["macOS Keychain<br/>tokens and API keys"]
+    API --- LLM["Optional local AI<br/>Ollama · Laya"]
+    API --- BR["Visible review browser<br/>Playwright"]
+  end
+  API -- "public job boards, feeds, career pages" --> WEB(("Internet"))
+  API -. "read-only email (opt-in)" .-> MAIL["Gmail · Outlook · IMAP"]
+  API -. "selected facts only (opt-in, budgeted)" .-> CLOUD["Cloud model provider"]
+```
+
+The desktop shell starts a bundled Python service on loopback with a random per-launch token. Discovery workers fetch public
+sources with SSRF protections; the answer engine works from verified facts with a fail-closed gate for legal and personal
+questions; the extension talks only to Meridian, never to the internet. Details: [ARCHITECTURE.md](ARCHITECTURE.md),
+[SECURITY.md](SECURITY.md), [docs/EXTENSION_DESIGN.md](docs/EXTENSION_DESIGN.md).
+
+## About
 
 A private macOS workspace for daily job recommendations, direct application links and a table of every opportunity and application. Public ATS boards, GitHub lists, Trackr and inbox alerts feed the list. You apply externally, record the submission, and matching recruitment emails update the timeline. Verified CV facts and optional document assistance support this workflow.
 
@@ -12,10 +89,14 @@ Meridian runs locally. Tauri 2 hosts the interface and launches a bundled Python
 
 Requirements for this Apple Silicon build: macOS 15+, Python 3.12, Node/npm, Rust, Xcode Command Line Tools. Google Chrome is preferred for the separate application browser; Playwright Chromium is an alternative. The packaged desktop application includes its Python backend, so Python is not required for ordinary use of the installed app. Optional Laya installation uses a separate Python runtime.
 
+<a id="quick-start"></a>One command sets everything up from a fresh clone (virtualenv from `requirements.lock`, npm installs, the extension
+and the bundled backend) and starts the app:
+
 ```sh
-make setup
-make dev
+git clone https://github.com/Ale-Newport/Job-search.git && cd Job-search && make setup && make dev
 ```
+
+`make build` produces a signed local `Meridian.app` and DMG (see [Development and verification](#development-and-verification)).
 
 The first launch starts with an empty database and automation paused. No fabricated candidate facts, jobs or application counts are installed. Closing the window keeps the menu bar application running. Use **Quit Meridian** to stop the local service. Background polling runs while the desktop process is running; it does not wake a sleeping Mac.
 

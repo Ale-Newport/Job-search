@@ -36,3 +36,30 @@ extension/dist/
 xcuserdata/
 DerivedData/
 *.xcuserstate
+
+# Credentials and signing material: never commit them (Meridian keeps secrets in macOS Keychain).
+*.pem
+*.key
+*.p12
+*.p8
+*.cer
+*.mobileprovision
+*.keystore
+credentials*.json
+client_secret*.json
+token*.json
+!extension/**/token*.json
+
+# Editors, coverage and tool caches.
+.idea/
+.vscode/
+*.swp
+.mypy_cache/
+.coverage
+.coverage.*
+htmlcov/
+coverage/
+*.orig
+
+# Raw demo recordings (scripts/record_demo.py --keep); only the GIF and PNGs are committed.
+docs/media/*.webm

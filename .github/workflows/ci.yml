@@ -1,0 +1,136 @@
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  PYTHON_VERSION: "3.12"
+  NODE_VERSION: "22"
+  PIP_DISABLE_PIP_VERSION_CHECK: "1"
+
+jobs:
+  lint:
+    name: Lint (ruff, eslint, rustfmt)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with: { persist-credentials: false }
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with: { python-version: "${{ env.PYTHON_VERSION }}" }
+      - run: pip install "ruff==$(sed -n 's/^ruff==//p' requirements.lock)"
+      - run: ruff check --no-fix backend scripts extension/tests extension/scripts
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with: { node-version: "${{ env.NODE_VERSION }}", cache: npm, cache-dependency-path: frontend/package-lock.json }
+      - run: npm --prefix frontend ci
+      - run: npm --prefix frontend run lint
+      - run: cargo fmt --manifest-path src-tauri/Cargo.toml -- --check
+
+  backend:
+    name: Backend tests (macOS, shard ${{ matrix.shard }}/4)
+    runs-on: macos-15
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with: { persist-credentials: false }
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with: { python-version: "${{ env.PYTHON_VERSION }}", cache: pip, cache-dependency-path: requirements.lock }
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with: { node-version: "${{ env.NODE_VERSION }}", cache: npm, cache-dependency-path: extension/package-lock.json }
+      - name: Install locked dependencies
+        run: |
+          python -m venv .venv
+          .venv/bin/pip install -r requirements.lock
+          .venv/bin/pip install --no-deps -e .
+          .venv/bin/python -m playwright install chromium
+      # Some bridge tests compare against the genuine extension bundle in extension/dist, as `make extension` builds it.
+      - name: Build the browser extension
+        run: |
+          npm --prefix extension ci
+          npm --prefix extension run build
+      # The suite has ~8,500 tests; whole test files are spread over four runners (each file stays in one process).
+      - name: pytest (shard ${{ matrix.shard }} of 4)
+        run: |
+          files=$(find backend/tests -name 'test_*.py' | sort | awk -v n=4 -v k=${{ matrix.shard }} 'NR % n == k % n')
+          echo "$files" | sed 's/^/  /'
+          MERIDIAN_TEST=1 .venv/bin/pytest -q -p no:cacheprovider $files
+
+  frontend:
+    name: Frontend (typecheck, build)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with: { persist-credentials: false }
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with: { node-version: "${{ env.NODE_VERSION }}", cache: npm, cache-dependency-path: frontend/package-lock.json }
+      - run: npm --prefix frontend ci
+      - run: npm --prefix frontend run typecheck
+      - run: npm --prefix frontend run build
+
+  extension:
+    name: Browser extension (typecheck, unit tests, production build)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with: { persist-credentials: false }
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with: { node-version: "${{ env.NODE_VERSION }}", cache: npm, cache-dependency-path: extension/package-lock.json }
+      - run: npm --prefix extension ci
+      - run: npm --prefix extension run typecheck
+      - run: npm --prefix extension test
+      - run: npm --prefix extension run build
+      - run: npm --prefix extension run check
+
+  desktop:
+    name: Desktop shell (cargo check, cargo test)
+    runs-on: macos-15
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with: { persist-credentials: false }
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with: { workspaces: src-tauri }
+      # tauri-build requires the bundled backend binary to exist. The real one is a PyInstaller build made by
+      # scripts/build_sidecar.sh for releases; the Rust tests never execute it, so an empty stub is enough here.
+      - name: Stub the sidecar binary
+        run: |
+          mkdir -p src-tauri/binaries
+          touch "src-tauri/binaries/meridian-backend-$(rustc -vV | sed -n 's/host: //p')"
+      - run: cargo check --manifest-path src-tauri/Cargo.toml --locked
+      - run: cargo test --manifest-path src-tauri/Cargo.toml --locked --quiet
+
+  audit:
+    name: Dependency audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with: { persist-credentials: false }
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with: { python-version: "${{ env.PYTHON_VERSION }}" }
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with: { node-version: "${{ env.NODE_VERSION }}" }
+      - name: pip-audit (requirements.lock)
+        run: pip install pip-audit && pip-audit --strict --disable-pip -r requirements.lock
+      - name: npm audit (production and development dependencies)
+        run: |
+          for dir in . frontend extension; do
+            echo "== $dir"; npm audit --prefix "$dir" --audit-level=high
+          done

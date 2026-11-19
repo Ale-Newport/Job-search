@@ -1,0 +1,32 @@
+# Weekly dependency updates. Minor and patch bumps are grouped per ecosystem so they arrive as one pull request;
+# security updates are raised separately as soon as an advisory is published. Every Dependabot pull request still
+# needs the code owner's review before it can be merged.
+version: 2
+updates:
+  - package-ecosystem: pip
+    directory: /
+    schedule: { interval: weekly, day: monday }
+    open-pull-requests-limit: 5
+    labels: [dependencies, python]
+    groups:
+      python-minor-patch: { update-types: [minor, patch] }
+  - package-ecosystem: npm
+    directories: [/, /frontend, /extension]
+    schedule: { interval: weekly, day: monday }
+    open-pull-requests-limit: 5
+    labels: [dependencies, javascript]
+    groups:
+      npm-minor-patch: { update-types: [minor, patch] }
+  - package-ecosystem: cargo
+    directory: /src-tauri
+    schedule: { interval: weekly, day: monday }
+    open-pull-requests-limit: 5
+    labels: [dependencies, rust]
+    groups:
+      cargo-minor-patch: { update-types: [minor, patch] }
+  - package-ecosystem: github-actions
+    directory: /
+    schedule: { interval: weekly, day: monday }
+    labels: [dependencies, ci]
+    groups:
+      actions: { patterns: ["*"] }

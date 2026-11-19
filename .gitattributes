@@ -1,0 +1,28 @@
+# Normalise line endings in the repository; check out text with LF everywhere (the scripts are POSIX shell).
+* text=auto eol=lf
+*.sh text eol=lf
+*.bat text eol=crlf
+
+# Binary assets: never diffed or merged as text.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.icns binary
+*.pdf binary
+*.docx binary
+*.woff binary
+*.woff2 binary
+*.zip binary
+
+# Lock files: merge as text but keep them out of diffs and language statistics.
+package-lock.json -diff linguist-generated
+Cargo.lock -diff linguist-generated
+requirements.lock linguist-generated
+
+# Recorded fixtures and generated test bundles are not source code.
+backend/tests/fixtures/** linguist-generated
+extension/tests/widgets/fixtures/** linguist-generated
+extension/tests/fixtures/** linguist-vendored
+docs/*.json linguist-documentation

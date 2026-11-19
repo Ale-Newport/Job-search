@@ -1,6 +1,6 @@
 SHELL := /bin/bash
 PYTHON := .venv/bin/python
-.PHONY: setup dev dev-web backend test test-ui test-ui-suite test-ext test-ext-fast release-gate lint typecheck extension extension-deps extension-safari extension-typecheck build build-app clean clean-dry backup-data
+.PHONY: setup dev dev-web backend test test-ui test-ui-suite test-ext test-ext-fast release-gate lint typecheck extension extension-deps extension-safari extension-typecheck build build-app clean clean-dry backup-data scan-secrets
 setup:
 	./scripts/bootstrap_macos.sh
 dev:
@@ -106,3 +106,6 @@ clean-dry:
 # Quit Meridian first; run it before installing a new build.
 backup-data:
 	./scripts/backup_data.sh
+# Scans every commit for leaked credentials with the same rules as CI (.gitleaks.toml). Needs gitleaks: brew install gitleaks.
+scan-secrets:
+	gitleaks git . --config .gitleaks.toml --redact --no-banner

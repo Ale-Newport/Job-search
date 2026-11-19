@@ -1,0 +1,18 @@
+# gitleaks configuration: the default rules, plus an allowlist for synthetic values that tests use on purpose.
+# Every value below is fake: "Zm9yLXRlc3RzLW9ubHktc2VjcmV0LXZhbHVlLTEyMzQ" is base64 for "for-tests-only-secret-value-1234",
+# "AAECAwQF..." / "BBECAwQF..." are the bytes 0,1,2,... used as nonces, the JWT is the public jwt.io example, and the
+# hash is the SHA-256 of the fake secret. Add a value here only when it is provably synthetic.
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Synthetic test fixtures"
+regexes = [
+  '''Zm9yLXRlc3RzLW9ubHktc2VjcmV0LXZhbHVlLTEyMzQ''',
+  '''Zk9xQw3m8vYpLr2sT7uH1dEaGbN4cJiK5oVxWyU0AfM''',
+  '''(AA|BB)ECAwQFBgcICQoLDA0OD[wx]''',
+  '''7bdaec0c3990919f1f51ebf8d2c63f2712d3659eec9883d98931b6aed9a1b18e''',
+  '''eyJhbGciOiJIUzI1NiJ9\.eyJzdWIiOiIxMjM0NTY3ODkwIn0\.dBjftJeZ4CVPmB92K27uhbUJU1p1r_wW1gFWFOEjXk''',
+  '''mrd1\.5f0c2f4e-7d49-4bd3-8a41-0f3c8f6a9b11''',
+  '''^(Control|Alt|Meta)\+(Alt|Shift)\+KeyR$''',
+]

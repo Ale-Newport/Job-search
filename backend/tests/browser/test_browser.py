@@ -504,7 +504,7 @@ async def test_inline_guide_isolated_from_page_and_accepts_only_trusted_events(b
     assert received == []
     pt = await prompt_point(prompt, "#answer")
     await browser.page.mouse.click(**pt)
-    await browser.page.keyboard.press("Meta+A")
+    await browser.page.keyboard.press("ControlOrMeta+A")
     await browser.page.keyboard.insert_text("2 weeks")
     pt = await prompt_point(prompt, "button.primary")
     await browser.page.mouse.click(**pt)
@@ -1075,7 +1075,7 @@ async def test_user_edits_win_during_fill_and_survive_rerender(browser, fixture_
         await asyncio.wait_for(entered.wait(), 10)
         for name, value in [('first_name', 'User chosen name'), ('email', 'changed@example.test'), ('phone', '')]:
             await browser.page.locator('[name="' + name + '"]').click()
-            await browser.page.keyboard.press('Meta+A')
+            await browser.page.keyboard.press('ControlOrMeta+A')
             await browser.page.keyboard.press('Backspace')
             if value:
                 await browser.page.keyboard.insert_text(value)

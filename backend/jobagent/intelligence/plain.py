@@ -1393,7 +1393,7 @@ def _read(question: str, intent: str, textarea: bool, choice: bool, signature: b
     return freeze(out)
 
 
-MARKER_EDGE = re.compile(r"(?i)^\s*(?:required|optional|mandatory|obligatorio|opcional|requerido)\s*[:\-\u2013]?\s+|\s+[:\-\u2013]?\s*(?:required|optional|mandatory|"
+MARKER_EDGE = re.compile(r"(?i)^\s*(?:required|optional|mandatory|obligatorio|opcional|requerido)(?:\s*[:\-\u2013])?\s+|(?<!\s)\s+(?:[:\-\u2013]\s*)?(?:required|optional|mandatory|"
                          r"obligatorio|opcional|requerido)\s*$")
 
 

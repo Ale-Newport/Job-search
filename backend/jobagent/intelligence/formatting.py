@@ -404,7 +404,7 @@ def choice(value, options, *, question="", disclosure_concept=None):
                 return positive[0]
             if re.fullmatch(r'[a-z]+',norm):
                 return negative[0]
-    countries = [o for o in labels if normalize(re.sub(r"\s+\+\d[\d\s-]*$", "", o["label"])) == norm]
+    countries = [o for o in labels if normalize(re.sub(r"(?<!\s)\s+\+\d[\d\s-]*$", "", o["label"])) == norm]
     if len(countries) == 1:
         return countries[0]
     # A displayed institutional acronym is decoration, not a different entity.

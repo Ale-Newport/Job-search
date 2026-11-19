@@ -6,6 +6,8 @@ exactly what the originals matched; these tests pin the speed, the behaviour is 
 from __future__ import annotations
 
 import asyncio
+import inspect
+import re
 
 import threading
 import time
@@ -15,7 +17,7 @@ import pytest
 
 import jobagent.automation  # noqa: F401  (the application's import order)
 from jobagent import discovery, mail
-from jobagent.intelligence import engine, legal, professional_context, semantics
+from jobagent.intelligence import engine, formatting, legal, plain, professional_context, semantics
 from jobagent.intelligence.formatting import AnswerFormatResolver, page_pattern
 
 N = 100_000
@@ -108,3 +110,54 @@ def test_discovery_connects_to_the_address_it_validated(monkeypatch):
     assert body == b'{"ok": true}' and content_type == "application/json"
     assert final == f"http://jobs.example.invalid:{port}/feed?x=1"
     assert seen["host"] == f"jobs.example.invalid:{port}"
+
+
+# --------------------------------------------------------------------- MARKER_EDGE (plain.py) and the country-code suffix
+# (formatting.choice). These two were the last CodeQL polynomial-ReDoS alerts (#31, #32, #17). The originals are kept here
+# so the rewrites are compared against exactly what they replaced.
+ORIGINAL_MARKER_EDGE = r"(?i)^\s*(?:required|optional|mandatory|obligatorio|opcional|requerido)\s*[:\-–]?\s+|\s+[:\-–]?\s*(?:required|optional|mandatory|obligatorio|opcional|requerido)\s*$"  # noqa: E501
+ORIGINAL_COUNTRY_CODE = r"\s+\+\d[\d\s-]*$"
+REWRITTEN_COUNTRY_CODE = r"(?<!\s)\s+\+\d[\d\s-]*$"
+
+
+def _random_texts(tokens, count, seed):
+    import random
+
+    rng = random.Random(seed)
+    for _ in range(count):
+        text = "".join(rng.choice(tokens) for _ in range(rng.randint(0, 12)))
+        yield text.upper() if rng.random() < 0.2 else text
+
+
+def test_marker_edge_matches_exactly_what_the_original_matched():
+    original, live = re.compile(ORIGINAL_MARKER_EDGE), plain.MARKER_EDGE
+    tokens = [" ", "  ", "\t", ":", "-", "–", "required", "Optional", "obligatorio", "requerido", "name", "x"]
+    for text in _random_texts(tokens, 30_000, seed=31):
+        assert live.sub(" ", text) == original.sub(" ", text), repr(text)
+        assert bool(live.search(text)) == bool(original.search(text)), repr(text)
+
+
+def test_country_code_suffix_matches_exactly_what_the_original_matched():
+    original, rewritten = re.compile(ORIGINAL_COUNTRY_CODE), re.compile(REWRITTEN_COUNTRY_CODE)
+    assert REWRITTEN_COUNTRY_CODE in inspect.getsource(formatting.choice)  # the test checks the expression in use
+    for text in _random_texts([" ", "  ", "+", "44", "1", "-", "Spain", "United Kingdom", "x"], 30_000, seed=17):
+        assert rewritten.sub("", text) == original.sub("", text), repr(text)
+
+
+@pytest.mark.parametrize("call,text", [
+    (lambda s: plain.MARKER_EDGE.search(s), "a" + " " * N + "x"),
+    (lambda s: plain.MARKER_EDGE.sub(" ", s), "required" + " " * N + "x"),
+    (lambda s: plain.MARKER_EDGE.sub(" ", s), "Name" + " " * N + ": required"),
+    (lambda s: formatting.choice("Spain", [{"label": s}, {"label": "France +33"}]), "Spain" + " " * N + "x"),
+])
+def test_marker_edge_and_country_codes_take_linear_time(call, text):
+    fast(call, text)
+
+
+def test_marker_edge_and_country_codes_still_work():
+    assert plain.MARKER_EDGE.sub(" ", "Required: Full name").strip() == "Full name"
+    assert plain.MARKER_EDGE.sub(" ", "Full name - required").strip() == "Full name"
+    assert plain.MARKER_EDGE.sub(" ", "Nombre (obligatorio)").strip() == "Nombre (obligatorio)"  # a bracketed marker is not an edge
+    options = [{"label": "Spain +34"}, {"label": "France +33"}, {"label": "United Kingdom +44"}]
+    assert formatting.choice("Spain", options) == options[0]
+    assert formatting.choice("United Kingdom", options) == options[2]

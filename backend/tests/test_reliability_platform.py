@@ -253,9 +253,7 @@ async def test_three_process_applications_recover_independently(tmp_path,reliabi
         supervisor=app.state.automation
         async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app),base_url='http://testserver',headers={'Authorization':'Bearer reliability-test'}) as client:
             for i,ats in enumerate(('greenhouse','ashby','workday')):
-                # The first application is the one whose browser is killed: its slow upload keeps it running long
-                # enough for the fault to land on a fast machine, instead of finishing before injection.
-                flags='&reload=yes&conditional=yes' if i==1 else '&slow=yes'
+                flags='&reload=yes&conditional=yes' if i==1 else '&slow=yes' if i==2 else ''
                 job,_=ingest_job(db,{'title':'Software Engineer','company':f'Fixture {i}','url':reliability_server+f'/reliability_wizard.html?identity={i}{flags}', 'ats':ats,'metadata':{'account_scope':f'fixture-{i}'}})
                 application_id=prepare_application(db,job['id'],data_dir=tmp_path)['id']
                 for kind in ('cv','cover_letter'):
@@ -281,7 +279,9 @@ async def test_three_process_applications_recover_independently(tmp_path,reliabi
                         injected=True
                     else:
                         marker=str(tmp_path/'browser-profile/applications'/first['application_id'])
-                        lines=subprocess.check_output(['ps','-axo','pid=,args='],text=True).splitlines()
+                        # ww: full command lines. Without it Linux ps cuts Chrome's long argument list at the terminal
+                        # width when piped, and --user-data-dir is never seen.
+                        lines=subprocess.check_output(['ps','-axwwo','pid=,args='],text=True).splitlines()
                         candidates=[int(line.strip().split()[0]) for line in lines if '--user-data-dir='+marker in line and '--type=' not in line]
                         if candidates:
                             os.kill(candidates[0],signal.SIGKILL)

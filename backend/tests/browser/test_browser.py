@@ -580,14 +580,17 @@ async def test_orchestrator_inline_answers_draft_skip_resume_and_no_submission(t
         await service.browser.page.keyboard.press("1")
         await service.browser.page.keyboard.press("Enter")
         await click("button.primary")
-        # Wait for the new run, not the previous checkpoint.
+        # Wait for the new run, not the previous checkpoint. The next question's prompt replaces the previous one, whose
+        # CDP session can close while it is being read: keep polling instead of failing on that moment.
+        from playwright.async_api import Error as PlaywrightError
+
         for _ in range(500):
-            if (
-                not service.running
-                and service.prompt.cdp
-                and (await state())["question"] == "How are you currently using AI?"
-            ):
-                break
+            if not service.running and service.prompt.cdp:
+                try:
+                    if (await state())["question"] == "How are you currently using AI?":
+                        break
+                except PlaywrightError:
+                    pass
             await asyncio.sleep(0.02)
         assert await service.browser.page.locator("select").input_value() == "1 month", await state()
         await click(".row button")  # Generate a draft via the browser UI.

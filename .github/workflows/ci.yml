@@ -39,8 +39,10 @@ jobs:
       - run: cargo fmt --manifest-path src-tauri/Cargo.toml -- --check
 
   backend:
-    name: Backend tests (macOS, shard ${{ matrix.shard }}/4)
-    runs-on: macos-latest
+    # Meridian targets macOS, but the backend suite is platform-aware (macOS-only checks such as codesign skip themselves),
+    # and hosted macOS runners did not pick up this repository's jobs. `make release-gate` remains the full macOS check.
+    name: Backend tests (shard ${{ matrix.shard }}/4)
+    runs-on: ubuntu-latest
     timeout-minutes: 60
     strategy:
       fail-fast: false
@@ -58,7 +60,7 @@ jobs:
           python -m venv .venv
           .venv/bin/pip install -r requirements.lock
           .venv/bin/pip install --no-deps -e .
-          .venv/bin/python -m playwright install chromium
+          .venv/bin/python -m playwright install --with-deps chromium
       # Some bridge tests compare against the genuine extension bundle in extension/dist, as `make extension` builds it.
       - name: Build the browser extension
         run: |
@@ -101,11 +103,16 @@ jobs:
 
   desktop:
     name: Desktop shell (cargo check, cargo test)
-    runs-on: macos-latest
+    runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with: { persist-credentials: false }
+      # Tauri's Linux backend (WebKitGTK) so the shell compiles and its unit tests run on a Linux runner.
+      - name: Install Tauri system libraries
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
         with: { workspaces: src-tauri }
       # tauri-build requires the bundled backend binary to exist. The real one is a PyInstaller build made by

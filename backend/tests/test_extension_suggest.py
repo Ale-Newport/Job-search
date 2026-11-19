@@ -306,6 +306,8 @@ async def test_long_questions_are_drafted_in_the_background_and_short_unknowns_o
     ctx.model.delay = 0.5  # the draft cannot be written before the first answer is sent: that answer says "writing"
     elements = [el(1, "textbox", "Why do you want to work at Acme Robotics?", tag="textarea", type="textarea", max_length=800),
                 el(3, "textbox", "Anything else?", max_length=60)]
+    # Research reads the role in the background; let it settle so based_on does not depend on how fast this machine is.
+    await ctx.app.state.extension_research.wait(ctx.created["research"]["run_id"], 60)
     results, _ = await scan(ctx, elements)
     generating = expect(results[1], "GENERATING", "never", why="generated")
     assert generating["generation"]["status"] in {"QUEUED", "GENERATING"} and generating["based_on"]["job_description"] is True

@@ -253,7 +253,9 @@ async def test_three_process_applications_recover_independently(tmp_path,reliabi
         supervisor=app.state.automation
         async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app),base_url='http://testserver',headers={'Authorization':'Bearer reliability-test'}) as client:
             for i,ats in enumerate(('greenhouse','ashby','workday')):
-                flags='&reload=yes&conditional=yes' if i==1 else '&slow=yes' if i==2 else ''
+                # The first application is the one whose browser is killed: its slow upload keeps it running long
+                # enough for the fault to land on a fast machine, instead of finishing before injection.
+                flags='&reload=yes&conditional=yes' if i==1 else '&slow=yes'
                 job,_=ingest_job(db,{'title':'Software Engineer','company':f'Fixture {i}','url':reliability_server+f'/reliability_wizard.html?identity={i}{flags}', 'ats':ats,'metadata':{'account_scope':f'fixture-{i}'}})
                 application_id=prepare_application(db,job['id'],data_dir=tmp_path)['id']
                 for kind in ('cv','cover_letter'):

@@ -2,7 +2,8 @@ name: CI
 
 on:
   push:
-    branches: ["**"]
+    # Dependabot branches are tested by their pull requests; testing the push too would run everything twice.
+    branches-ignore: ["dependabot/**"]
     tags: ["v*"]
   pull_request:
   workflow_dispatch:
@@ -12,7 +13,7 @@ permissions:
 
 concurrency:
   group: ci-${{ github.ref }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  cancel-in-progress: true
 
 env:
   PYTHON_VERSION: "3.12"

@@ -6,6 +6,7 @@ updates:
   - package-ecosystem: pip
     directory: /
     schedule: { interval: weekly, day: monday }
+    cooldown: { default-days: 7 }  # let a new release settle a week before proposing it (security updates are not delayed)
     open-pull-requests-limit: 5
     labels: [dependencies, python]
     groups:
@@ -13,13 +14,20 @@ updates:
   - package-ecosystem: npm
     directories: [/, /frontend, /extension]
     schedule: { interval: weekly, day: monday }
+    cooldown: { default-days: 7 }  # let a new release settle a week before proposing it (security updates are not delayed)
     open-pull-requests-limit: 5
     labels: [dependencies, javascript]
+    ignore:
+      # TypeScript 7 (the native compiler) breaks typescript-eslint and the frontend's CSS side-effect imports
+      # (see the closed pull requests 14 and 16). Remove this once typescript-eslint supports it.
+      - dependency-name: typescript
+        update-types: ["version-update:semver-major"]
     groups:
       npm-minor-patch: { update-types: [minor, patch] }
   - package-ecosystem: cargo
     directory: /src-tauri
     schedule: { interval: weekly, day: monday }
+    cooldown: { default-days: 7 }  # let a new release settle a week before proposing it (security updates are not delayed)
     open-pull-requests-limit: 5
     labels: [dependencies, rust]
     groups:
@@ -27,6 +35,7 @@ updates:
   - package-ecosystem: github-actions
     directory: /
     schedule: { interval: weekly, day: monday }
+    cooldown: { default-days: 7 }  # let a new release settle a week before proposing it (security updates are not delayed)
     labels: [dependencies, ci]
     groups:
       actions: { patterns: ["*"] }

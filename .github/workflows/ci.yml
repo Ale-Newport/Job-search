@@ -2,9 +2,9 @@ name: CI
 
 on:
   push:
-    # Dependabot branches are tested by their pull requests; testing the push too would run everything twice.
+    # Dependabot branches are tested by their pull requests; testing the push too would run everything twice. Release
+    # tags are not built again: they point at commits CI has already tested, and nothing here publishes artifacts.
     branches-ignore: ["dependabot/**"]
-    tags: ["v*"]
   pull_request:
   workflow_dispatch:
 

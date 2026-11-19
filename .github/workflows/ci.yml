@@ -40,7 +40,7 @@ jobs:
 
   backend:
     name: Backend tests (macOS, shard ${{ matrix.shard }}/4)
-    runs-on: macos-15
+    runs-on: macos-latest
     timeout-minutes: 60
     strategy:
       fail-fast: false
@@ -101,7 +101,7 @@ jobs:
 
   desktop:
     name: Desktop shell (cargo check, cargo test)
-    runs-on: macos-15
+    runs-on: macos-latest
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1

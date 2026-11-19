@@ -1,6 +1,9 @@
 SHELL := /bin/bash
 PYTHON := .venv/bin/python
-.PHONY: setup dev dev-web backend test test-ui test-ui-suite test-ext test-ext-fast release-gate lint typecheck extension extension-deps extension-safari extension-typecheck build build-app clean clean-dry backup-data scan-secrets
+.PHONY: setup dev dev-web backend test test-ui test-ui-suite test-ext test-ext-fast release-gate lint typecheck extension extension-deps extension-safari extension-typecheck build build-app clean clean-dry backup-data scan-secrets doctor
+# Checks the required tools and prints their versions without installing anything (paste its output into bug reports).
+doctor:
+	./scripts/doctor.sh
 setup:
 	./scripts/bootstrap_macos.sh
 dev:

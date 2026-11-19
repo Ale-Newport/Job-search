@@ -20,10 +20,12 @@ Report security problems privately as described in [SECURITY.md](SECURITY.md), n
 
 ## Development setup
 
-On an Apple Silicon Mac with macOS 15+, Python 3.12, Node.js, Rust and the Xcode Command Line Tools:
+On an Apple Silicon Mac with macOS 15+, Python 3.12, Node.js 22 or newer (`.nvmrc` pins the version CI uses, so
+`nvm use` picks it), Rust and the Xcode Command Line Tools:
 
 ```sh
 git clone https://github.com/<your-user>/Job-search.git && cd Job-search
+make doctor  # checks those tools and prints their versions; changes nothing
 make setup   # virtualenv from requirements.lock, npm installs, extension dependencies, bundled backend
 make dev     # desktop app with hot reload
 ```

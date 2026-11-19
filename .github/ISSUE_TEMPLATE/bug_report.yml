@@ -51,6 +51,12 @@ body:
       label: macOS version, chip and browser
       placeholder: macOS 15.4, Apple M2, Chrome 131
   - type: textarea
+    id: doctor
+    attributes:
+      label: Output of make doctor
+      description: For setup, build or test problems, run `make doctor` in the repository and paste its output (it lists tool versions only).
+      render: shell
+  - type: textarea
     id: logs
     attributes:
       label: Relevant log lines

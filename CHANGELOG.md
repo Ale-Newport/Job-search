@@ -37,12 +37,20 @@ First public release: a local-first macOS job-search workspace and its Chrome/Sa
 - Loopback-only API with a random per-launch bearer token; restricted origins and Host headers; strict desktop CSP.
 - Secrets only in macOS Keychain; AES-GCM encrypted backup exports; SSRF-safe public fetching that rejects private
   destinations and redirects; credential redaction in logs and checkpoints.
+- Dependencies updated to clear known advisories: certifi 2026.10.23, cryptography 50.0.2, pillow 13.0.0, pypdf 6.21.4,
+  setuptools 84.2.1 and soupsieve 4.1.2 (Python); vite 7.3.8, minimatch 11.0.9 and source-map-js 1.2.4 (frontend tooling).
+
+### Fixed
+
+- Browser tests select text with `ControlOrMeta+A`, and the concurrent-recovery test reads full `ps` command lines, so
+  the suite also passes on Linux CI runners.
+- A background-drafting test no longer races the company research it reads.
 
 ### Repository
 
 - MIT licence, code of conduct, contributing guide, security policy with private vulnerability reporting.
-- GitHub Actions: lint, backend tests on macOS, frontend and extension builds, Rust checks, dependency audit, CodeQL and a
-  full-history gitleaks scan. Dependabot for pip, npm, Cargo and Actions.
+- GitHub Actions: lint, the backend suite in four shards, frontend and extension builds, Rust checks, dependency audits,
+  CodeQL and a full-history gitleaks scan. Dependabot for pip, npm, Cargo and Actions.
 
 [Unreleased]: https://github.com/Ale-Newport/Job-search/compare/v0.1.0...HEAD
 [0.1.0]: https://github.com/Ale-Newport/Job-search/releases/tag/v0.1.0

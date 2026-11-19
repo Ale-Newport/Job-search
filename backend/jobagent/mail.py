@@ -166,7 +166,7 @@ def classify_message(subject: str, body: str, received_at: str | None = None) ->
     result["application_reference"] = next(
         iter(
             re.findall(
-                r"(?:application|reference|requisition|job)\s*(?:id|number|#|ref)?\s*[:#]\s*([\w-]{4,})", content
+                r"(?:application|reference|requisition|job)\s*(?:(?:id|number|#|ref)\s*)?[:#]\s*([\w-]{4,})", content
             )
         ),
         None,

@@ -102,8 +102,8 @@ def ats_identity(url: str) -> tuple[str, str | None]:
         if len(segments) > index+1:
             return 'workable', 'workable:'+segments[index+1].upper()
     if host.endswith('.myworkdayjobs.com') and 'job' in segments:
-        requisition = re.search(r'_([^/]+)$', segments[-1])
-        return 'workday', f'workday:{host}:{requisition.group(1)}' if requisition else None
+        requisition = segments[-1].partition('_')[2]  # everything after the first '_' (a segment has no '/')
+        return 'workday', f'workday:{host}:{requisition}' if requisition else None
     if 'sites' in segments and 'job' in segments and ('oraclecloud.com' in host or re.search(r'career|jobs', host)):
         site_index = segments.index('sites')
         job_index = segments.index('job')
@@ -416,6 +416,7 @@ async def validate_public_url(url: str):
     )
     if not infos or any(not ipaddress.ip_address(info[4][0]).is_global for info in infos):
         raise ValueError("Discovery accepts public Internet destinations only")
+    return list(dict.fromkeys(info[4][0] for info in infos))
 
 
 async def fetch(url: str, *, accept="application/json,text/html", max_body=MAX_BODY, response_metadata=None) -> tuple[bytes, str, str]:
@@ -426,8 +427,18 @@ async def fetch(url: str, *, accept="application/json,text/html", max_body=MAX_B
         headers={"User-Agent": "Meridian/1.0 (personal read-only job discovery)", "Accept": accept},
     ) as client:
         for _ in range(6):
-            await validate_public_url(url)
-            async with client.stream("GET", url) as response:
+            addresses = await validate_public_url(url)
+            target, extra = url, {}
+            if addresses:
+                # Connect to the address that was just checked, keeping the Host header and TLS name, so a second DNS
+                # answer (rebinding) cannot point the request at a private address after validation.
+                parts = urlsplit(url)
+                port = parts.port or (443 if parts.scheme == "https" else 80)
+                ip = addresses[0]
+                target = urlunsplit((parts.scheme, f"[{ip}]:{port}" if ":" in ip else f"{ip}:{port}", parts.path or "/",
+                                     parts.query, ""))
+                extra = {"headers": {"Host": parts.netloc.rsplit("@", 1)[-1]}, "extensions": {"sni_hostname": parts.hostname}}
+            async with client.stream("GET", target, **extra) as response:
                 if response.status_code in {301, 302, 303, 307, 308}:
                     location = response.headers.get("location")
                     if not location:
@@ -444,7 +455,7 @@ async def fetch(url: str, *, accept="application/json,text/html", max_body=MAX_B
                     content.extend(chunk)
                     if len(content) > max_body:
                         raise ValueError(f"Source exceeds the {max_body // (1024 * 1024)} MB download limit")
-                return bytes(content), response.headers.get("content-type", ""), str(response.url)
+                return bytes(content), response.headers.get("content-type", ""), url
     raise ValueError("Too many redirects")
 
 

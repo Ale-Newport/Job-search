@@ -35,7 +35,7 @@ def plain_alert_links(body):
         title, employer = lines[:2]
         if title.startswith("http") or employer.startswith("http") or len(title) > 300:
             continue
-        parts = re.split(r"\s+(?:-|–|·|•)\s+", employer, maxsplit=1)
+        parts = re.split(r"(?<!\s)\s+(?:-|–|·|•)\s+", employer, maxsplit=1)
         company, location = parts[0], parts[1] if len(parts) > 1 else ""
         for url, platform in destinations:
             links.append(

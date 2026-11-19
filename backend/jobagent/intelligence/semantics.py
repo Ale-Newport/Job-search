@@ -195,7 +195,7 @@ DECLARATION_SECTION = re.compile(
 PLAIN_NAME = re.compile(
     r"^(?:(?:please|kindly) )?(?:(?:print|type|enter|write|input|provide|sign|put|fill in|escribe|introduce|indica|teclea) )?(?:in )?"
     r"(?:(?:your|my|the|tu|su|el|applicant|applicants|candidate|candidates|full|legal|first|last|given|family|sur|complete|official|"
-    r"printed|typed|registered|signatory|signing|whole|entire|completo|completa|legal|oficial) )*"
+    r"printed|typed|registered|signatory|signing|whole|entire|completo|completa|oficial) )*"
     r"(?:name|names|nombre|apellidos?|nombre y apellidos?)(?: (?:completo|completa|legal|oficial|real|y apellidos?))?"
     r"(?: (?:here|below|above|aqui|abajo))?$")
 

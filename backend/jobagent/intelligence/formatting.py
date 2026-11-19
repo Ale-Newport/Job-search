@@ -55,6 +55,55 @@ NAMED_DATES = {"%d/%m/%Y": "DD/MM/YYYY", "%m/%d/%Y": "MM/DD/YYYY", "%Y-%m-%d": "
 _DATE_PARTS = {"%d": r"(?:0[1-9]|[12]\d|3[01])", "%m": r"(?:0[1-9]|1[0-2])", "%Y": r"\d{4}", "%y": r"\d{2}"}
 
 
+_REPEATS = {"MAX_REPEAT", "MIN_REPEAT", "POSSESSIVE_REPEAT"}
+
+
+@lru_cache(maxsize=256)
+def page_pattern(pattern: str):
+    """The compiled HTML ``pattern`` of an employer's field, or None when Meridian will not run it. The page chooses this
+    regex, so a hostile one must not be able to stall the service: refuse long patterns, backreferences and a repeat
+    that contains another repeat or an alternation (the shapes that backtrack exponentially). An unsupported pattern
+    only means the answer's format is not checked against it."""
+    import re._parser as parser
+
+    if not isinstance(pattern, str) or len(pattern) > 256:
+        return None
+    try:
+        compiled = re.compile(pattern)
+        tree = parser.parse(pattern)
+    except (re.error, RecursionError, OverflowError):
+        return None
+
+    def risky(items, inside_repeat: bool) -> bool:
+        for op, arg in items:
+            name = str(op)
+            if name in {"GROUPREF", "GROUPREF_EXISTS"}:
+                return True
+            if name in _REPEATS:
+                low, high, sub = arg
+                repeats = high is None or high > 1 or str(high) == "MAXREPEAT"
+                if inside_repeat and repeats:
+                    return True
+                if risky(sub, inside_repeat or repeats):
+                    return True
+            elif name == "BRANCH":
+                if inside_repeat:
+                    return True
+                if any(risky(branch, inside_repeat) for branch in arg[1]):
+                    return True
+            elif name == "SUBPATTERN":
+                if risky(arg[-1], inside_repeat):
+                    return True
+            elif name in {"ASSERT", "ASSERT_NOT"}:
+                if risky(arg[1], inside_repeat):
+                    return True
+            elif name == "ATOMIC_GROUP":
+                if risky(arg, inside_repeat):
+                    return True
+        return False
+
+    return None if risky(list(tree), False) else compiled
+
 def written_date_pattern(strftime_format: str) -> str:
     """The text a ``DATE:<strftime>`` contract allows (zero-padded numbers, the separators as written)."""
     return "".join(_DATE_PARTS.get(part, re.escape(part)) for part in re.split(r"(%[dmYy])", strftime_format) if part)
@@ -221,11 +270,11 @@ class AnswerFormatResolver:
             except ValueError:
                 return "ANSWER_FORMAT_ERROR"
         if field.get("pattern") and contract not in {"SINGLE_CHOICE", "MULTIPLE_CHOICE"}:
-            try:
-                if not re.fullmatch(field["pattern"], text):
-                    return "ANSWER_FORMAT_ERROR"
-            except re.error:
+            compiled = page_pattern(field["pattern"])
+            if compiled is None:
                 return "UNSUPPORTED_FIELD_PATTERN"
+            if not compiled.fullmatch(text):
+                return "ANSWER_FORMAT_ERROR"
         if contract in {"INTEGER", "DECIMAL", "PERCENTAGE_NUMBER", "PERCENTAGE"}:
             try:
                 number = Decimal(text.rstrip("%"))
@@ -361,7 +410,7 @@ def choice(value, options, *, question="", disclosure_concept=None):
     # A displayed institutional acronym is decoration, not a different entity.
     if len(norm) > 3:
         matches = [o for o in labels if normalize(re.sub(
-            r"\s*(?:\([A-Z][A-Z0-9&]{1,9}\)|[-–—:]\s*[A-Z][A-Z0-9&]{1,9})\s*$", "", re.sub(
+            r"(?<!\s)\s*(?:\([A-Z][A-Z0-9&]{1,9}\)|[-–—:]\s*[A-Z][A-Z0-9&]{1,9})\s*$", "", re.sub(
                 r"^\s*[A-Z][A-Z0-9&]{1,9}\s*[-–—:]\s*", "", o["label"]
             ))) == norm]
         if len(matches) == 1:

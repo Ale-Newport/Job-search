@@ -48,7 +48,7 @@ def confirmed_visa_route_options(route, options):
         )
         if not match:
             continue
-        alternatives = [normalize(part) for part in re.split(r"\s*/\s*|\s+or\s+", match[1], flags=re.I)]
+        alternatives = [normalize(part) for part in re.split(r"(?:(?<!\s)\s+)?/\s*|(?<!\s)\s+or\s+", match[1], flags=re.I)]
         if route_name in alternatives:
             supported.append((len(alternatives), label))
     # Prefer the exact route over a broader union, but never arbitrarily choose
@@ -161,7 +161,7 @@ INSTRUCTION_IN_LABEL = re.compile(
     r".{0,40}\b(?:previous|above|prior|earlier|preceding|former|all|any)\b"
     r".{0,30}\b(?:instructions?|prompts?|rules?|guidelines?|directions?)\b"
     r"|\b(?:ignora|ignorar|olvida|olvidar|omite|descarta|desatiende|anula)\b.{0,40}\b(?:instrucciones|indicaciones|reglas|directrices|ordenes)\b"
-    r"|(?:^|[.:;(\[])\s*(?:system|assistant)\s*(?:prompt|message)?\s*:|\bsystem prompt\s*:|\bdeveloper (?:message|prompt)\s*:"
+    r"|(?:^|[.:;(\[])\s*(?:system|assistant)\s*(?:(?:prompt|message)\s*)?:|\bsystem prompt\s*:|\bdeveloper (?:message|prompt)\s*:"
     r"|\byou are now (?:in |an? |the )?(?:admin|developer|debug|god|root|unrestricted|jailbr\w+|dan)\b"
     r"|\b(?:enter|enable|activate|switch (?:to|into)|now in) (?:admin|developer|debug|god|root|jailbreak|dan) mode\b"
     r"|\bnew instructions?\s*[:=\-\u2013]|<\s*/?\s*(?:system|assistant|developer)\s*>"
@@ -557,7 +557,7 @@ class CandidateEngine:
             and not field.get("options")
             and field.get("type") not in {"number", "date", "month", "checkbox", "radio"}
         ):
-            parts = re.split(r"\s+(?:and also|and|;)\s+", question, flags=re.I)
+            parts = re.split(r"(?<!\s)\s+(?:and also|and|;)\s+", question, flags=re.I)
             parsed = [interpret(part, field) for part in parts]
             signatures = {(p["intent"], p["attribute"], p["selector"]) for p in parsed}
             cohesive_narrative = s["intent"] in NARRATIVE_INTENTS and all(

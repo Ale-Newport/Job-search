@@ -74,13 +74,13 @@ def requirements(question, field=None):
     match = re.search(r'(?:up to|maximum|max\.?|no more than|at most|m[aá]ximo(?: de)?|como m[aá]ximo|como mucho|hasta|no m[aá]s de|un m[aá]ximo de)\s*(\d+)\s*(?:words?|palabras?)', text, re.I)
     if match:
         result['max_words'] = int(match[1])
-    match = re.search(r'(\d+)\s*[- ]?\s*(?:words?|palabras?)\s*(?:limit|maximum|max\b|m[aá]ximo|como m[aá]ximo|de l[ií]mite)', text, re.I)
+    match = re.search(r'(?<!\d)(\d+)\s*(?:-\s*)?(?:words?|palabras?)\s*(?:limit|maximum|max\b|m[aá]ximo|como m[aá]ximo|de l[ií]mite)', text, re.I)
     if match:
         result['max_words'] = int(match[1])
     match = re.search(r'\b(?:exactly|exactamente)\s*(\d+)\s*(?:words?|palabras?)\b', text, re.I)
     if match:
         result.update(min_words=int(match[1]), max_words=int(match[1]), target_words=int(match[1]))
-    match = re.search(r'(\d+)\s*[-–]\s*(\d+)\s*(?:words?|palabras?)|\bentre\s*(\d+)\s*y\s*(\d+)\s*palabras?', text, re.I)
+    match = re.search(r'(?<!\d)(\d+)\s*[-–]\s*(\d+)\s*(?:words?|palabras?)|\bentre\s*(\d+)\s*y\s*(\d+)\s*palabras?', text, re.I)
     if match:
         low, high = (match[1], match[2]) if match[1] else (match[3], match[4])
         result.update(min_words=int(low), max_words=int(high))

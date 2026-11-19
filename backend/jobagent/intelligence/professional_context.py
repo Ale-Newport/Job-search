@@ -14,7 +14,7 @@ PRIVATE_CONCEPTS = {
     'visa', 'sponsorship', 'work_authorization', 'right_to_work', 'consent', 'gdpr',
     'criminal_history', 'security_clearance', 'salary', 'salary_expectations',
 }
-EMAIL = re.compile(r'[\w.+-]+@[\w.-]+\.[a-z]{2,}', re.I)
+EMAIL = re.compile(r'(?<![\w.+-])[\w.+-]+@[\w.-]+\.[a-z]{2,}', re.I)  # used as a yes/no search: start only at the run's start
 PHONE = re.compile(r'(?:\+?\d[\d ()-]{7,}\d)')
 PERSONAL_LABEL = re.compile(
     r'(?:^|[\n;|.!?])\s*(?:name|full name|first name|last name|address|postal address|postcode|'

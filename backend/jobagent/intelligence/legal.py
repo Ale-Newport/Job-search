@@ -50,7 +50,7 @@ FACET_PATTERNS = {
 FACETS = re.compile("|".join(r"\b(?:" + pattern + r")\b" for pattern in
                              (SPONSORSHIP_FREE.pattern, *FACET_PATTERNS.values())))
 # The words 'Yes' / 'No' of a choice hint are no negation: 'Select Yes / No', 'Sí/No'.
-CHOICE_HINT = re.compile(r"\(?\s*\b(?:select |choose |pick |answer |elige |selecciona )?(?:yes|s[i\u00ed])\s*(?:/|or|o)?\s*no\b\s*\)?", re.I)
+CHOICE_HINT = re.compile(r"(?:\(\s*|(?<!\s)\s+)?\b(?:select |choose |pick |answer |elige |selecciona )?(?:yes|s[i\u00ed])\s*(?:(?:/|or|o)\s*)?no\b\s*\)?", re.I)
 OPTION_PREFIX = re.compile(r"^\s*(?:yes|no|si|sí)\s*[,.:;–—-]\s*(?=\S)", re.I)
 
 NEGATOR = re.compile(

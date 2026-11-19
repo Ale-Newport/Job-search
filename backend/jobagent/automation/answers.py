@@ -152,7 +152,7 @@ def _canonical_key(label: str) -> str | None:
     # spaces (a hostile label of 20,000 of them held the whole process for half a minute).
     from ..intelligence.plain import label_core  # (lazy: the intelligence package imports this module)
     label = " ".join(label_core(label[:4000]).split())  # a non-string is still a TypeError, as it always was
-    norm = normalize(re.sub(r"(?:\s+\(?(?:required|optional)\)?|\((?:required|optional)\))\s*$", "", label, flags=re.I))
+    norm = normalize(re.sub(r"(?:(?<!\s)\s+\(?(?:required|optional)\)?|\((?:required|optional)\))\s*$", "", label, flags=re.I))
     for key, aliases in ALIASES.items():
         if norm == normalize(key) or norm in aliases:
             return key
@@ -309,7 +309,7 @@ def option_for(answer: str, options: list[dict], *, question: str = "") -> dict 
             if len(matches) == 1:
                 return matches[0]
         city_text = answer.split(',', 1)[0]
-        city_text = re.sub(r'\s*(?:\([^)]*\)|\b(?:UK|GB|United Kingdom|Great Britain))\s*$', '', city_text, flags=re.I)
+        city_text = re.sub(r'(?<!\s)\s*(?:\([^)]*\)|\b(?:UK|GB|United Kingdom|Great Britain))\s*$', '', city_text, flags=re.I)
         city = normalize(city_text)
         country = next((aliases.get(normalize(p), normalize(p)) for p in answer.split(',')[1:]
                         if normalize(p) in {'uk', 'gb', 'u k', 'united kingdom', 'great britain'}), None)

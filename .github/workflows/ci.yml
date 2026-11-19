@@ -61,6 +61,10 @@ jobs:
           .venv/bin/pip install -r requirements.lock
           .venv/bin/pip install --no-deps -e .
           .venv/bin/python -m playwright install --with-deps chromium
+      # Meridian launches Chrome with its sandbox on (chromium_sandbox=True). Ubuntu 24.04 restricts the unprivileged user
+      # namespaces that sandbox needs; lift that restriction on the runner instead of turning the sandbox off.
+      - name: Allow the Chrome sandbox on the runner
+        run: sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
       # Some bridge tests compare against the genuine extension bundle in extension/dist, as `make extension` builds it.
       - name: Build the browser extension
         run: |

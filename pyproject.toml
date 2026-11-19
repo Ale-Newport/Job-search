@@ -10,7 +10,7 @@ requires-python = ">=3.12,<3.15"
 dependencies = [
   "fastapi>=0.115,<1", "uvicorn>=0.34,<1", "pydantic>=2.10,<3", "httpx>=0.28,<1",
   "beautifulsoup4>=4.13,<5", "pypdf>=5,<7", "python-docx>=1.1,<2", "reportlab>=4.3,<5",
-  "alembic>=1.15,<2", "sqlalchemy>=2.0,<3", "keyring>=25,<27", "cryptography>=44,<49",
+  "alembic>=1.15,<2", "sqlalchemy>=2.0,<3", "keyring>=25,<27", "cryptography>=44,<51",
   "python-multipart>=0.0.20,<1", "playwright>=1.51,<2", "python-dateutil>=2.9,<3",
 ]
 [project.optional-dependencies]

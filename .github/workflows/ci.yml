@@ -128,7 +128,7 @@ jobs:
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with: { node-version: "${{ env.NODE_VERSION }}" }
       - name: pip-audit (requirements.lock)
-        run: pip install pip-audit && pip-audit --strict --disable-pip -r requirements.lock
+        run: pip install pip-audit && pip-audit --strict --no-deps --disable-pip -r requirements.lock
       - name: npm audit (production and development dependencies)
         run: |
           for dir in . frontend extension; do

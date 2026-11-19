@@ -13,5 +13,8 @@
     "test:extension": "npm --prefix extension test",
     "lint": "npm --prefix frontend run lint"
   },
-  "devDependencies": {"@tauri-apps/cli": "^2.12.5"}
+  "devDependencies": {"@tauri-apps/cli": "^2.12.5"},
+  "engines": {
+    "node": ">=22"
+  }
 }

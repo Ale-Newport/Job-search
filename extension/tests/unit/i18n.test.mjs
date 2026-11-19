@@ -221,7 +221,8 @@ test("CPL-18/UX-02: the desktop app's 'How it works' lists the chords the conten
   // what the desktop app says: each language's rows of the howTo block, key label (spaces removed) -> sentence
   const blocks = copy.split("howTo: {").slice(1).map((block) => block.slice(0, block.indexOf("more:")));
   assert.equal(blocks.length, 2, "an English and a Spanish block");
-  const rows = (block) => new Map([...block.matchAll(/\["((?:[^"\\]|\\.)+)", "((?:[^"\\]|\\.)+)"\]/g)].map((row) => [row[1].replace(/\s+/g, ""), row[2]]));
+  // a row is ["key", "sentence"] on one line or, as Prettier wraps long rows, over several lines with a trailing comma
+  const rows = (block) => new Map([...block.matchAll(/\[\s*"((?:[^"\\]|\\.)+)",\s*"((?:[^"\\]|\\.)+)",?\s*\]/g)].map((row) => [row[1].replace(/\s+/g, ""), row[2]]));
   for (const [lang, block] of [["en", blocks[0]], ["es", blocks[1]]]) {
     const keys = rows(block);
     for (const wanted of [`${alt}Z`, `${alt}R`, `${alt}${shift}M`, `${alt}${shift}Z`, start[1]]) {

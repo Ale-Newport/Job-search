@@ -75,6 +75,7 @@ release-gate: lint typecheck test test-ui-suite
 lint:
 	.venv/bin/ruff check --no-fix backend scripts extension/tests extension/scripts
 	npm --prefix frontend run lint
+	npm --prefix frontend run format:check
 	cargo fmt --manifest-path src-tauri/Cargo.toml -- --check
 typecheck:
 	@test -x extension/node_modules/.bin/tsc || { echo "Extension dependencies are not installed: run make setup (or npm --prefix extension ci)." >&2; exit 1; }

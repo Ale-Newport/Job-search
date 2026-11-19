@@ -174,7 +174,8 @@ export type ExtensionOverallState =
   | "detected" // an UNPAIRED extension contacted the bridge in the last ~15 min
   | "not_installed"; // nothing has contacted the bridge
 /** Per-browser row state. A pending pairing is expressed by pending_pairing.browser. */
-export type ExtensionBrowserState = "not_installed" | "detected" | "connected" | "outdated";
+export type ExtensionBrowserState =
+  "not_installed" | "detected" | "connected" | "outdated";
 
 export interface ExtensionBridge {
   state: "listening" | "port_in_use" | "stopped" | "error";
@@ -281,7 +282,8 @@ export type ExtensionPatch = Partial<ExtensionSettings>;
  *  `update: true` only prepares and opens the page); the others are its steps, for the buttons that repeat one of them.
  *  prepare: copy bundled files to the stable folder and return its path; reveal: `open -R`; open_browser_page: chrome://extensions
  *  in Chrome or launch Safari; copy_path: pbcopy. */
-export type ExtensionInstallAction = "prepare" | "reveal" | "open_browser_page" | "copy_path" | "install";
+export type ExtensionInstallAction =
+  "prepare" | "reveal" | "open_browser_page" | "copy_path" | "install";
 export interface ExtensionInstallRequest {
   action: ExtensionInstallAction;
   /** Only with action "install": refresh the folder and open the browser's page, nothing else. */
@@ -321,7 +323,14 @@ export interface ExtensionActivityItem {
   created_at: string;
   message: string;
   origin: "assistant";
-  kind: "paired" | "revoked" | "page_assisted" | "inserted" | "draft_ready" | "skipped_sensitive" | "blocked";
+  kind:
+    | "paired"
+    | "revoked"
+    | "page_assisted"
+    | "inserted"
+    | "draft_ready"
+    | "skipped_sensitive"
+    | "blocked";
   browser: ExtensionBrowser;
   host: string | null;
   company: string | null;

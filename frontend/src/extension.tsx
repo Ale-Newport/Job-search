@@ -23,7 +23,15 @@ import {
   X,
 } from "lucide-react";
 import { api, useResource } from "./api";
-import { Button, Confirm, Empty, IconButton, Panel, Resource, Tag } from "./components";
+import {
+  Button,
+  Confirm,
+  Empty,
+  IconButton,
+  Panel,
+  Resource,
+  Tag,
+} from "./components";
 import { COPY, EXTENSION_PORTS, GUIDE_ES } from "./extension-copy";
 import type { StateVars } from "./extension-copy";
 import {
@@ -71,7 +79,8 @@ const TONE: Record<ExtensionOverallState, "green" | "amber" | "neutral"> = {
   not_installed: "neutral",
 };
 const ACTIVITY_TITLE = "Recent assistant activity";
-const ACTIVITY_HINT = "What the assistant did in your browser. Answer text is never stored here.";
+const ACTIVITY_HINT =
+  "What the assistant did in your browser. Answer text is never stored here.";
 // Meridian only hears from an extension that is running: "not detected" is the honest word, not "not installed".
 const BROWSER_TAG = {
   not_installed: ["Not detected", "neutral"],
@@ -88,9 +97,14 @@ function involved(s: ExtensionStatus): string {
     detected: "detected",
     outdated: "outdated",
   };
-  if (s.state === "pairing" && s.pending_pairing) return browserName(s.pending_pairing.browser);
-  const list = (["chrome", "safari"] as const).filter((b) => s.browsers[b].state === wanted[s.state]);
-  return (list.length ? list : (["chrome"] as const)).map(browserName).join(" and ");
+  if (s.state === "pairing" && s.pending_pairing)
+    return browserName(s.pending_pairing.browser);
+  const list = (["chrome", "safari"] as const).filter(
+    (b) => s.browsers[b].state === wanted[s.state],
+  );
+  return (list.length ? list : (["chrome"] as const))
+    .map(browserName)
+    .join(" and ");
 }
 function varsFor(s: ExtensionStatus): StateVars {
   const old = s.clients.find((c) => c.outdated);
@@ -106,7 +120,13 @@ function varsFor(s: ExtensionStatus): StateVars {
 }
 
 /** Settings > Browser assistant. `feed` is the one status poller owned by the app shell. */
-export function ExtensionPanel({ ctx, feed }: { ctx: AppContext; feed: ExtensionFeed }) {
+export function ExtensionPanel({
+  ctx,
+  feed,
+}: {
+  ctx: AppContext;
+  feed: ExtensionFeed;
+}) {
   return (
     <ExtensionFeedContext value={feed}>
       <PanelBody ctx={ctx} />
@@ -120,7 +140,9 @@ function PanelBody({ ctx }: { ctx: AppContext }) {
   const [remove, setRemove] = useState<ExtensionClient | null>(null);
   // Deep links (banner, setup guide, Today callout) land here with target "extension": put keyboard focus on the
   // request instead of the top of the page. Decided once, so a request that arrives later never steals focus.
-  const [landOnRequest] = useState(() => ctx.target === "extension" && !!s?.pending_pairing);
+  const [landOnRequest] = useState(
+    () => ctx.target === "extension" && !!s?.pending_pairing,
+  );
   const headline = useRef<HTMLHeadingElement>(null);
   useEffect(() => {
     document.body.classList.add("ext-panel-open");
@@ -134,7 +156,11 @@ function PanelBody({ ctx }: { ctx: AppContext }) {
 
   return (
     <>
-      <Resource loading={feed.loading && !s} error={s ? "" : feed.error} retry={feed.reload}>
+      <Resource
+        loading={feed.loading && !s}
+        error={s ? "" : feed.error}
+        retry={feed.reload}
+      >
         {s && copy && (
           <>
             <div
@@ -180,7 +206,11 @@ function PanelBody({ ctx }: { ctx: AppContext }) {
               <>
                 <ClientsCard s={s} onRemove={setRemove} />
                 <HowItWorks />
-                <ActivityCard ctx={ctx} title={ACTIVITY_TITLE} description={ACTIVITY_HINT} />
+                <ActivityCard
+                  ctx={ctx}
+                  title={ACTIVITY_TITLE}
+                  description={ACTIVITY_HINT}
+                />
                 <SettingsCard s={s} ctx={ctx} />
                 <DraftsCard s={s} ctx={ctx} />
                 <BrowsersGrid s={s} ctx={ctx} />
@@ -197,7 +227,11 @@ function PanelBody({ ctx }: { ctx: AppContext }) {
             )}
             <PrivacyCard />
             {!connected && s.clients.length > 0 && (
-              <ActivityCard ctx={ctx} title={ACTIVITY_TITLE} description={ACTIVITY_HINT} />
+              <ActivityCard
+                ctx={ctx}
+                title={ACTIVITY_TITLE}
+                description={ACTIVITY_HINT}
+              />
             )}
             <SpanishGuide s={s} />
           </>
@@ -212,7 +246,11 @@ function PanelBody({ ctx }: { ctx: AppContext }) {
           onClose={() => setRemove(null)}
           onConfirm={async () => {
             await api(`/extension/clients/${remove.id}`, "DELETE");
-            await ctx.act("extension-refresh", () => Promise.resolve({}), `${remove.label} disconnected.`);
+            await ctx.act(
+              "extension-refresh",
+              () => Promise.resolve({}),
+              `${remove.label} disconnected.`,
+            );
             // The dialog hands focus back to the (now removed) Disconnect button when it closes: take it after that.
             window.setTimeout(focusHeadline, 80);
           }}
@@ -223,9 +261,12 @@ function PanelBody({ ctx }: { ctx: AppContext }) {
 }
 
 async function restart(ctx: AppContext) {
-  const res = await ctx.act("extension-retry", () => api<ExtensionStatus>("/extension/bridge/restart", "POST", {}));
+  const res = await ctx.act("extension-retry", () =>
+    api<ExtensionStatus>("/extension/bridge/restart", "POST", {}),
+  );
   if (!res) return;
-  if (res.bridge && res.bridge.state !== "listening") ctx.toast(en.bridge.still, true);
+  if (res.bridge && res.bridge.state !== "listening")
+    ctx.toast(en.bridge.still, true);
   else ctx.toast(en.bridge.restored);
 }
 
@@ -239,7 +280,10 @@ function HeroActions({ s, ctx }: { s: ExtensionStatus; ctx: AppContext }) {
           onClick={() =>
             ctx.act(
               "extension-enable",
-              () => api("/extension/settings", "PATCH", { enabled: true } satisfies ExtensionPatch),
+              () =>
+                api("/extension/settings", "PATCH", {
+                  enabled: true,
+                } satisfies ExtensionPatch),
               "Browser assistant turned on.",
             )
           }
@@ -252,9 +296,14 @@ function HeroActions({ s, ctx }: { s: ExtensionStatus; ctx: AppContext }) {
   if (s.state === "bridge_error") {
     return (
       <>
-        {s.bridge.state !== "port_in_use" && s.bridge.message && <p className="ext-detail">{s.bridge.message}</p>}
+        {s.bridge.state !== "port_in_use" && s.bridge.message && (
+          <p className="ext-detail">{s.bridge.message}</p>
+        )}
         <div className="actions ext-hero-actions">
-          <Button loading={ctx.busy === "extension-retry"} onClick={() => restart(ctx)}>
+          <Button
+            loading={ctx.busy === "extension-retry"}
+            onClick={() => restart(ctx)}
+          >
             {en.bridge.retry}
           </Button>
         </div>
@@ -266,7 +315,11 @@ function HeroActions({ s, ctx }: { s: ExtensionStatus; ctx: AppContext }) {
       <>
         {s.bridge.message && <p className="ext-detail">{s.bridge.message}</p>}
         <div className="actions ext-hero-actions">
-          <Button secondary loading={ctx.busy === "extension-retry"} onClick={() => restart(ctx)}>
+          <Button
+            secondary
+            loading={ctx.busy === "extension-retry"}
+            onClick={() => restart(ctx)}
+          >
             {en.bridge.start}
           </Button>
         </div>
@@ -330,7 +383,8 @@ function PairingCard({
           <p>{en.pairing.dialog}</p>
           {p.recognized === false && (
             <p className="ext-warning">
-              <ShieldAlert size={15} aria-hidden="true" /> <span>{en.pairing.unrecognised}</span>
+              <ShieldAlert size={15} aria-hidden="true" />{" "}
+              <span>{en.pairing.unrecognised}</span>
             </p>
           )}
         </div>
@@ -338,17 +392,31 @@ function PairingCard({
           <code className="ext-code" aria-hidden="true">
             {formatCode(p.code)}
           </code>
-          <small aria-hidden="true">{expired ? en.pairing.expired : en.pairing.expiresIn(clock(left))}</small>
+          <small aria-hidden="true">
+            {expired ? en.pairing.expired : en.pairing.expiresIn(clock(left))}
+          </small>
           <small className="visually-hidden">
-            Expires at {new Date(p.expires_at).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}
+            Expires at{" "}
+            {new Date(p.expires_at).toLocaleTimeString("en-GB", {
+              hour: "2-digit",
+              minute: "2-digit",
+            })}
           </small>
         </div>
       </div>
       <div className="panel-actions">
-        <Button disabled={expired} loading={ctx.busy === "extension-approve"} onClick={() => decide("approve")}>
+        <Button
+          disabled={expired}
+          loading={ctx.busy === "extension-approve"}
+          onClick={() => decide("approve")}
+        >
           <Check size={15} /> {en.approve}
         </Button>
-        <Button secondary loading={ctx.busy === "extension-deny"} onClick={() => decide("deny")}>
+        <Button
+          secondary
+          loading={ctx.busy === "extension-deny"}
+          onClick={() => decide("deny")}
+        >
           {en.deny}
         </Button>
       </div>
@@ -368,7 +436,11 @@ function StepList({ steps }: { steps: Step[] }) {
   return (
     <ol className="ext-steps">
       {steps.map((step, i) => (
-        <li key={step.text} data-done={step.done} aria-current={i === current ? "step" : undefined}>
+        <li
+          key={step.text}
+          data-done={step.done}
+          aria-current={i === current ? "step" : undefined}
+        >
           <span className="ext-step-mark" aria-hidden="true">
             {step.done ? <Check size={13} /> : i + 1}
           </span>
@@ -376,7 +448,9 @@ function StepList({ steps }: { steps: Step[] }) {
             {step.done && <span className="visually-hidden">Done: </span>}
             {step.text}
           </span>
-          {step.actions ? <div className="ext-step-actions">{step.actions}</div> : null}
+          {step.actions ? (
+            <div className="ext-step-actions">{step.actions}</div>
+          ) : null}
         </li>
       ))}
     </ol>
@@ -419,15 +493,21 @@ function BrowserCard({
   const [prepared, setPrepared] = useState<string | null>(null);
   const path = info.extension_path ?? prepared;
 
-  async function run(action: ExtensionInstallAction, quiet = false): Promise<ExtensionInstallResult | null> {
+  async function run(
+    action: ExtensionInstallAction,
+    quiet = false,
+  ): Promise<ExtensionInstallResult | null> {
     setBusy(action);
     feed.watch();
     try {
       const res = await ctx.act(`extension-${browser}-${action}`, () =>
-        api<ExtensionInstallResult>(`/extension/install/${browser}`, "POST", { action }),
+        api<ExtensionInstallResult>(`/extension/install/${browser}`, "POST", {
+          action,
+        }),
       );
       if (res?.path) setPrepared(res.path);
-      if (res && !quiet && res.message) ctx.toast(res.message, res.ok === false);
+      if (res && !quiet && res.message)
+        ctx.toast(res.message, res.ok === false);
       return res;
     } finally {
       setBusy(null);
@@ -437,7 +517,9 @@ function BrowserCard({
   async function putPathOnClipboard(target: string): Promise<void> {
     try {
       await navigator.clipboard.writeText(target);
-      ctx.toast("Folder path copied. In Chrome's file picker press ⌘⇧G, paste it and press Return.");
+      ctx.toast(
+        "Folder path copied. In Chrome's file picker press ⌘⇧G, paste it and press Return.",
+      );
     } catch {
       await run("copy_path");
     }
@@ -458,17 +540,31 @@ function BrowserCard({
     setBusy("install");
     feed.watch();
     try {
-      const body: ExtensionInstallRequest = update ? { action: "install", update: true } : { action: "install" };
+      const body: ExtensionInstallRequest = update
+        ? { action: "install", update: true }
+        : { action: "install" };
       // a folder that cannot be prepared answers with an error, which act() already shows
-      const res: ExtensionInstallResult | null = await ctx.act(`extension-${browser}-install`, () =>
-        api<ExtensionInstallResult>(`/extension/install/${browser}`, "POST", body),
+      const res: ExtensionInstallResult | null = await ctx.act(
+        `extension-${browser}-install`,
+        () =>
+          api<ExtensionInstallResult>(
+            `/extension/install/${browser}`,
+            "POST",
+            body,
+          ),
       );
       if (!res) return;
       if (res.path) setPrepared(res.path);
       if (res.ok === false) ctx.toast(res.message, true);
       // Chrome not found (Edge, Brave and other Chromium browsers load the same folder): everything else still worked
-      else if (res.steps?.some((step) => step.action === "open_browser_page" && step.skipped))
-        ctx.toast(update ? en.chrome.updatedNoChrome : en.chrome.installedNoChrome);
+      else if (
+        res.steps?.some(
+          (step) => step.action === "open_browser_page" && step.skipped,
+        )
+      )
+        ctx.toast(
+          update ? en.chrome.updatedNoChrome : en.chrome.installedNoChrome,
+        );
       else ctx.toast(update ? en.chrome.updated : en.chrome.installed);
     } finally {
       setBusy(null);
@@ -494,7 +590,11 @@ function BrowserCard({
       ]
     : [
         // Meridian cannot read Safari's settings: the extension reaching Meridian is the only evidence there is.
-        { text: en.safari.steps[0], done: installed, actions: openPage("Open Safari") },
+        {
+          text: en.safari.steps[0],
+          done: installed,
+          actions: openPage("Open Safari"),
+        },
         { text: en.safari.steps[1], done: connected },
         { text: en.safari.steps[2], done: connected },
       ];
@@ -504,7 +604,11 @@ function BrowserCard({
         { text: en.chrome.update[1], done: false },
       ]
     : [
-        { text: en.safari.update[0], done: false, actions: openPage("Open Safari") },
+        {
+          text: en.safari.update[0],
+          done: false,
+          actions: openPage("Open Safari"),
+        },
         { text: en.safari.update[1], done: false },
       ];
   /** Chrome: the one button first, then what is left to do by hand. Other browsers have no such button. */
@@ -512,21 +616,38 @@ function BrowserCard({
     chrome ? (
       <>
         <div className="ext-install">
-          <Button loading={busy === "install"} onClick={() => installInChrome(update)}>
-            <Chrome size={15} /> {update ? en.chrome.updateButton : en.chrome.install}
+          <Button
+            loading={busy === "install"}
+            onClick={() => installInChrome(update)}
+          >
+            <Chrome size={15} />{" "}
+            {update ? en.chrome.updateButton : en.chrome.install}
           </Button>
-          <p className="ext-detail">{update ? en.chrome.updateIntro : en.chrome.intro}</p>
-          {!info.browser_installed && <p className="ext-note">{en.chrome.noChrome}</p>}
+          <p className="ext-detail">
+            {update ? en.chrome.updateIntro : en.chrome.intro}
+          </p>
+          {!info.browser_installed && (
+            <p className="ext-note">{en.chrome.noChrome}</p>
+          )}
           {path && (
             <div className="ext-install-path">
-              <code className="ext-path" tabIndex={0} aria-label="Extension folder path">
+              <code
+                className="ext-path"
+                tabIndex={0}
+                aria-label="Extension folder path"
+              >
                 {path}
               </code>
               <div className="ext-inline">
                 <Button key="copy" secondary onClick={copyPath}>
                   <Copy size={14} /> {en.chrome.again.copy}
                 </Button>
-                <Button key="reveal" secondary loading={busy === "reveal"} onClick={() => run("reveal")}>
+                <Button
+                  key="reveal"
+                  secondary
+                  loading={busy === "reveal"}
+                  onClick={() => run("reveal")}
+                >
                   <FolderOpen size={14} /> {en.chrome.again.reveal}
                 </Button>
                 {openPage(en.chrome.again.open)}
@@ -542,7 +663,11 @@ function BrowserCard({
 
   let body: ReactNode;
   if (info.bundled === false) {
-    body = <p className="ext-note">{chrome ? en.chrome.missing : en.safari.missing}</p>;
+    body = (
+      <p className="ext-note">
+        {chrome ? en.chrome.missing : en.safari.missing}
+      </p>
+    );
   } else if (outdated) {
     body = (
       <>
@@ -556,7 +681,9 @@ function BrowserCard({
   } else if (connected) {
     body = (
       <details className="ext-more">
-        <summary>{tucked ? "Reinstall or update" : "Show the install steps"}</summary>
+        <summary>
+          {tucked ? "Reinstall or update" : "Show the install steps"}
+        </summary>
         {guide(steps)}
       </details>
     );
@@ -566,8 +693,14 @@ function BrowserCard({
         <div className="ext-found" role="status">
           <Check size={16} aria-hidden="true" />
           <div>
-            <strong>{pendingHere ? "Waiting for your approval" : en.foundTitle(name)}</strong>
-            <p>{pendingHere ? "Approve the connection request above to finish." : en.found(name)}</p>
+            <strong>
+              {pendingHere ? "Waiting for your approval" : en.foundTitle(name)}
+            </strong>
+            <p>
+              {pendingHere
+                ? "Approve the connection request above to finish."
+                : en.found(name)}
+            </p>
           </div>
         </div>
         <details className="ext-more">
@@ -622,12 +755,17 @@ function ConnectionHelp({ s }: { s: ExtensionStatus }) {
   const c = en.help;
   const range = `${EXTENSION_PORTS.first} to ${EXTENSION_PORTS.last}`;
   const port = s.bridge.state === "listening" ? s.bridge.port : null;
-  const outside = port != null && (port < EXTENSION_PORTS.first || port > EXTENSION_PORTS.last);
+  const outside =
+    port != null &&
+    (port < EXTENSION_PORTS.first || port > EXTENSION_PORTS.last);
   return (
     <details className="ext-help" open={outside || undefined}>
       <summary>{c.title}</summary>
       {port != null && (
-        <p className={outside ? "ext-note" : "ext-detail"} role={outside ? "alert" : undefined}>
+        <p
+          className={outside ? "ext-note" : "ext-detail"}
+          role={outside ? "alert" : undefined}
+        >
           {outside ? c.portOutside(port, range) : c.port(port, range)}
         </p>
       )}
@@ -645,27 +783,52 @@ function ConnectionHelp({ s }: { s: ExtensionStatus }) {
 
 // ------------------------------------------------------------------------------------------------ connected browsers
 
-function ClientsCard({ s, onRemove }: { s: ExtensionStatus; onRemove: (client: ExtensionClient) => void }) {
+function ClientsCard({
+  s,
+  onRemove,
+}: {
+  s: ExtensionStatus;
+  onRemove: (client: ExtensionClient) => void;
+}) {
   if (!s.clients.length) return null;
   return (
-    <Panel title="Connected browsers" description="Each connection can be removed at any time.">
+    <Panel
+      title="Connected browsers"
+      description="Each connection can be removed at any time."
+    >
       <div className="simple-list">
         {s.clients.map((c) => (
           <div key={c.id}>
             <span className="list-icon" aria-hidden="true">
-              {c.browser === "chrome" ? <Chrome size={17} /> : <Compass size={17} />}
+              {c.browser === "chrome" ? (
+                <Chrome size={17} />
+              ) : (
+                <Compass size={17} />
+              )}
             </span>
             <div className="grow">
               <strong>{c.label}</strong>
               <small>
-                Version {c.version} · {c.last_seen_at ? `last used ${ago(c.last_seen_at)}` : "not used yet"}
+                Version {c.version} ·{" "}
+                {c.last_seen_at
+                  ? `last used ${ago(c.last_seen_at)}`
+                  : "not used yet"}
                 {c.stats.pages > 0 &&
                   ` · ${plural(c.stats.insertions, "field")} filled on ${plural(c.stats.pages, "page")}`}
               </small>
-              {c.last_error && <small className="error-text">{c.last_error}</small>}
+              {c.last_error && (
+                <small className="error-text">{c.last_error}</small>
+              )}
             </div>
-            {c.outdated ? <Tag tone="amber">Update needed</Tag> : <Tag tone="green">Connected</Tag>}
-            <IconButton title={`Disconnect ${c.label}`} onClick={() => onRemove(c)}>
+            {c.outdated ? (
+              <Tag tone="amber">Update needed</Tag>
+            ) : (
+              <Tag tone="green">Connected</Tag>
+            )}
+            <IconButton
+              title={`Disconnect ${c.label}`}
+              onClick={() => onRemove(c)}
+            >
               <Trash2 size={15} />
             </IconButton>
           </div>
@@ -695,7 +858,8 @@ function HowItWorks() {
 
 // ------------------------------------------------------------------------------------------------ settings
 
-const sameValue = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
+const sameValue = (a: unknown, b: unknown) =>
+  JSON.stringify(a) === JSON.stringify(b);
 
 function ToggleRow({
   id,
@@ -740,18 +904,25 @@ function SettingsCard({ s, ctx }: { s: ExtensionStatus; ctx: AppContext }) {
     setPending((p) => {
       const next: Record<string, unknown> = { ...p };
       for (const key of Object.keys(p)) {
-        if (settled.current.has(key) || sameValue(next[key], set[key as keyof ExtensionSettings])) {
+        if (
+          settled.current.has(key) ||
+          sameValue(next[key], set[key as keyof ExtensionSettings])
+        ) {
           delete next[key];
           settled.current.delete(key);
         }
       }
-      return Object.keys(next).length === Object.keys(p).length ? p : (next as ExtensionPatch);
+      return Object.keys(next).length === Object.keys(p).length
+        ? p
+        : (next as ExtensionPatch);
     });
   }, [set]);
   async function patch(change: ExtensionPatch) {
     const keys = Object.keys(change);
     setPending((p) => ({ ...p, ...change }));
-    const ok = await ctx.act("extension-settings", () => api("/extension/settings", "PATCH", change));
+    const ok = await ctx.act("extension-settings", () =>
+      api("/extension/settings", "PATCH", change),
+    );
     if (ok) keys.forEach((key) => settled.current.add(key));
     else
       setPending((p) => {
@@ -763,17 +934,40 @@ function SettingsCard({ s, ctx }: { s: ExtensionStatus; ctx: AppContext }) {
   const locked = ctx.busy === "extension-settings";
   return (
     <>
-      <Panel title="Assistant settings" description="Changes apply to every connected browser straight away.">
-        <ToggleRow id="enabled" copy={c.enabled} checked={view.enabled} disabled={locked} onChange={(v) => patch({ enabled: v })} />
+      <Panel
+        title="Assistant settings"
+        description="Changes apply to every connected browser straight away."
+      >
+        <ToggleRow
+          id="enabled"
+          copy={c.enabled}
+          checked={view.enabled}
+          disabled={locked}
+          onChange={(v) => patch({ enabled: v })}
+        />
         <SettingsGroup title={c.groups.form} />
-        <ToggleRow id="auto_advance" copy={c.autoAdvance} checked={view.auto_advance} disabled={locked} onChange={(v) => patch({ auto_advance: v })} />
-        <ToggleRow id="skip_filled" copy={c.skipFilled} checked={view.skip_filled} disabled={locked} onChange={(v) => patch({ skip_filled: v })} />
+        <ToggleRow
+          id="auto_advance"
+          copy={c.autoAdvance}
+          checked={view.auto_advance}
+          disabled={locked}
+          onChange={(v) => patch({ auto_advance: v })}
+        />
+        <ToggleRow
+          id="skip_filled"
+          copy={c.skipFilled}
+          checked={view.skip_filled}
+          disabled={locked}
+          onChange={(v) => patch({ skip_filled: v })}
+        />
         <ToggleRow
           id="tab_inserts_protected"
           copy={c.tabProtected}
           checked={view.tab_inserts_protected}
           disabled={locked}
-          onChange={(v) => (v ? setConfirmTab(true) : patch({ tab_inserts_protected: false }))}
+          onChange={(v) =>
+            v ? setConfirmTab(true) : patch({ tab_inserts_protected: false })
+          }
         />
         <div className="settings-row">
           <div>
@@ -785,7 +979,11 @@ function SettingsCard({ s, ctx }: { s: ExtensionStatus; ctx: AppContext }) {
             aria-describedby="ext-save_corrections-hint"
             value={view.save_corrections}
             disabled={locked}
-            onChange={(e) => patch({ save_corrections: e.target.value as ExtensionSaveCorrections })}
+            onChange={(e) =>
+              patch({
+                save_corrections: e.target.value as ExtensionSaveCorrections,
+              })
+            }
           >
             {(["ask", "always", "never"] as const).map((v) => (
               <option key={v} value={v}>
@@ -795,13 +993,47 @@ function SettingsCard({ s, ctx }: { s: ExtensionStatus; ctx: AppContext }) {
           </select>
         </div>
         <SettingsGroup title={c.groups.prepare} />
-        <ToggleRow id="background_research" copy={c.research} checked={view.background_research} disabled={locked} onChange={(v) => patch({ background_research: v })} />
-        <ToggleRow id="web_lookup" copy={c.webLookup} checked={view.web_lookup} disabled={locked || !view.background_research} onChange={(v) => patch({ web_lookup: v })} />
-        <ToggleRow id="local_assist" copy={c.localAssist} checked={view.local_assist} disabled={locked} onChange={(v) => patch({ local_assist: v })} />
-        <ToggleRow id="background_drafts" copy={c.drafts} checked={view.background_drafts} disabled={locked} onChange={(v) => patch({ background_drafts: v })} />
-        <CapRow value={view.draft_budget_usd} disabled={locked || !view.background_drafts} onSave={(v) => patch({ draft_budget_usd: v })} />
+        <ToggleRow
+          id="background_research"
+          copy={c.research}
+          checked={view.background_research}
+          disabled={locked}
+          onChange={(v) => patch({ background_research: v })}
+        />
+        <ToggleRow
+          id="web_lookup"
+          copy={c.webLookup}
+          checked={view.web_lookup}
+          disabled={locked || !view.background_research}
+          onChange={(v) => patch({ web_lookup: v })}
+        />
+        <ToggleRow
+          id="local_assist"
+          copy={c.localAssist}
+          checked={view.local_assist}
+          disabled={locked}
+          onChange={(v) => patch({ local_assist: v })}
+        />
+        <ToggleRow
+          id="background_drafts"
+          copy={c.drafts}
+          checked={view.background_drafts}
+          disabled={locked}
+          onChange={(v) => patch({ background_drafts: v })}
+        />
+        <CapRow
+          value={view.draft_budget_usd}
+          disabled={locked || !view.background_drafts}
+          onSave={(v) => patch({ draft_budget_usd: v })}
+        />
         <SettingsGroup title={c.groups.browser} />
-        <ToggleRow id="hint_on_ats" copy={c.hint} checked={view.hint_on_ats} disabled={locked} onChange={(v) => patch({ hint_on_ats: v })} />
+        <ToggleRow
+          id="hint_on_ats"
+          copy={c.hint}
+          checked={view.hint_on_ats}
+          disabled={locked}
+          onChange={(v) => patch({ hint_on_ats: v })}
+        />
         <div className="settings-row">
           <div>
             <strong id="ext-language">{c.language[0]}</strong>
@@ -812,7 +1044,9 @@ function SettingsCard({ s, ctx }: { s: ExtensionStatus; ctx: AppContext }) {
             aria-describedby="ext-language-hint"
             value={view.language}
             disabled={locked}
-            onChange={(e) => patch({ language: e.target.value as ExtensionLanguage })}
+            onChange={(e) =>
+              patch({ language: e.target.value as ExtensionLanguage })
+            }
           >
             {(["auto", "en", "es"] as const).map((v) => (
               <option key={v} value={v}>
@@ -821,7 +1055,11 @@ function SettingsCard({ s, ctx }: { s: ExtensionStatus; ctx: AppContext }) {
             ))}
           </select>
         </div>
-        <SitesRow sites={view.always_on_sites} disabled={locked} onChange={(sites) => patch({ always_on_sites: sites })} />
+        <SitesRow
+          sites={view.always_on_sites}
+          disabled={locked}
+          onChange={(sites) => patch({ always_on_sites: sites })}
+        />
       </Panel>
       {confirmTab && (
         <Confirm
@@ -857,7 +1095,9 @@ function CapRow({
   const parsed = trimmed === "" ? null : Number(trimmed);
   // Whole cents: the server stores the cap rounded to 2 decimals.
   const next = parsed === null ? null : Math.round(parsed * 100) / 100;
-  const invalid = parsed !== null && (!Number.isFinite(parsed) || !next || next <= 0 || parsed > 1000);
+  const invalid =
+    parsed !== null &&
+    (!Number.isFinite(parsed) || !next || next <= 0 || parsed > 1000);
   const dirty = !invalid && next !== value;
   function submit(e: FormEvent) {
     e.preventDefault();
@@ -912,9 +1152,12 @@ function SitesRow({
     e.preventDefault();
     if (!text.trim()) return;
     const host = normalizeHost(text);
-    if (!host) return setProblem("Enter a website address such as careers.example.com.");
-    if (sites.includes(host)) return setProblem(`${host} is already in the list.`);
-    if (sites.length >= MAX_SITES) return setProblem(`You can add up to ${MAX_SITES} sites.`);
+    if (!host)
+      return setProblem("Enter a website address such as careers.example.com.");
+    if (sites.includes(host))
+      return setProblem(`${host} is already in the list.`);
+    if (sites.length >= MAX_SITES)
+      return setProblem(`You can add up to ${MAX_SITES} sites.`);
     setProblem("");
     setText("");
     onChange([...sites, host]);
@@ -925,7 +1168,10 @@ function SitesRow({
         <strong id="ext-always_on_sites">{c[0]}</strong>
         <p id="ext-always_on_sites-hint">{c[1]}</p>
         {sites.length > 0 && (
-          <ul className="ext-sites" aria-label="Sites where the assistant starts automatically">
+          <ul
+            className="ext-sites"
+            aria-label="Sites where the assistant starts automatically"
+          >
             {sites.map((site) => (
               <li key={site}>
                 <span>{site}</span>
@@ -966,7 +1212,11 @@ function SitesRow({
           </Button>
         </form>
         {problem && (
-          <p className="error-text" id="ext-always_on_sites-error" role="status">
+          <p
+            className="error-text"
+            id="ext-always_on_sites-error"
+            role="status"
+          >
             {problem}
           </p>
         )}
@@ -982,7 +1232,10 @@ function DraftsCard({ s, ctx }: { s: ExtensionStatus; ctx: AppContext }) {
   const capped = d.monthly_limit_usd != null && !d.unlimited;
   const reached = capped && d.spent_usd >= (d.monthly_limit_usd ?? Infinity);
   return (
-    <Panel title="Written answers" description="Long, personalised answers use an answer model and your verified profile.">
+    <Panel
+      title="Written answers"
+      description="Long, personalised answers use an answer model and your verified profile."
+    >
       {d.configured ? (
         <div className="ext-drafts">
           <div className="settings-row">
@@ -991,7 +1244,8 @@ function DraftsCard({ s, ctx }: { s: ExtensionStatus; ctx: AppContext }) {
                 {d.provider} · {d.model}
               </strong>
               <p>
-                {money(d.spent_usd)} used in {d.month} across {plural(d.calls, "call")} ·{" "}
+                {money(d.spent_usd)} used in {d.month} across{" "}
+                {plural(d.calls, "call")} ·{" "}
                 {d.unlimited
                   ? "spending is uncapped"
                   : `monthly limit ${d.monthly_limit_usd == null ? "not set" : money(d.monthly_limit_usd)}`}
@@ -1014,7 +1268,10 @@ function DraftsCard({ s, ctx }: { s: ExtensionStatus; ctx: AppContext }) {
               <TriangleAlert size={21} aria-hidden="true" />
               <div>
                 <strong>Monthly AI limit reached.</strong>
-                <p>Short answers such as name, email and education still work. Long drafts resume next month or when you raise the limit.</p>
+                <p>
+                  Short answers such as name, email and education still work.
+                  Long drafts resume next month or when you raise the limit.
+                </p>
               </div>
             </div>
           )}
@@ -1025,8 +1282,9 @@ function DraftsCard({ s, ctx }: { s: ExtensionStatus; ctx: AppContext }) {
           <div>
             <strong>Long answers need an answer model.</strong>
             <p>
-              Short fields such as name, email, education and links work without one. Choose a provider, add its key
-              and test the connection in Settings.
+              Short fields such as name, email, education and links work without
+              one. Choose a provider, add its key and test the connection in
+              Settings.
             </p>
             <Button secondary onClick={() => ctx.navigate("settings", "ai")}>
               Configure answer model
@@ -1077,16 +1335,25 @@ function ActivityCard({
   description: string;
   quiet?: boolean;
 }) {
-  const r = useResource<List<ExtensionActivityItem>>("/extension/activity?limit=10", ctx.refresh);
+  const r = useResource<List<ExtensionActivityItem>>(
+    "/extension/activity?limit=10",
+    ctx.refresh,
+  );
   if (quiet && !r.data && !r.loading) return null; // optional panel elsewhere in the app: never show an error box
   return (
     <Panel title={title} description={description}>
-      <Resource loading={r.loading && !r.data} error={r.data ? "" : r.error} retry={r.reload}>
+      <Resource
+        loading={r.loading && !r.data}
+        error={r.data ? "" : r.error}
+        retry={r.reload}
+      >
         {r.data?.items.length ? (
           <div className="simple-list ext-activity">
             {r.data.items.map((item) => {
               const Icon = KIND_ICON[item.kind] ?? FileText;
-              const where = [item.host, item.company, item.title].filter(Boolean).join(" · ");
+              const where = [item.host, item.company, item.title]
+                .filter(Boolean)
+                .join(" · ");
               return (
                 <div key={item.id}>
                   <span className="list-icon" aria-hidden="true">
@@ -1104,7 +1371,11 @@ function ActivityCard({
             })}
           </div>
         ) : (
-          <Empty icon={<Sparkles size={25} />} title="Nothing yet" description="Pages you assist will appear here." />
+          <Empty
+            icon={<Sparkles size={25} />}
+            title="Nothing yet"
+            description="Pages you assist will appear here."
+          />
         )}
       </Resource>
     </Panel>
@@ -1113,7 +1384,8 @@ function ActivityCard({
 
 /** Recent assistant events on the Activity page (hidden until the assistant has been set up). */
 export function AssistantActivity({ ctx }: { ctx: AppContext }) {
-  if (ctx.assistant === "not_installed" || ctx.assistant === "unknown") return null;
+  if (ctx.assistant === "not_installed" || ctx.assistant === "unknown")
+    return null;
   return (
     <ActivityCard
       ctx={ctx}
@@ -1128,7 +1400,9 @@ export function AssistantActivity({ ctx }: { ctx: AppContext }) {
 
 /** Open the Spanish guide by default for people whose language is Spanish (decided once, never re-applied). */
 const prefersSpanish = (language: string) =>
-  language === "es" || (language === "auto" && (navigator.language || "").toLowerCase().startsWith("es"));
+  language === "es" ||
+  (language === "auto" &&
+    (navigator.language || "").toLowerCase().startsWith("es"));
 
 function SpanishGuide({ s }: { s: ExtensionStatus }) {
   const es = COPY.es;
@@ -1157,7 +1431,8 @@ function SpanishGuide({ s }: { s: ExtensionStatus }) {
       </p>
       {s.pending_pairing && (
         <p>
-          <strong>{es.pairing.title}</strong> {es.pairing.compare} {es.pairing.dialog}
+          <strong>{es.pairing.title}</strong> {es.pairing.compare}{" "}
+          {es.pairing.dialog}
         </p>
       )}
       <h4>{es.chrome.title}</h4>
@@ -1177,7 +1452,9 @@ function SpanishGuide({ s }: { s: ExtensionStatus }) {
       <p>{es.safari.applications}</p>
       <p>
         {es.safari.notListed}
-        {s.browsers.safari.needs_unsigned_toggle ? ` ${es.safari.unsigned}` : ""}
+        {s.browsers.safari.needs_unsigned_toggle
+          ? ` ${es.safari.unsigned}`
+          : ""}
       </p>
       <h4>{es.help.title}</h4>
       <ul>
@@ -1220,7 +1497,11 @@ function SpanishGuide({ s }: { s: ExtensionStatus }) {
 /** Quiet dot/pill for the Settings nav item. aria-hidden: it must NOT change the button's accessible name
  *  (tests and screen readers address the nav item as "Settings"); the text equivalent is the visually hidden
  *  description the nav button points at through aria-describedby. */
-export function ExtensionNavChip({ status }: { status: ExtensionStatus | null }) {
+export function ExtensionNavChip({
+  status,
+}: {
+  status: ExtensionStatus | null;
+}) {
   const chip = chipFor(status);
   if (!chip) return null;
   return (
@@ -1251,9 +1532,11 @@ export function ExtensionPairingBanner({
       <div className="grow">
         <strong>{name} wants to connect to Meridian</strong>
         <p>
-          Pairing code <span className="ext-inline-code">{formatCode(p.code)}</span>. Approve it here only if you just
-          clicked Connect and the extension shows the same code. You can also type that code into the Meridian window
-          that opened.
+          Pairing code{" "}
+          <span className="ext-inline-code">{formatCode(p.code)}</span>. Approve
+          it here only if you just clicked Connect and the extension shows the
+          same code. You can also type that code into the Meridian window that
+          opened.
         </p>
       </div>
       <Button onClick={onReview}>Review request</Button>

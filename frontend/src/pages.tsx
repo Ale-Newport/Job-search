@@ -218,11 +218,7 @@ export function Dashboard({ ctx }: { ctx: AppContext }) {
                           `Last checked ${time(source.last_checked)}`}
                       </small>
                     </div>
-                    <Status
-                      value={
-                        source.health || "not checked"
-                      }
-                    />
+                    <Status value={source.health || "not checked"} />
                   </div>
                 ))}
               </div>
@@ -280,7 +276,11 @@ export function Timeline({ events }: { events: Data[] }) {
               <time>{time(e.created_at || e.timestamp)}</time>
             </div>
             <p>
-              {[e.company, e.title, e.origin === "extension" ? "Browser assistant" : e.origin]
+              {[
+                e.company,
+                e.title,
+                e.origin === "extension" ? "Browser assistant" : e.origin,
+              ]
                 .filter(Boolean)
                 .join(" · ")}
             </p>
@@ -794,11 +794,12 @@ export function Discover({ ctx }: { ctx: AppContext }) {
                           value={
                             !s.enabled
                               ? "paused"
-                              : s.health || (s.config?.delivery === "email"
-                                ? s.last_checked
-                                  ? "receiving alerts"
-                                  : "awaiting alerts"
-                                : "not checked")
+                              : s.health ||
+                                (s.config?.delivery === "email"
+                                  ? s.last_checked
+                                    ? "receiving alerts"
+                                    : "awaiting alerts"
+                                  : "not checked")
                           }
                         />
                       </td>
@@ -1372,7 +1373,12 @@ export function Companies({ ctx }: { ctx: AppContext }) {
       <div className="toolbar">
         <SearchInput value={q} onChange={setQ} placeholder="Find a company" />
         <Tag>{companies.length} companies</Tag>
-        {coverage.data && <Tag>{coverage.data.verified ?? 0} verified · {coverage.data.partial ?? 0} partial</Tag>}
+        {coverage.data && (
+          <Tag>
+            {coverage.data.verified ?? 0} verified ·{" "}
+            {coverage.data.partial ?? 0} partial
+          </Tag>
+        )}
       </div>
       <Resource {...r} retry={r.reload}>
         {companies.length ? (
@@ -1406,10 +1412,24 @@ export function Companies({ ctx }: { ctx: AppContext }) {
                   </p>
                   <div className="tags">
                     <Tag>Priority {c.priority ?? 50}</Tag>
-                    <Status value={items(coverage.data).find((row) => row.company_id === c.id)?.health || "not checked"} />
+                    <Status
+                      value={
+                        items(coverage.data).find(
+                          (row) => row.company_id === c.id,
+                        )?.health || "not checked"
+                      }
+                    />
                     {c.auto_apply && <Tag tone="amber">Auto eligible</Tag>}
                   </div>
-                  {coverage.data && <small>{items(coverage.data).find((row) => row.company_id === c.id)?.daily_enabled ? "Included in daily discovery" : "Daily discovery source needs attention"}</small>}
+                  {coverage.data && (
+                    <small>
+                      {items(coverage.data).find(
+                        (row) => row.company_id === c.id,
+                      )?.daily_enabled
+                        ? "Included in daily discovery"
+                        : "Daily discovery source needs attention"}
+                    </small>
+                  )}
                   <p className="company-notes">
                     {c.notes ||
                       "Add notes about what makes this company interesting to you."}

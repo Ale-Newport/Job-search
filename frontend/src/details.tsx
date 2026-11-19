@@ -1,5 +1,8 @@
 import { OpportunityActions } from "./tracking";
-import { AnswerInspector, ApplicationAnswerInspector } from "./answer-inspector";
+import {
+  AnswerInspector,
+  ApplicationAnswerInspector,
+} from "./answer-inspector";
 import { Networking } from "./networking";
 import { useEffect, useRef, useState } from "react";
 import {
@@ -140,7 +143,9 @@ export function JobDetail({ id, ctx }: { id: string; ctx: AppContext }) {
               <Sparkles size={15} />
               Tailor documents
             </Button>
-            <Button secondary onClick={() => setPeople(true)}>Relevant people</Button>
+            <Button secondary onClick={() => setPeople(true)}>
+              Relevant people
+            </Button>
             <Button
               secondary
               onClick={() =>
@@ -198,7 +203,9 @@ export function JobDetail({ id, ctx }: { id: string; ctx: AppContext }) {
                 <KeyValues
                   data={{
                     deadline:
-                      j.application_deadline || j.metadata?.application_deadline || "Not published",
+                      j.application_deadline ||
+                      j.metadata?.application_deadline ||
+                      "Not published",
                     cv_required:
                       j.metadata?.cv_required == null
                         ? "Not supplied"
@@ -267,9 +274,15 @@ export function JobDetail({ id, ctx }: { id: string; ctx: AppContext }) {
           {prepare && (
             <PrepareJob job={j} ctx={ctx} onClose={() => setPrepare(false)} />
           )}{" "}
-          {people && <Modal wide title="Relevant people" onClose={() => setPeople(false)}>
-            <Networking ctx={{ ...ctx, target: id }} />
-          </Modal>}
+          {people && (
+            <Modal
+              wide
+              title="Relevant people"
+              onClose={() => setPeople(false)}
+            >
+              <Networking ctx={{ ...ctx, target: id }} />
+            </Modal>
+          )}
           {generate && (
             <GenerateDocument
               job={j}
@@ -505,12 +518,14 @@ function GenerateDocument({
     setBusy(true);
     setError("");
     try {
-      const r = await taskResult(await api("/documents/generate", "POST", {
-        job_id: job.id,
-        kind,
-        fact_ids: selected,
-        approved,
-      }));
+      const r = await taskResult(
+        await api("/documents/generate", "POST", {
+          job_id: job.id,
+          kind,
+          fact_ids: selected,
+          approved,
+        }),
+      );
       setResult(r);
       if (approved) {
         await ctx.act(
@@ -643,8 +658,16 @@ export function ApplicationDetail({
   const latestRun = a?.runs?.at(-1);
   const runStatus = latestRun?.status;
   const closed = [
-    "APPLIED", "CONFIRMED", "RECRUITER_SCREEN", "ASSESSMENT", "TECHNICAL_TEST",
-    "INTERVIEW", "FINAL_INTERVIEW", "OFFER", "REJECTED", "WITHDRAWN",
+    "APPLIED",
+    "CONFIRMED",
+    "RECRUITER_SCREEN",
+    "ASSESSMENT",
+    "TECHNICAL_TEST",
+    "INTERVIEW",
+    "FINAL_INTERVIEW",
+    "OFFER",
+    "REJECTED",
+    "WITHDRAWN",
   ].includes(a?.status || "");
   const uncertain = a?.runs?.some((run) =>
     ["interrupted", "unconfirmed", "submitting"].includes(run.status),
@@ -669,9 +692,18 @@ export function ApplicationDetail({
     ctx.busy === "approve-section" ||
     ctx.busy === "resume" ||
     ["queued", "running", "submitting"].includes(runStatus);
-  const watching = !closed && [
-    "queued", "running", "submitting", "browser_question", "section_review", "needs_review", "ready_for_review", "human_required",
-  ].includes(runStatus);
+  const watching =
+    !closed &&
+    [
+      "queued",
+      "running",
+      "submitting",
+      "browser_question",
+      "section_review",
+      "needs_review",
+      "ready_for_review",
+      "human_required",
+    ].includes(runStatus);
   useEffect(() => {
     if ((!active && !watching) || r.loading) return;
     const timer = setTimeout(refreshApplication, 2500);
@@ -698,7 +730,8 @@ export function ApplicationDetail({
                       : `${label(a.mode || "review")} mode`}
                 </Tag>
                 <Tag>Created {date(a.created_at)}</Tag>
-                {(a.assistant || a.events?.some((e: Data) => e.origin === "extension")) && (
+                {(a.assistant ||
+                  a.events?.some((e: Data) => e.origin === "extension")) && (
                   <Tag tone="green">
                     <Sparkles size={11} aria-hidden="true" />
                     {a.assistant
@@ -729,29 +762,33 @@ export function ApplicationDetail({
                     Review & approve submission
                   </Button>
                 ) : (
-                    <Button
-                      loading={active}
-                      onClick={() =>
-                        ctx.act(
-                          "apply",
-                          () => api(`/applications/${id}/apply`, "POST", {}),
-                          "Browser run started.",
-                        )
-                      }
-                    >
-                      <Play size={15} />
-                      {["error", "blocked", "paused"].includes(runStatus) ? "Retry Auto Apply" : "Apply"}
-                    </Button>
+                  <Button
+                    loading={active}
+                    onClick={() =>
+                      ctx.act(
+                        "apply",
+                        () => api(`/applications/${id}/apply`, "POST", {}),
+                        "Browser run started.",
+                      )
+                    }
+                  >
+                    <Play size={15} />
+                    {["error", "blocked", "paused"].includes(runStatus)
+                      ? "Retry Auto Apply"
+                      : "Apply"}
+                  </Button>
                 )}
                 {active && (
                   <Button
                     secondary
                     loading={ctx.busy === "cancel-run"}
-                    onClick={() => ctx.act(
-                      "cancel-run",
-                      () => api(`/applications/${id}/cancel`, "POST", {}),
-                      "Browser operation stopped. Check its latest status before continuing.",
-                    )}
+                    onClick={() =>
+                      ctx.act(
+                        "cancel-run",
+                        () => api(`/applications/${id}/cancel`, "POST", {}),
+                        "Browser operation stopped. Check its latest status before continuing.",
+                      )
+                    }
                   >
                     <Square size={15} />
                     Stop attempt
@@ -785,7 +822,11 @@ export function ApplicationDetail({
                   Resume agent
                 </Button>
                 {uncertain && (
-                  <Button secondary disabled={active} onClick={() => setReconcile(true)}>
+                  <Button
+                    secondary
+                    disabled={active}
+                    onClick={() => setReconcile(true)}
+                  >
                     <ShieldCheck size={15} />
                     Reconcile submission
                   </Button>
@@ -800,13 +841,14 @@ export function ApplicationDetail({
               <ArrowRight size={15} />
             </Button>
           </div>
-          {latestRun?.error && !closed && (
-            <ErrorBox error={latestRun.error} />
-          )}
+          {latestRun?.error && !closed && <ErrorBox error={latestRun.error} />}
           {runStatus === "browser_question" && !closed && (
             <div className="tracking-callout">
               <Hand size={20} />
-              <p>Waiting for your answer in Chrome. If you closed the form, resume the agent to reopen it.</p>
+              <p>
+                Waiting for your answer in Chrome. If you closed the form,
+                resume the agent to reopen it.
+              </p>
             </div>
           )}
           {a.section_consent && a.runs?.at(-1)?.status === "section_review" && (
@@ -922,9 +964,17 @@ export function ApplicationDetail({
                       <div className="row-between">
                         <h4>{v.question}</h4>
                         <div className="tags">
-                          {v.origin === "extension" && <Tag>Inserted by assistant</Tag>}
+                          {v.origin === "extension" && (
+                            <Tag>Inserted by assistant</Tag>
+                          )}
                           <Status
-                            value={v.inferred ? "Inferred · review" : v.verified ? "verified" : "unverified"}
+                            value={
+                              v.inferred
+                                ? "Inferred · review"
+                                : v.verified
+                                  ? "verified"
+                                  : "unverified"
+                            }
                           />
                         </div>
                       </div>
@@ -942,8 +992,13 @@ export function ApplicationDetail({
               )}
               {!!a.answer_history?.length && (
                 <details>
-                  <summary>Previous answers ({a.answer_history.length})</summary>
-                  <p className="muted">Retained for your records. Current review uses the answers above.</p>
+                  <summary>
+                    Previous answers ({a.answer_history.length})
+                  </summary>
+                  <p className="muted">
+                    Retained for your records. Current review uses the answers
+                    above.
+                  </p>
                   <div className="answer-list">
                     {a.answer_history.map((v) => (
                       <div className="answer-card" key={v.id}>
@@ -956,7 +1011,9 @@ export function ApplicationDetail({
                           )}
                         </div>
                         <p className="prose-text">{v.answer}</p>
-                        <small className="muted">Superseded {date(v.superseded_at)}</small>
+                        <small className="muted">
+                          Superseded {date(v.superseded_at)}
+                        </small>
                       </div>
                     ))}
                   </div>
@@ -1204,7 +1261,11 @@ function SectionApproval({
   return (
     <Modal
       wide
-      title={entry ? "Review application entry" : `Review section · ${section?.title || "Application"}`}
+      title={
+        entry
+          ? "Review application entry"
+          : `Review section · ${section?.title || "Application"}`
+      }
       onClose={close}
     >
       <p className="panel-copy">
@@ -1215,8 +1276,8 @@ function SectionApproval({
         {entry
           ? "Approve opening the employer's application form. Meridian will inspect the form before filling it."
           : section?.kind === "continue"
-          ? "Approve moving to the next step with the current form values. The next section will require another review."
-          : "Approve these exact values and attachments for this section. Unknown answers are left for you to resolve."}
+            ? "Approve moving to the next step with the current form values. The next section will require another review."
+            : "Approve these exact values and attachments for this section. Unknown answers are left for you to resolve."}
       </p>
       <div className="answer-list">
         {(section?.fields || []).map((field: Data, index: number) => (
@@ -1259,8 +1320,8 @@ function SectionApproval({
           {entry
             ? "Approve & open application"
             : section?.kind === "continue"
-            ? "Approve & continue"
-            : "Approve & fill section"}
+              ? "Approve & continue"
+              : "Approve & fill section"}
         </Button>
       </div>
     </Modal>
@@ -1330,7 +1391,15 @@ function Approval({
                 <div className="answer-card" key={v.id || i}>
                   <div className="row-between">
                     <h4>{v.question}</h4>
-                    <Status value={v.inferred ? "Inferred · review" : v.verified ? "verified" : "unverified"} />
+                    <Status
+                      value={
+                        v.inferred
+                          ? "Inferred · review"
+                          : v.verified
+                            ? "verified"
+                            : "unverified"
+                      }
+                    />
                   </div>
                   <p>{v.answer}</p>
                   {v.reason && <p className="muted">{v.reason}</p>}
@@ -1472,14 +1541,24 @@ function AnswerComposer({
             setBusy(true);
             setError("");
             try {
-              const d = await api("/ai/draft", "POST", {
-                question,
-                job_id: a.job_id,
-                fact_ids: factIds,
-              }, undefined, 300000);
+              const d = await api(
+                "/ai/draft",
+                "POST",
+                {
+                  question,
+                  job_id: a.job_id,
+                  fact_ids: factIds,
+                },
+                undefined,
+                300000,
+              );
               setAnswer(d.answer || "");
               setEvidence({ ...d, question });
-              if (!d.answer) setError(d.reason || "No supported answer is available. Inspect the diagnostics below.");
+              if (!d.answer)
+                setError(
+                  d.reason ||
+                    "No supported answer is available. Inspect the diagnostics below.",
+                );
             } catch (e) {
               setError((e as Error).message);
             } finally {
@@ -1498,9 +1577,7 @@ function AnswerComposer({
             rows={6}
           />
         </label>
-        {evidence && (
-          <AnswerInspector answer={evidence} open />
-        )}{" "}
+        {evidence && <AnswerInspector answer={evidence} open />}{" "}
         {error && <ErrorBox error={error} />}
       </div>
       <div className="modal-footer">
@@ -1627,7 +1704,15 @@ export function RunDetail({ id, ctx }: { id: string; ctx: AppContext }) {
     run = r.data,
     steps = run?.steps || [];
   const refreshRun = r.reload;
-  const active = ["running", "submitting", "browser_question", "section_review", "needs_review", "ready_for_review", "human_required"].includes(run?.status);
+  const active = [
+    "running",
+    "submitting",
+    "browser_question",
+    "section_review",
+    "needs_review",
+    "ready_for_review",
+    "human_required",
+  ].includes(run?.status);
   useEffect(() => {
     if (!active || r.loading) return;
     const timer = setTimeout(refreshRun, 2500);

@@ -1,4 +1,10 @@
-import { createContext, useCallback, useContext, useEffect, useState } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useState,
+} from "react";
 import { useResource } from "./api";
 import type {
   ExtensionAssist,
@@ -28,7 +34,10 @@ export interface ExtensionFeed {
 export const ExtensionFeedContext = createContext<ExtensionFeed | null>(null);
 export function useExtensionFeed(): ExtensionFeed {
   const feed = useContext(ExtensionFeedContext);
-  if (!feed) throw new Error("The browser assistant status is only available inside the app shell.");
+  if (!feed)
+    throw new Error(
+      "The browser assistant status is only available inside the app shell.",
+    );
   return feed;
 }
 
@@ -37,16 +46,25 @@ export function useExtensionFeed(): ExtensionFeed {
  * components from a .tsx file triggers react-refresh/only-export-components.
  */
 export function useExtensionStatus(refresh: number): ExtensionFeed {
-  const { data, loading, error, reload } = useResource<ExtensionStatus>("/extension", refresh);
+  const { data, loading, error, reload } = useResource<ExtensionStatus>(
+    "/extension",
+    refresh,
+  );
   const [guidedUntil, setGuidedUntil] = useState(0);
   const watch = useCallback(() => setGuidedUntil(Date.now() + GUIDED_MS), []);
   const state = data?.state;
   const pairing = !!data?.pending_pairing;
   useEffect(() => {
     if (loading) return;
-    const guided = Date.now() < guidedUntil && (state === "not_installed" || state === "outdated");
+    const guided =
+      Date.now() < guidedUntil &&
+      (state === "not_installed" || state === "outdated");
     const quick = guided || pairing || state === "detected";
-    const delay = document.hidden ? POLL_HIDDEN_MS : quick ? POLL_FAST_MS : POLL_IDLE_MS;
+    const delay = document.hidden
+      ? POLL_HIDDEN_MS
+      : quick
+        ? POLL_FAST_MS
+        : POLL_IDLE_MS;
     const timer = setTimeout(reload, delay);
     return () => clearTimeout(timer);
   }, [loading, reload, guidedUntil, state, pairing]);
@@ -74,7 +92,12 @@ export function calloutSnoozed(now: number = Date.now()): boolean {
   try {
     const at = Number(localStorage.getItem(CALLOUT_KEY));
     // a clock set back (or a corrupt value) must not hide the callout for ever: only a past moment inside the window counts
-    return Number.isFinite(at) && at > 0 && at <= now + 60_000 && now - at < CALLOUT_SNOOZE_MS;
+    return (
+      Number.isFinite(at) &&
+      at > 0 &&
+      at <= now + 60_000 &&
+      now - at < CALLOUT_SNOOZE_MS
+    );
   } catch {
     return false;
   }
@@ -88,10 +111,12 @@ export function snoozeCallout(now: number = Date.now()): void {
 }
 
 /** "482913" -> "482 913" */
-export const formatCode = (code: string) => code.replace(/(\d{3})(?=\d)/g, "$1 ").trim();
+export const formatCode = (code: string) =>
+  code.replace(/(\d{3})(?=\d)/g, "$1 ").trim();
 /** "482913" -> "4 8 2 9 1 3" for screen readers (VoiceOver otherwise says "four hundred eighty-two thousand…"). */
 export const spokenCode = (code: string) => code.split("").join(" ");
-export const browserName = (browser: ExtensionBrowser) => (browser === "chrome" ? "Chrome" : "Safari");
+export const browserName = (browser: ExtensionBrowser) =>
+  browser === "chrome" ? "Chrome" : "Safari";
 
 /** Seconds until `iso`, never negative; re-evaluates every second while mounted. */
 export function useCountdown(iso: string | undefined): number {
@@ -102,7 +127,9 @@ export function useCountdown(iso: string | undefined): number {
     const id = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(id);
   }, [target]);
-  return Number.isNaN(target) ? 0 : Math.max(0, Math.round((target - now) / 1000));
+  return Number.isNaN(target)
+    ? 0
+    : Math.max(0, Math.round((target - now) / 1000));
 }
 export const clock = (seconds: number) =>
   `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
@@ -123,22 +150,33 @@ export function ago(iso: string | null | undefined): string {
 export const plural = (count: number, one: string, many = `${one}s`) =>
   `${count.toLocaleString()} ${count === 1 ? one : many}`;
 export const money = (value: number) =>
-  value.toLocaleString("en-US", { style: "currency", currency: "USD", maximumFractionDigits: value < 1 ? 4 : 2 });
+  value.toLocaleString("en-US", {
+    style: "currency",
+    currency: "USD",
+    maximumFractionDigits: value < 1 ? 4 : 2,
+  });
 
 /** "Assisted in Chrome · 14 fields" for tracker rows and the application header. */
-export function assistedLine(assist: ExtensionAssist | null | undefined): string {
+export function assistedLine(
+  assist: ExtensionAssist | null | undefined,
+): string {
   if (!assist) return "";
   const where = `Assisted in ${browserName(assist.browser)}`;
-  return assist.fields_inserted > 0 ? `${where} · ${plural(assist.fields_inserted, "field")}` : where;
+  return assist.fields_inserted > 0
+    ? `${where} · ${plural(assist.fields_inserted, "field")}`
+    : where;
 }
 
 /** Primitive that is safe to put in AppContext (stable identity between polls). */
 export type AssistantFlag = ExtensionOverallState | "unknown";
-export const assistantFlag = (status: ExtensionStatus | null | undefined): AssistantFlag =>
-  status?.state ?? "unknown";
+export const assistantFlag = (
+  status: ExtensionStatus | null | undefined,
+): AssistantFlag => status?.state ?? "unknown";
 
 /** What the Settings nav item shows. Healthy and not-installed states are deliberately silent. */
-export function chipFor(status: ExtensionStatus | null | undefined): { text: string; tone: "amber" | "neutral" } | null {
+export function chipFor(
+  status: ExtensionStatus | null | undefined,
+): { text: string; tone: "amber" | "neutral" } | null {
   switch (status?.state) {
     case "pairing":
       return { text: "Approve", tone: "amber" };
@@ -175,6 +213,9 @@ export function normalizeHost(input: string): string | null {
   text = text.replace(/^[a-z][a-z0-9+.-]*:\/\//, "").replace(/^www\./, "");
   text = text.split(/[/?#]/)[0].replace(/:\d+$/, "").replace(/\.$/, "");
   const label = "[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?";
-  const valid = new RegExp(`^(${label}\\.)+([a-z]{2,63}|xn--[a-z0-9-]{1,59})$`).test(text) && text.length <= 253;
+  const valid =
+    new RegExp(`^(${label}\\.)+([a-z]{2,63}|xn--[a-z0-9-]{1,59})$`).test(
+      text,
+    ) && text.length <= 253;
   return valid ? text : null;
 }

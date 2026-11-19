@@ -106,7 +106,11 @@ export function ApplicationProfile({ ctx }: { ctx: AppContext }) {
             ))}
           </div>
           <p className="panel-copy">
-            Meridian uses your general profile to fill new questions, including written answers. Inferred answers are marked for review and never become verified facts automatically. Conditional questions stay blank when they do not apply. Missing personal disclosures are handled in the browser.
+            Meridian uses your general profile to fill new questions, including
+            written answers. Inferred answers are marked for review and never
+            become verified facts automatically. Conditional questions stay
+            blank when they do not apply. Missing personal disclosures are
+            handled in the browser.
           </p>
           {!!r.data?.answers?.length && (
             <details>
@@ -119,13 +123,17 @@ export function ApplicationProfile({ ctx }: { ctx: AppContext }) {
                     <div className="grow">
                       <div className="memory-title">
                         <strong>{a.question}</strong>
-                        {a.origin === "extension" && <Tag>Inserted by assistant</Tag>}
+                        {a.origin === "extension" && (
+                          <Tag>Inserted by assistant</Tag>
+                        )}
                       </div>
                       <p>{a.action === "skip" ? "Left blank" : a.answer}</p>
                       <small>
-                        {a.superseded ? "Superseded by newer general profile details · not used" : a.reusable
-                          ? `Reusable${a.scope ? ` · ${a.scope}` : ""}`
-                          : "This application only"}
+                        {a.superseded
+                          ? "Superseded by newer general profile details · not used"
+                          : a.reusable
+                            ? `Reusable${a.scope ? ` · ${a.scope}` : ""}`
+                            : "This application only"}
                       </small>
                     </div>
                     <Button

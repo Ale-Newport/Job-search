@@ -15,7 +15,9 @@ function Crash({ detail }: { detail: string }) {
       <h1 style={{ fontSize: 20 }}>Meridian could not draw this screen</h1>
       <p>Your data is safe. Reload, and if this repeats, send this detail:</p>
       <pre style={{ whiteSpace: "pre-wrap", fontSize: 12 }}>{detail}</pre>
-      <button type="button" onClick={() => location.reload()}>Reload</button>
+      <button type="button" onClick={() => location.reload()}>
+        Reload
+      </button>
     </main>
   );
 }
@@ -28,7 +30,11 @@ class Boundary extends React.Component<
     return { detail: describe(error) };
   }
   render() {
-    return this.state.detail ? <Crash detail={this.state.detail} /> : this.props.children;
+    return this.state.detail ? (
+      <Crash detail={this.state.detail} />
+    ) : (
+      this.props.children
+    );
   }
 }
 const root = ReactDOM.createRoot(document.getElementById("root")!);

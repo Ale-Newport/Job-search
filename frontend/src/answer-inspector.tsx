@@ -173,8 +173,14 @@ export function ApplicationAnswerInspector({
             answer={row}
             open={
               !!(row.status || row.state || row.generation_state) &&
-              !["COMPLETED", "ANSWER_VALIDATED", "ANSWER_ACCEPTED_BY_FORM"].includes(
-                String(row.status || row.state || row.generation_state).toUpperCase(),
+              ![
+                "COMPLETED",
+                "ANSWER_VALIDATED",
+                "ANSWER_ACCEPTED_BY_FORM",
+              ].includes(
+                String(
+                  row.status || row.state || row.generation_state,
+                ).toUpperCase(),
               )
             }
           />

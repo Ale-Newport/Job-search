@@ -173,7 +173,14 @@ export default function App() {
       reloadTasks();
     }, 20000);
     return () => clearTimeout(interval);
-  }, [health.loading, automation.loading, tasks.loading, reloadHealth, reloadAutomation, reloadTasks]);
+  }, [
+    health.loading,
+    automation.loading,
+    tasks.loading,
+    reloadHealth,
+    reloadAutomation,
+    reloadTasks,
+  ]);
   useEffect(() => {
     if (!health.error || health.loading) return;
     const timer = setTimeout(() => setRefresh((v) => v + 1), 3000);
@@ -245,7 +252,11 @@ export default function App() {
               <button
                 className={`nav-item ${page === n.id ? "active" : ""}`}
                 aria-current={page === n.id ? "page" : undefined}
-                aria-describedby={n.id === "settings" && assistantHint ? "assistant-hint" : undefined}
+                aria-describedby={
+                  n.id === "settings" && assistantHint
+                    ? "assistant-hint"
+                    : undefined
+                }
                 onClick={() => navigate(n.id)}
               >
                 <n.icon size={18} strokeWidth={1.7} />
@@ -253,7 +264,9 @@ export default function App() {
                 {n.id === "review" && attention > 0 && (
                   <span className="nav-count">{attention}</span>
                 )}
-                {n.id === "settings" && <ExtensionNavChip status={extension.data} />}
+                {n.id === "settings" && (
+                  <ExtensionNavChip status={extension.data} />
+                )}
               </button>
             </div>
           ))}
@@ -305,7 +318,9 @@ export default function App() {
             <strong>{navigation.find((n) => n.id === page)?.label}</strong>
           </div>
           <div className="topbar-actions">
-            <Button secondary onClick={() => setBrowserApply(true)}>Auto Apply from Chrome</Button>
+            <Button secondary onClick={() => setBrowserApply(true)}>
+              Auto Apply from Chrome
+            </Button>
             <button className="global-search" onClick={() => setSearch(true)}>
               <Search size={16} />
               <span>Search anything</span>
@@ -338,7 +353,9 @@ export default function App() {
             </IconButton>
           </div>
         </header>
-        {browserApply && <BrowserApply ctx={ctx} onClose={() => setBrowserApply(false)} />}
+        {browserApply && (
+          <BrowserApply ctx={ctx} onClose={() => setBrowserApply(false)} />
+        )}
         <div className="page-content" key={`${page}:${target || ""}`}>
           {health.error && (
             <div className="offline-banner">

@@ -28,14 +28,7 @@ import {
   Zap,
 } from "lucide-react";
 import type { AppContext, Data } from "./types";
-import {
-  api,
-  download,
-  items,
-  label,
-  time,
-  useResource,
-} from "./api";
+import { api, download, items, label, time, useResource } from "./api";
 import { BoundaryConfirmation, BrowserAccountConfirmation } from "./onboarding";
 import {
   Button,
@@ -146,7 +139,6 @@ const aiFields: Field[] = [
     label: "Allow fallback to Jev when local confidence is low",
     type: "checkbox",
   },
-
 ];
 export function Automation({ ctx }: { ctx: AppContext }) {
   const r = useResource("/automation", ctx.refresh),
@@ -298,21 +290,113 @@ export function Automation({ ctx }: { ctx: AppContext }) {
             </div>
           </Panel>
         </div>
-        <Panel title="Worker monitor" description="Each workflow owns its browser, checkpoints and retry budget. Controls affect only the selected task.">
-          <label className="field">Concurrent applications<select value={d.settings?.application_concurrency || 2} onChange={e => ctx.act("concurrency", () => api("/settings", "PATCH", { application_concurrency: Number(e.target.value) }))}>
-            {[1,2,3,4,5,6].map(n => <option key={n} value={n}>{n}</option>)}
-          </select></label>
-          <div className="table-scroll"><table><thead><tr><th>Task</th><th>Status / step</th><th>Worker</th><th>Actions</th></tr></thead><tbody>
-            {(d.tasks || []).map((task: Data) => { const worker = (d.workers || []).find((w: Data) => w.task_id === task.id); return <tr key={task.id}>
-              <td>{label(task.kind)}<small>{task.id.slice(0,8)} · attempt {task.attempts}/{task.max_attempts}</small></td>
-              <td>{label(task.state)}<small>{worker?.operation || task.error || "Queued"}</small></td>
-              <td>{worker ? `PID ${worker.process_id}` : "—"}<small>{worker ? `${Math.round(worker.memory_bytes / 1048576)} MB` : ""}</small></td>
-              <td><div className="panel-actions">
-                {['retry','restart','resume','cancel'].map(action => <Button secondary key={action} disabled={action === 'cancel' && ['COMPLETED','FAILED','CANCELLED'].includes(task.state)} onClick={() => ctx.act(`task-${task.id}`, () => api(`/automation/tasks/${task.id}/${action}`, "POST", {}))}>{label(action)}</Button>)}
-                <Button secondary onClick={async () => { const logs = await ctx.act("task-logs", () => api(`/automation/tasks/${task.id}/logs`)); if (logs) setSession(logs); }}>View logs</Button>
-              </div></td>
-            </tr>; })}
-          </tbody></table></div>
+        <Panel
+          title="Worker monitor"
+          description="Each workflow owns its browser, checkpoints and retry budget. Controls affect only the selected task."
+        >
+          <label className="field">
+            Concurrent applications
+            <select
+              value={d.settings?.application_concurrency || 2}
+              onChange={(e) =>
+                ctx.act("concurrency", () =>
+                  api("/settings", "PATCH", {
+                    application_concurrency: Number(e.target.value),
+                  }),
+                )
+              }
+            >
+              {[1, 2, 3, 4, 5, 6].map((n) => (
+                <option key={n} value={n}>
+                  {n}
+                </option>
+              ))}
+            </select>
+          </label>
+          <div className="table-scroll">
+            <table>
+              <thead>
+                <tr>
+                  <th>Task</th>
+                  <th>Status / step</th>
+                  <th>Worker</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {(d.tasks || []).map((task: Data) => {
+                  const worker = (d.workers || []).find(
+                    (w: Data) => w.task_id === task.id,
+                  );
+                  return (
+                    <tr key={task.id}>
+                      <td>
+                        {label(task.kind)}
+                        <small>
+                          {task.id.slice(0, 8)} · attempt {task.attempts}/
+                          {task.max_attempts}
+                        </small>
+                      </td>
+                      <td>
+                        {label(task.state)}
+                        <small>
+                          {worker?.operation || task.error || "Queued"}
+                        </small>
+                      </td>
+                      <td>
+                        {worker ? `PID ${worker.process_id}` : "—"}
+                        <small>
+                          {worker
+                            ? `${Math.round(worker.memory_bytes / 1048576)} MB`
+                            : ""}
+                        </small>
+                      </td>
+                      <td>
+                        <div className="panel-actions">
+                          {["retry", "restart", "resume", "cancel"].map(
+                            (action) => (
+                              <Button
+                                secondary
+                                key={action}
+                                disabled={
+                                  action === "cancel" &&
+                                  ["COMPLETED", "FAILED", "CANCELLED"].includes(
+                                    task.state,
+                                  )
+                                }
+                                onClick={() =>
+                                  ctx.act(`task-${task.id}`, () =>
+                                    api(
+                                      `/automation/tasks/${task.id}/${action}`,
+                                      "POST",
+                                      {},
+                                    ),
+                                  )
+                                }
+                              >
+                                {label(action)}
+                              </Button>
+                            ),
+                          )}
+                          <Button
+                            secondary
+                            onClick={async () => {
+                              const logs = await ctx.act("task-logs", () =>
+                                api(`/automation/tasks/${task.id}/logs`),
+                              );
+                              if (logs) setSession(logs);
+                            }}
+                          >
+                            View logs
+                          </Button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         </Panel>
         <Panel
           title="Browser runs"
@@ -444,7 +528,9 @@ export function Settings({
           </button>
         ))}
       </div>
-      {tab === "intelligence" && <CandidateIntelligence ctx={ctx} coverageOnly />}
+      {tab === "intelligence" && (
+        <CandidateIntelligence ctx={ctx} coverageOnly />
+      )}
       {tab === "extension" && <ExtensionPanel ctx={ctx} feed={extension} />}
       <Resource
         {...r}
@@ -637,7 +723,11 @@ export function Settings({
                 />
               )}
             </Panel>
-            <ApplicationAnswerLLMSetup ctx={ctx} settings={s} integrations={items(integrations.data)} />
+            <ApplicationAnswerLLMSetup
+              ctx={ctx}
+              settings={s}
+              integrations={items(integrations.data)}
+            />
             <Panel
               title="Provider credentials & cost control"
               description="Credentials are stored in Keychain; price settings support budget enforcement."
@@ -761,7 +851,6 @@ export function Settings({
           }}
         />
       )}
-
     </>
   );
 }
@@ -1206,7 +1295,9 @@ function AIUsage({ ctx, settings }: { ctx: AppContext; settings: Data }) {
     usage = latest?.[1] || {},
     providers = usage.providers || {};
   const [dashboard, setDashboard] = useState("");
-  const adjustments: Data[] = Array.isArray(usage.adjustments) ? usage.adjustments : [];
+  const adjustments: Data[] = Array.isArray(usage.adjustments)
+    ? usage.adjustments
+    : [];
   const lastAdjustment = adjustments[adjustments.length - 1];
   const money = (value: unknown) =>
     Number(value || 0).toLocaleString(undefined, {
@@ -1215,16 +1306,18 @@ function AIUsage({ ctx, settings }: { ctx: AppContext; settings: Data }) {
       maximumFractionDigits: 4,
     });
   const reconcile = () =>
-    ctx.act(
-      "usage-reconcile",
-      () =>
-        api("/ai/usage/reconcile", "POST", {
-          amount_usd: Number(dashboard),
-          month: latest?.[0].slice(9),
-          note: "Matched to the provider's dashboard",
-        }),
-      "Recorded spend matched to your provider's figure.",
-    ).then(() => setDashboard(""));
+    ctx
+      .act(
+        "usage-reconcile",
+        () =>
+          api("/ai/usage/reconcile", "POST", {
+            amount_usd: Number(dashboard),
+            month: latest?.[0].slice(9),
+            note: "Matched to the provider's dashboard",
+          }),
+        "Recorded spend matched to your provider's figure.",
+      )
+      .then(() => setDashboard(""));
   return (
     <Panel
       title="AI usage & budget"
@@ -1258,20 +1351,28 @@ function AIUsage({ ctx, settings }: { ctx: AppContext; settings: Data }) {
               {lastAdjustment && (
                 <p>
                   Matched to your provider's dashboard on{" "}
-                  {String(lastAdjustment.at).slice(0, 10)}: {money(lastAdjustment.from)} →{" "}
-                  {money(lastAdjustment.to)}.
+                  {String(lastAdjustment.at).slice(0, 10)}:{" "}
+                  {money(lastAdjustment.from)} → {money(lastAdjustment.to)}.
                 </p>
               )}
             </div>
-            <Tag>{settings.ai_budget_unlimited ? "Uncapped AI spending" : `Monthly budget $${settings.monthly_budget ?? 0}`}</Tag>
+            <Tag>
+              {settings.ai_budget_unlimited
+                ? "Uncapped AI spending"
+                : `Monthly budget $${settings.monthly_budget ?? 0}`}
+            </Tag>
           </div>
           <div className="settings-row">
             <div>
-              <strong>Does your provider's dashboard say something else?</strong>
+              <strong>
+                Does your provider's dashboard say something else?
+              </strong>
               <p>
-                Meridian estimates spend from token counts and your configured rates (cache hits and off-peak
-                hours included where the provider publishes them); the dashboard is the invoice. Enter its figure
-                for this month to match the record, and the monthly cap follows it.
+                Meridian estimates spend from token counts and your configured
+                rates (cache hits and off-peak hours included where the provider
+                publishes them); the dashboard is the invoice. Enter its figure
+                for this month to match the record, and the monthly cap follows
+                it.
               </p>
             </div>
             <label className="field">
@@ -1286,7 +1387,11 @@ function AIUsage({ ctx, settings }: { ctx: AppContext; settings: Data }) {
             </label>
             <Button
               secondary
-              disabled={dashboard === "" || !Number.isFinite(Number(dashboard)) || Number(dashboard) < 0}
+              disabled={
+                dashboard === "" ||
+                !Number.isFinite(Number(dashboard)) ||
+                Number(dashboard) < 0
+              }
               onClick={reconcile}
             >
               Match this month
@@ -1319,8 +1424,11 @@ function AIUsage({ ctx, settings }: { ctx: AppContext; settings: Data }) {
         </>
       ) : (
         <p className="panel-copy">
-          No remote AI usage has been recorded. {settings.ai_budget_unlimited ? "AI spending is uncapped." : `Current monthly budget: $${settings.monthly_budget ?? 0}.`} Configure provider token prices before
-          using a remote engine.
+          No remote AI usage has been recorded.{" "}
+          {settings.ai_budget_unlimited
+            ? "AI spending is uncapped."
+            : `Current monthly budget: $${settings.monthly_budget ?? 0}.`}{" "}
+          Configure provider token prices before using a remote engine.
         </p>
       )}
     </Panel>

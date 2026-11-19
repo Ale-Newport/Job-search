@@ -63,7 +63,12 @@ export async function api<T = Data>(
                 ? { "Content-Type": "application/json" }
                 : {}),
             },
-            body: body === undefined ? undefined : isForm ? body : JSON.stringify(body),
+            body:
+              body === undefined
+                ? undefined
+                : isForm
+                  ? body
+                  : JSON.stringify(body),
           });
         } catch (error) {
           // Reconnect on the next request; never replay a mutation whose outcome is unknown.
@@ -75,8 +80,13 @@ export async function api<T = Data>(
           const error = await response
             .json()
             .catch(() => ({ detail: response.statusText }));
-          const detail = error.detail ?? error.message ?? `Request failed (${response.status})`;
-          throw new Error(typeof detail === "string" ? detail : JSON.stringify(detail));
+          const detail =
+            error.detail ??
+            error.message ??
+            `Request failed (${response.status})`;
+          throw new Error(
+            typeof detail === "string" ? detail : JSON.stringify(detail),
+          );
         }
         if (response.status === 204) return {} as T;
         return response.json() as Promise<T>;
@@ -143,10 +153,15 @@ export async function taskResult(result: Data): Promise<Data> {
     const task = await api(`/automation/tasks/${result.task_id}`);
     if (task.state === "COMPLETED") return task.checkpoint;
     if (["FAILED", "CANCELLED", "WAITING_FOR_USER"].includes(task.state))
-      throw new Error(task.error || "This task needs attention. Open Automation to inspect it.");
-    await new Promise(resolve => setTimeout(resolve, 500));
+      throw new Error(
+        task.error ||
+          "This task needs attention. Open Automation to inspect it.",
+      );
+    await new Promise((resolve) => setTimeout(resolve, 500));
   }
-  throw new Error("Generation is still running. Check Automation or Documents before generating another version.");
+  throw new Error(
+    "Generation is still running. Check Automation or Documents before generating another version.",
+  );
 }
 export function useResource<T = Data>(path: string | null, refresh = 0) {
   const [data, setData] = useState<T | null>(null),
@@ -167,7 +182,8 @@ export function useResource<T = Data>(path: string | null, refresh = 0) {
         if (!controller.signal.aborted) setData(value);
       })
       .catch((e) => {
-        if (!controller.signal.aborted && e.name !== "AbortError") setError(e.message);
+        if (!controller.signal.aborted && e.name !== "AbortError")
+          setError(e.message);
       })
       .finally(() => {
         if (!controller.signal.aborted) setLoading(false);

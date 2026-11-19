@@ -13,7 +13,12 @@ import {
 } from "lucide-react";
 import type { AppContext, Data, ExtensionOpenResult } from "./types";
 import { api, date, label, openExternal, useResource } from "./api";
-import { assistedLine, browserName, calloutSnoozed, snoozeCallout } from "./extension-state";
+import {
+  assistedLine,
+  browserName,
+  calloutSnoozed,
+  snoozeCallout,
+} from "./extension-state";
 import {
   Button,
   Empty,
@@ -154,11 +159,19 @@ export function OpportunityActions({
               loading={ctx.busy === `assistant-open:${job.id}`}
               onClick={async () => {
                 const opened = await ctx.act(`assistant-open:${job.id}`, () =>
-                  api<ExtensionOpenResult>(`/extension/jobs/${job.id}/open`, "POST", {}),
+                  api<ExtensionOpenResult>(
+                    `/extension/jobs/${job.id}/open`,
+                    "POST",
+                    {},
+                  ),
                 );
                 if (!opened) return;
                 if (opened.ok === false)
-                  ctx.toast(opened.message || "Could not open the application in your browser.", true);
+                  ctx.toast(
+                    opened.message ||
+                      "Could not open the application in your browser.",
+                    true,
+                  );
                 else
                   ctx.toast(
                     opened.message ||
@@ -403,12 +416,16 @@ export function Daily({ ctx }: { ctx: AppContext }) {
                 {email?.last_error
                   ? "Inbox sync needs attention. Open Email to reconnect or review the error."
                   : email?.last_sync
-                  ? `Email connected · last sync ${date(email.last_sync)}. Matching recruitment emails update your table.`
-                  : email
-                    ? "Gmail is connected. The first inbox sync is still pending; open Email to finish the macOS Keychain prompt."
-                    : "Connect your application inbox to detect confirmations, assessments, interviews and decisions."}
+                    ? `Email connected · last sync ${date(email.last_sync)}. Matching recruitment emails update your table.`
+                    : email
+                      ? "Gmail is connected. The first inbox sync is still pending; open Email to finish the macOS Keychain prompt."
+                      : "Connect your application inbox to detect confirmations, assessments, interviews and decisions."}
               </p>
-              <Button secondary id="email-status-button" onClick={() => ctx.navigate("email")}>
+              <Button
+                secondary
+                id="email-status-button"
+                onClick={() => ctx.navigate("email")}
+              >
                 Email status
               </Button>
             </div>
@@ -418,9 +435,13 @@ export function Daily({ ctx }: { ctx: AppContext }) {
                 <div className="tracking-callout" id="assistant-callout">
                   <Sparkles size={17} />
                   <p>
-                    Fill any application form in your own browser. Meridian suggests each answer; press Tab to accept it.
+                    Fill any application form in your own browser. Meridian
+                    suggests each answer; press Tab to accept it.
                   </p>
-                  <Button secondary onClick={() => ctx.navigate("settings", "extension")}>
+                  <Button
+                    secondary
+                    onClick={() => ctx.navigate("settings", "extension")}
+                  >
                     Set up the browser assistant
                   </Button>
                   {ctx.assistant !== "pairing" && (
@@ -635,11 +656,28 @@ export function Tracker({
         actions={<Button onClick={() => setAdd(true)}>Add opportunity</Button>}
       />
       <div className="tracker-filters">
-        <select aria-label="Filter job availability" value={availability} onChange={e => { setAvailability(e.target.value); setOffset(0); }}>
-          <option value="">All availability</option><option value="open">Verified open</option>
+        <select
+          aria-label="Filter job availability"
+          value={availability}
+          onChange={(e) => {
+            setAvailability(e.target.value);
+            setOffset(0);
+          }}
+        >
+          <option value="">All availability</option>
+          <option value="open">Verified open</option>
         </select>
-        <select aria-label="Filter application deadline" value={deadline} onChange={e => { setDeadline(e.target.value); setOffset(0); }}>
-          <option value="">All published & unknown deadlines</option><option value="7">Closes within 7 days</option><option value="14">Closes within 14 days</option>
+        <select
+          aria-label="Filter application deadline"
+          value={deadline}
+          onChange={(e) => {
+            setDeadline(e.target.value);
+            setOffset(0);
+          }}
+        >
+          <option value="">All published & unknown deadlines</option>
+          <option value="7">Closes within 7 days</option>
+          <option value="14">Closes within 14 days</option>
         </select>
         <SearchInput
           value={query}
@@ -769,7 +807,9 @@ export function Tracker({
                         />
                       )}
                       {j.assistant && (
-                        <small className="assist-note">{assistedLine(j.assistant)}</small>
+                        <small className="assist-note">
+                          {assistedLine(j.assistant)}
+                        </small>
                       )}
                     </td>
                     <td>{j.applied_at ? date(j.applied_at) : "—"}</td>
@@ -783,7 +823,14 @@ export function Tracker({
                         "Not published"
                       )}
                     </td>
-                    <td><Tag>{label(j.availability || "UNKNOWN")}</Tag><small>{j.last_verified ? `Verified ${date(j.last_verified)}` : "Awaiting verification"}</small></td>
+                    <td>
+                      <Tag>{label(j.availability || "UNKNOWN")}</Tag>
+                      <small>
+                        {j.last_verified
+                          ? `Verified ${date(j.last_verified)}`
+                          : "Awaiting verification"}
+                      </small>
+                    </td>
                     <td>
                       {j.last_email ? (
                         <>

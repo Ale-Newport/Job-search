@@ -21,10 +21,7 @@ const providers = [
   { id: "openai-compatible", name: "Custom OpenAI-compatible endpoint" },
 ];
 
-const rateKeys = [
-  "input_cost_per_million",
-  "output_cost_per_million",
-] as const;
+const rateKeys = ["input_cost_per_million", "output_cost_per_million"] as const;
 
 const cacheRateFields = [
   { key: "cached_input_cost_per_million", name: "Cached input" },
@@ -42,24 +39,42 @@ function requiredRateKeys(provider: string): string[] {
 // (not edited here) is carried through a save untouched.
 const optionalRateKeys = (provider: string): string[] =>
   provider === "openai" ? [] : ["cached_input_cost_per_million"];
-const scheduleKeys = ["off_peak_multiplier", "peak_hours_utc", "peak_weekdays_only"];
+const scheduleKeys = [
+  "off_peak_multiplier",
+  "peak_hours_utc",
+  "peak_weekdays_only",
+];
 
 function modelPrices(config: Data, model: unknown, provider: string): Data {
   const saved = config.answer_model_prices?.[String(model || "").trim()];
   return Object.fromEntries(
-    [...requiredRateKeys(provider), ...optionalRateKeys(provider)].map((key) => [key, saved?.[key] ?? ""]),
+    [...requiredRateKeys(provider), ...optionalRateKeys(provider)].map(
+      (key) => [key, saved?.[key] ?? ""],
+    ),
   );
 }
 
 function savedRecord(prices: Data, provider: string, previous?: Data): Data {
   return {
-    ...Object.fromEntries(requiredRateKeys(provider).map((key) => [key, Number(prices[key])])),
+    ...Object.fromEntries(
+      requiredRateKeys(provider).map((key) => [key, Number(prices[key])]),
+    ),
     ...Object.fromEntries(
       optionalRateKeys(provider)
-        .filter((key) => prices[key] !== "" && prices[key] != null && Number.isFinite(Number(prices[key])) && Number(prices[key]) >= 0)
+        .filter(
+          (key) =>
+            prices[key] !== "" &&
+            prices[key] != null &&
+            Number.isFinite(Number(prices[key])) &&
+            Number(prices[key]) >= 0,
+        )
         .map((key) => [key, Number(prices[key])]),
     ),
-    ...Object.fromEntries(scheduleKeys.filter((key) => previous && key in previous).map((key) => [key, previous![key]])),
+    ...Object.fromEntries(
+      scheduleKeys
+        .filter((key) => previous && key in previous)
+        .map((key) => [key, previous![key]]),
+    ),
   };
 }
 
@@ -177,7 +192,8 @@ function AnswerLLMForm({
     text_retry_attempts: settings.text_retry_attempts ?? 2,
     text_concurrency: settings.text_concurrency ?? 2,
     text_quality_review: settings.text_quality_review ?? true,
-    text_full_professional_context: settings.text_full_professional_context ?? false,
+    text_full_professional_context:
+      settings.text_full_professional_context ?? false,
     text_fallback_model: settings.text_fallback_model || "",
     monthly_budget: settings.monthly_budget ?? 0,
     ai_budget_unlimited: settings.ai_budget_unlimited ?? false,
@@ -190,7 +206,11 @@ function AnswerLLMForm({
     modelPrices(initialConfig, values.text_model, values.text_provider),
   );
   const [fallbackPrices, setFallbackPrices] = useState<Data>(
-    modelPrices(initialConfig, values.text_fallback_model, values.text_provider),
+    modelPrices(
+      initialConfig,
+      values.text_fallback_model,
+      values.text_provider,
+    ),
   );
   const [models, setModels] = useState<Array<{ id: string; label?: string }>>(
     [],
@@ -202,7 +222,8 @@ function AnswerLLMForm({
   const provider = values.text_provider;
   const remote = provider !== "none" && provider !== "ollama";
   const change = (key: string, value: unknown) => {
-    if (key === "text_model") setPrices(modelPrices(savedConfig, value, provider));
+    if (key === "text_model")
+      setPrices(modelPrices(savedConfig, value, provider));
     if (key === "text_fallback_model")
       setFallbackPrices(modelPrices(savedConfig, value, provider));
     setValues((v) => ({ ...v, [key]: value }));
@@ -231,11 +252,7 @@ function AnswerLLMForm({
   async function persist(requireModel: boolean) {
     const model = String(values.text_model).trim();
     const fallback = String(values.text_fallback_model).trim();
-    if (
-      requireModel &&
-      provider !== "none" &&
-      !model
-    )
+    if (requireModel && provider !== "none" && !model)
       throw new Error(
         "Discover models or enter a supported model identifier before saving.",
       );
@@ -246,19 +263,24 @@ function AnswerLLMForm({
       throw new Error(
         "Enter the endpoint for your OpenAI-compatible provider.",
       );
+    if (remote && requireModel && !validPrices(prices, provider))
+      throw new Error(
+        "Enter current input and output token prices for the primary model. At least one rate must be positive." +
+          (provider === "openai"
+            ? " OpenAI also requires nonnegative cached input and cache write rates."
+            : ""),
+      );
     if (
       remote &&
       requireModel &&
-      !validPrices(prices, provider)
+      fallback &&
+      !validPrices(fallbackPrices, provider)
     )
       throw new Error(
-        "Enter current input and output token prices for the primary model. At least one rate must be positive." +
-          (provider === "openai" ? " OpenAI also requires nonnegative cached input and cache write rates." : ""),
-      );
-    if (remote && requireModel && fallback && !validPrices(fallbackPrices, provider))
-      throw new Error(
         "Enter separate current input and output token prices for the fallback model. At least one rate must be positive." +
-          (provider === "openai" ? " OpenAI also requires nonnegative cached input and cache write rates." : ""),
+          (provider === "openai"
+            ? " OpenAI also requires nonnegative cached input and cache write rates."
+            : ""),
       );
     if (
       remote &&
@@ -266,15 +288,27 @@ function AnswerLLMForm({
       fallback &&
       validPrices(prices, provider) &&
       validPrices(fallbackPrices, provider) &&
-      requiredRateKeys(provider).some((key) => Number(prices[key]) !== Number(fallbackPrices[key]))
+      requiredRateKeys(provider).some(
+        (key) => Number(prices[key]) !== Number(fallbackPrices[key]),
+      )
     )
-      throw new Error("Primary and fallback rates for the same model must match.");
+      throw new Error(
+        "Primary and fallback rates for the same model must match.",
+      );
     if (provider !== "none" && (secret.trim() || remote)) {
       const exactPrices = { ...savedConfig.answer_model_prices };
       if (remote && model && validPrices(prices, provider))
-        exactPrices[model] = savedRecord(prices, provider, savedConfig.answer_model_prices?.[model]);
+        exactPrices[model] = savedRecord(
+          prices,
+          provider,
+          savedConfig.answer_model_prices?.[model],
+        );
       if (remote && fallback && validPrices(fallbackPrices, provider))
-        exactPrices[fallback] = savedRecord(fallbackPrices, provider, savedConfig.answer_model_prices?.[fallback]);
+        exactPrices[fallback] = savedRecord(
+          fallbackPrices,
+          provider,
+          savedConfig.answer_model_prices?.[fallback],
+        );
       const config = {
         ...savedConfig,
         ...(remote ? { answer_model_prices: exactPrices } : {}),
@@ -371,8 +405,8 @@ function AnswerLLMForm({
           {values.text_full_professional_context
             ? "Your complete verified professional profile and professional CV text, the exact question and role context are sent to the selected provider."
             : "Relevant verified facts, the exact question and role context are sent to the selected provider."}{" "}
-          API keys are stored in macOS Keychain.
-          Connection tests use a synthetic prompt without candidate information.
+          API keys are stored in macOS Keychain. Connection tests use a
+          synthetic prompt without candidate information.
         </p>
       </div>
       {status.local?.available && localModels.length > 0 && (
@@ -604,10 +638,11 @@ function AnswerLLMForm({
                     }
                   />
                   <small>
-                    Send all current verified professional facts and professional
-                    CV text for each narrative answer. Contact, demographic and
-                    legal data stay excluded. Larger prompts use more tokens;
-                    cloud calls count toward the shared monthly cap.
+                    Send all current verified professional facts and
+                    professional CV text for each narrative answer. Contact,
+                    demographic and legal data stay excluded. Larger prompts use
+                    more tokens; cloud calls count toward the shared monthly
+                    cap.
                   </small>
                 </label>
                 {remote && (
@@ -617,9 +652,15 @@ function AnswerLLMForm({
                       <input
                         type="checkbox"
                         checked={values.ai_budget_unlimited}
-                        onChange={(e) => change("ai_budget_unlimited", e.target.checked)}
+                        onChange={(e) =>
+                          change("ai_budget_unlimited", e.target.checked)
+                        }
                       />
-                      <small>Explicitly authorize paid calls without a spending ceiling. Usage is still tracked across providers. Turn off to restore the configured monthly limit.</small>
+                      <small>
+                        Explicitly authorize paid calls without a spending
+                        ceiling. Usage is still tracked across providers. Turn
+                        off to restore the configured monthly limit.
+                      </small>
                     </label>
                     <label className="field">
                       <span>Monthly AI usage limit (USD)</span>
@@ -637,9 +678,10 @@ function AnswerLLMForm({
                         }
                       />
                       <small>
-                        A positive cap is required when uncapped spending is off. Connection
-                        tests and all AI providers count toward this shared cap.
-                        The maximum is $20/month; zero disables paid calls.
+                        A positive cap is required when uncapped spending is
+                        off. Connection tests and all AI providers count toward
+                        this shared cap. The maximum is $20/month; zero disables
+                        paid calls.
                       </small>
                     </label>
                     {(["input", "output"] as const).map((direction) => (
@@ -672,7 +714,9 @@ function AnswerLLMForm({
                     ))}
                     {provider !== "openai" && (
                       <label className="field">
-                        <span>Cached input price per million tokens (USD, optional)</span>
+                        <span>
+                          Cached input price per million tokens (USD, optional)
+                        </span>
                         <input
                           aria-label="Cached input price per million tokens (USD, optional)"
                           type="number"
@@ -682,37 +726,52 @@ function AnswerLLMForm({
                           onChange={(e) =>
                             setPrices((p) => ({
                               ...p,
-                              cached_input_cost_per_million: e.target.value === "" ? "" : Number(e.target.value),
+                              cached_input_cost_per_million:
+                                e.target.value === ""
+                                  ? ""
+                                  : Number(e.target.value),
                             }))
                           }
                         />
                         <small>
-                          What the provider charges for prompt tokens it serves from its cache (DeepSeek: &quot;cache hit&quot;).
-                          Blank charges them at the input rate. DeepSeek&apos;s published cache-hit and off-peak prices
-                          are applied by themselves when the rates above are its published ones.
+                          What the provider charges for prompt tokens it serves
+                          from its cache (DeepSeek: &quot;cache hit&quot;).
+                          Blank charges them at the input rate. DeepSeek&apos;s
+                          published cache-hit and off-peak prices are applied by
+                          themselves when the rates above are its published
+                          ones.
                         </small>
                       </label>
                     )}
-                    {provider === "openai" && cacheRateFields.map((field) => (
-                      <label className="field" key={field.key}>
-                        <span>{field.name} price per million tokens (USD)</span>
-                        <input
-                          aria-label={`${field.name} price per million tokens (USD)`}
-                          type="number"
-                          min={0}
-                          step="any"
-                          value={prices[field.key]}
-                          onChange={(e) => setPrices((p) => ({
-                            ...p,
-                            [field.key]: e.target.value === "" ? "" : Number(e.target.value),
-                          }))}
-                        />
-                        <small>
-                          Current published OpenAI rate for this exact primary
-                          model. Zero is accepted when it is the published rate.
-                        </small>
-                      </label>
-                    ))}
+                    {provider === "openai" &&
+                      cacheRateFields.map((field) => (
+                        <label className="field" key={field.key}>
+                          <span>
+                            {field.name} price per million tokens (USD)
+                          </span>
+                          <input
+                            aria-label={`${field.name} price per million tokens (USD)`}
+                            type="number"
+                            min={0}
+                            step="any"
+                            value={prices[field.key]}
+                            onChange={(e) =>
+                              setPrices((p) => ({
+                                ...p,
+                                [field.key]:
+                                  e.target.value === ""
+                                    ? ""
+                                    : Number(e.target.value),
+                              }))
+                            }
+                          />
+                          <small>
+                            Current published OpenAI rate for this exact primary
+                            model. Zero is accepted when it is the published
+                            rate.
+                          </small>
+                        </label>
+                      ))}
                     {String(values.text_fallback_model).trim() &&
                       (["input", "output"] as const).map((direction) => (
                         <label className="field" key={`fallback-${direction}`}>
@@ -724,7 +783,9 @@ function AnswerLLMForm({
                             type="number"
                             min={0}
                             step="any"
-                            value={fallbackPrices[`${direction}_cost_per_million`]}
+                            value={
+                              fallbackPrices[`${direction}_cost_per_million`]
+                            }
                             onChange={(e) =>
                               setFallbackPrices((p) => ({
                                 ...p,
@@ -741,24 +802,34 @@ function AnswerLLMForm({
                           </small>
                         </label>
                       ))}
-                    {provider === "openai" && String(values.text_fallback_model).trim() &&
+                    {provider === "openai" &&
+                      String(values.text_fallback_model).trim() &&
                       cacheRateFields.map((field) => (
                         <label className="field" key={`fallback-${field.key}`}>
-                          <span>Fallback {field.name.toLowerCase()} price per million tokens (USD)</span>
+                          <span>
+                            Fallback {field.name.toLowerCase()} price per
+                            million tokens (USD)
+                          </span>
                           <input
                             aria-label={`Fallback ${field.name.toLowerCase()} price per million tokens (USD)`}
                             type="number"
                             min={0}
                             step="any"
                             value={fallbackPrices[field.key]}
-                            onChange={(e) => setFallbackPrices((p) => ({
-                              ...p,
-                              [field.key]: e.target.value === "" ? "" : Number(e.target.value),
-                            }))}
+                            onChange={(e) =>
+                              setFallbackPrices((p) => ({
+                                ...p,
+                                [field.key]:
+                                  e.target.value === ""
+                                    ? ""
+                                    : Number(e.target.value),
+                              }))
+                            }
                           />
                           <small>
-                            Current published OpenAI rate for this exact fallback
-                            model. Required before cloud testing or generation.
+                            Current published OpenAI rate for this exact
+                            fallback model. Required before cloud testing or
+                            generation.
                           </small>
                         </label>
                       ))}

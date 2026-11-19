@@ -1,0 +1,67 @@
+name: Bug report
+description: Something in Meridian or Meridian Assistant does not work as documented.
+labels: [bug, triage]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report this. **Do not paste personal data**: no CV text, email addresses, phone
+        numbers, API keys, OAuth tokens or real application answers. Replace them with placeholders.
+        Security problems go to [private vulnerability reporting](../security/advisories/new), not here.
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Desktop app (Tauri window, tray, install)
+        - Discovery and sources (ATS boards, feeds, Trackr, email alerts)
+        - Tracker and email timeline
+        - Profile, CV import and evidence
+        - Browser assistant extension (Chrome)
+        - Browser assistant extension (Safari)
+        - Apply with review (automated browser)
+        - AI providers (Ollama, Laya, remote APIs)
+        - Build, setup or tests
+        - Other
+    validations: { required: true }
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: What you did, what you expected and what happened instead.
+    validations: { required: true }
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Open ...
+        2. Click ...
+        3. See ...
+    validations: { required: true }
+  - type: input
+    id: version
+    attributes:
+      label: Meridian version or commit
+      placeholder: v0.1.0 or the output of `git rev-parse --short HEAD`
+    validations: { required: true }
+  - type: input
+    id: environment
+    attributes:
+      label: macOS version, chip and browser
+      placeholder: macOS 15.4, Apple M2, Chrome 131
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant log lines
+      description: From Settings → Diagnostics or the terminal. Remove anything personal before pasting.
+      render: shell
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Checks
+      options:
+        - label: I searched existing issues and this is not a duplicate.
+          required: true
+        - label: I removed personal data, credentials and tokens from this report.
+          required: true

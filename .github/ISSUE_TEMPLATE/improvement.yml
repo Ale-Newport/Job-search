@@ -1,0 +1,26 @@
+name: Improvement
+description: Make an existing feature, document or test better (speed, accuracy, wording, accessibility, coverage).
+labels: [improvement, triage]
+body:
+  - type: input
+    id: where
+    attributes:
+      label: Where
+      description: Screen, file or document this concerns.
+      placeholder: e.g. Tracker table, docs/EXTENSION.md, backend/jobagent/matching.py
+    validations: { required: true }
+  - type: textarea
+    id: current
+    attributes:
+      label: Current behaviour
+    validations: { required: true }
+  - type: textarea
+    id: better
+    attributes:
+      label: Suggested improvement
+    validations: { required: true }
+  - type: dropdown
+    id: contribute
+    attributes:
+      label: Would you like to work on this?
+      options: ["Yes, I can open a pull request", "No, just reporting it"]

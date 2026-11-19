@@ -1,0 +1,30 @@
+name: Feature request
+description: Propose a new capability for Meridian.
+labels: [enhancement, triage]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What job-search task is hard or impossible today? Who runs into it?
+    validations: { required: true }
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: What should Meridian do? Mention the screen or workflow it belongs to.
+    validations: { required: true }
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+  - type: checkboxes
+    id: principles
+    attributes:
+      label: Project principles
+      description: Meridian is local-first and keeps a human in control. Proposals must respect that.
+      options:
+        - label: It keeps candidate data on the Mac unless the user explicitly configures a provider.
+          required: true
+        - label: It does not bypass CAPTCHAs, logins, rate limits or a site's terms, and does not submit applications without approval.
+          required: true

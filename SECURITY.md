@@ -1,4 +1,35 @@
-# Security and privacy
+# Security policy
+
+## Reporting a vulnerability
+
+Please **do not open a public issue** for a security problem. Report it privately through
+[GitHub private vulnerability reporting](https://github.com/Ale-Newport/Job-search/security/advisories/new)
+("Report a vulnerability" on the Security tab). Include the affected version or commit, a minimal reproduction and its impact.
+Never include live credentials, real CVs or real application data; use synthetic values.
+
+You can expect an acknowledgement within 7 days and an assessment, with a fix or mitigation plan, within 30 days. Once a fix
+is released, the advisory is published with credit to the reporter unless you prefer to stay anonymous.
+
+## Supported versions
+
+| Version | Supported |
+|---|---|
+| 0.1.x (latest release and `main`) | Yes |
+| Older commits | No: update to the latest release |
+
+## Repository protections
+
+- Every branch is covered by a ruleset: changes from anyone other than the maintainer go through a pull request that the code
+  owner ([CODEOWNERS](.github/CODEOWNERS)) must approve; approvals are dismissed when new commits are pushed; force pushes and
+  branch deletion are blocked. Release tags (`v*`) can only be created by the maintainer.
+- GitHub secret scanning with push protection, Dependabot alerts and security updates, CodeQL and a full-history gitleaks
+  scan ([.gitleaks.toml](.gitleaks.toml)) run on every push. Workflows run with a read-only token, Actions are pinned to commit
+  SHAs, and workflows from forks need the maintainer's approval before they run.
+
+If a credential is ever committed by mistake: revoke it at the provider first, then remove it from the code. Rewriting
+published history does not un-leak a secret.
+
+# Security and privacy model
 
 Meridian is a single-user local application. It binds its API only to loopback and requires a random per-launch bearer token delivered through a scoped Tauri command. Web origins and Host headers are restricted. The desktop CSP permits only local assets and its loopback API. There is no telemetry.
 
@@ -16,7 +47,7 @@ Structured logs omit request bodies and access logs. Credential-like content is 
 
 Development mode intentionally uses a fixed local test token. It must be explicitly enabled with `MERIDIAN_DEV=1`; production never silently enables it. CI/browser tests use temporary profiles and synthetic recruitment fixtures, never production accounts or job applications.
 
-Report vulnerabilities privately to the repository owner with a minimal reproduction and no live credentials. If a secret was exposed, revoke it at the provider and remove it from Keychain. Deleting the application's data folder removes personal records and browser sessions; remove Keychain entries separately under service `com.meridian.jobagent`.
+Report vulnerabilities as described in [Reporting a vulnerability](#reporting-a-vulnerability). If a secret was exposed, revoke it at the provider and remove it from Keychain. Deleting the application's data folder removes personal records and browser sessions; remove Keychain entries separately under service `com.meridian.jobagent`.
 
 The packaged PyInstaller sidecar extracts its Python shared libraries at launch. Ad-hoc local signing needs `com.apple.security.cs.disable-library-validation` for these libraries to load; hardened runtime remains enabled. The same entitlement is applied by Tauri to the signed bundle. Distribution builds should review this requirement with a consistent Developer ID signature across the interpreter and native dependencies.
 

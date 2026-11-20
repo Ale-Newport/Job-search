@@ -63,3 +63,17 @@ coverage/
 
 # Raw demo recordings (scripts/record_demo.py --keep); only the GIF and PNGs are committed.
 docs/media/*.webm
+
+# Kept local, never published: promotion drafts, AI coding-agent settings, and internal planning/evidence files that were
+# untracked from the public repository (their local copies stay on disk).
+LAUNCH*.md
+launch/
+docs/launch/
+.claude/
+CLAUDE.md
+CLAUDE.local.md
+.cursor/
+.aider*
+.codex/
+docs/IMPLEMENTATION_PLAN.md
+docs/upgrade-real-forms-first-pass.json
